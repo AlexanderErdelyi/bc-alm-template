@@ -1,0 +1,20 @@
+{
+  "_readme": "MCP server configuration for BC ALM workflow. Configure the azure-devops server with your organization and project details. The github server uses your existing GitHub authentication. See https://docs.github.com/en/copilot/customizing-copilot/using-model-context-protocol for MCP setup instructions.",
+  "servers": {
+    "azure-devops": {
+      "type": "http",
+      "url": "https://api.github.com/mcp",
+      "note": "Replace with your Azure DevOps MCP server URL. Community MCP server for ADO: https://github.com/microsoft/azure-devops-mcp",
+      "env": {
+        "AZURE_DEVOPS_ORG": "your-organization",
+        "AZURE_DEVOPS_PROJECT": "your-project",
+        "AZURE_PERSONAL_ACCESS_TOKEN": "${env:AZURE_DEVOPS_PAT}"
+      }
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.github.com/mcp",
+      "note": "GitHub MCP server — uses your existing GitHub Copilot authentication. No additional configuration needed."
+    }
+  }
+}
