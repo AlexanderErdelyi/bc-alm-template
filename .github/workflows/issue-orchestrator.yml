@@ -176,60 +176,70 @@ jobs:
                 } catch (_) {}
               }
 
-              // Only transition to planning if the issue is not already in a later stage
+              // Block only when the issue has already progressed past planning.
+              // stage:planning itself is NOT a blocker — if the issue is stuck
+              // there (e.g. the label was added by a previous run that lacked the
+              // inline plan step), we still need to run planning now.
               const inLaterStage =
-                currentLabels.includes('stage:planning') ||
                 currentLabels.includes('stage:awaiting-approval') ||
                 currentLabels.includes('stage:approved');
 
+              const alreadyAtPlanning = currentLabels.includes('stage:planning');
+
               if (!inLaterStage) {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  labels: ['stage:planning'],
-                });
+                if (!alreadyAtPlanning) {
+                  // First time reaching planning — add the label and notify.
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: ['stage:planning'],
+                  });
 
-                const hasAcceptanceCriteria = /accept(ance criteria|ed when)|given.*when.*then/i.test(body);
-                const hasStepsOrContext = /step|reproduce|context|background|problem|goal|why|what/i.test(body);
-                const suggestions = [];
-                if (!hasAcceptanceCriteria) {
-                  suggestions.push('- Consider adding acceptance criteria (GIVEN / WHEN / THEN) to help scope the implementation.');
-                }
-                if (!hasStepsOrContext) {
-                  suggestions.push('- Consider adding context or steps to reproduce to support planning.');
-                }
-                const suggestionBlock = suggestions.length
-                  ? '\n**Optional improvements:**\n' + suggestions.join('\n') + '\n'
-                  : '';
+                  const hasAcceptanceCriteria = /accept(ance criteria|ed when)|given.*when.*then/i.test(body);
+                  const hasStepsOrContext = /step|reproduce|context|background|problem|goal|why|what/i.test(body);
+                  const suggestions = [];
+                  if (!hasAcceptanceCriteria) {
+                    suggestions.push('- Consider adding acceptance criteria (GIVEN / WHEN / THEN) to help scope the implementation.');
+                  }
+                  if (!hasStepsOrContext) {
+                    suggestions.push('- Consider adding context or steps to reproduce to support planning.');
+                  }
+                  const suggestionBlock = suggestions.length
+                    ? '\n**Optional improvements:**\n' + suggestions.join('\n') + '\n'
+                    : '';
 
-                const heading = isRetrigger
-                  ? '## Intake & Triage (Re-evaluation) — Passed ✅'
-                  : '## Intake & Triage — Passed';
-                const intro = isRetrigger
-                  ? 'The issue has been re-evaluated and now meets quality standards.'
-                  : 'This issue has been triaged and looks ready for planning.';
-                const commentLines = [
-                  heading,
-                  '',
-                  intro,
-                  suggestionBlock,
-                  'The **planning stage** will start automatically now.',
-                  '',
-                  '---',
-                  '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake → planning***',
-                ];
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  body: commentLines.join('\n'),
-                });
+                  const heading = isRetrigger
+                    ? '## Intake & Triage (Re-evaluation) — Passed ✅'
+                    : '## Intake & Triage — Passed';
+                  const intro = isRetrigger
+                    ? 'The issue has been re-evaluated and now meets quality standards.'
+                    : 'This issue has been triaged and looks ready for planning.';
+                  const commentLines = [
+                    heading,
+                    '',
+                    intro,
+                    suggestionBlock,
+                    'The **planning stage** will start automatically now.',
+                    '',
+                    '---',
+                    '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake → planning***',
+                  ];
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: commentLines.join('\n'),
+                  });
+                }
 
                 // Signal to the next step that planning should run inline.
                 // GitHub Actions does not trigger workflows from events fired by
                 // GITHUB_TOKEN (anti-recursion guard), so we cannot rely on the
                 // stage:planning labeled event to start issue-planning.yml.
+                // This also handles issues that were previously stuck at
+                // stage:planning because an older workflow version lacked the
+                // inline plan step.
                 core.setOutput('planning_needed', 'true');
               }
             }
