@@ -2,7 +2,7 @@ name: Issue Orchestrator — Intake & Triage
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited, unlabeled, reopened]
 
 permissions:
   issues: write
@@ -10,6 +10,16 @@ permissions:
 jobs:
   intake:
     name: Intake & Triage
+    # Always run for opened/edited/reopened.
+    # For unlabeled, only run when a stage label or needs-info was removed
+    # (ignore unrelated label removals to avoid noisy runs).
+    if: |
+      github.event.action == 'opened' ||
+      github.event.action == 'reopened' ||
+      github.event.action == 'edited' ||
+      (github.event.action == 'unlabeled' &&
+       (github.event.label.name == 'needs-info' ||
+        startsWith(github.event.label.name, 'stage:')))
     runs-on: ubuntu-latest
     steps:
       - name: Ensure labels exist
@@ -51,6 +61,7 @@ jobs:
             const issue = context.payload.issue;
             const body = (issue.body || '').trim();
             const title = (issue.title || '').trim();
+            const action = context.payload.action;
             const problems = [];
 
             if (title.length < 10) {
@@ -60,79 +71,144 @@ jobs:
               problems.push('**Description is missing or too short** — please describe the issue in at least a sentence or two.');
             }
 
-            const hasAcceptanceCriteria = /accept(ance criteria|ed when)|given.*when.*then/i.test(body);
-            const hasStepsOrContext = /step|reproduce|context|background|problem|goal|why|what/i.test(body);
+            // Labels present on the issue at event time
+            const currentLabels = issue.labels.map(l => l.name);
 
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: ['stage:intake'],
-            });
+            // Do not reset issues that have already reached implementation
+            if (currentLabels.includes('stage:implementation')) {
+              core.info('Issue is in stage:implementation — skipping re-triage.');
+              return;
+            }
+
+            const isRetrigger = action !== 'opened';
+
+            // Ensure stage:intake is always present
+            if (!currentLabels.includes('stage:intake')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['stage:intake'],
+              });
+            }
 
             if (problems.length > 0) {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                labels: ['needs-info'],
-              });
+              // Remove stage:planning if it was set (quality gate blocks progression)
+              if (currentLabels.includes('stage:planning')) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: 'stage:planning',
+                  });
+                } catch (_) {}
+              }
 
-              const bullets = problems.map(p => `- ${p}`).join('\n');
-              const commentLines = [
-                '## Intake & Triage — Action Required',
-                '',
-                'Thank you for opening this issue!',
-                '',
-                'The automated triage check found the following quality gaps before planning can begin:',
-                '',
-                bullets,
-                '',
-                'Please update the issue with the missing information.',
-                'Once addressed, a maintainer can remove the `needs-info` label and add `stage:planning` to re-trigger the pipeline.',
-                '',
-                '---',
-                '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake***',
-              ];
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: commentLines.join('\n'),
-              });
+              // Add needs-info if not already present
+              const needsInfoAlreadySet = currentLabels.includes('needs-info');
+              if (!needsInfoAlreadySet) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['needs-info'],
+                });
+              }
+
+              // Post a comment only when first failing (opened) or when the state
+              // transitions back to needs-info (re-trigger without prior needs-info label).
+              // Avoids repeated identical comments on every edit while still incomplete.
+              if (!isRetrigger || !needsInfoAlreadySet) {
+                const bullets = problems.map(p => `- ${p}`).join('\n');
+                const heading = isRetrigger
+                  ? '## Intake & Triage (Re-evaluation) — Action Required'
+                  : '## Intake & Triage — Action Required';
+                const intro = isRetrigger
+                  ? 'The issue was re-evaluated and still has quality gaps before planning can begin:'
+                  : 'Thank you for opening this issue!\n\nThe automated triage check found the following quality gaps before planning can begin:';
+                const commentLines = [
+                  heading,
+                  '',
+                  intro,
+                  '',
+                  bullets,
+                  '',
+                  'Please update the issue with the missing information.',
+                  'Once you have updated the title or description, triage will re-run automatically.',
+                  'Alternatively, remove the `needs-info` label after fixing the issue to trigger a re-check.',
+                  '',
+                  '---',
+                  '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake***',
+                ];
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: commentLines.join('\n'),
+                });
+              }
             } else {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                labels: ['stage:planning'],
-              });
-
-              const suggestions = [];
-              if (!hasAcceptanceCriteria) {
-                suggestions.push('- Consider adding acceptance criteria (GIVEN / WHEN / THEN) to help scope the implementation.');
+              // Quality OK — remove needs-info if present
+              if (currentLabels.includes('needs-info')) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: 'needs-info',
+                  });
+                } catch (_) {}
               }
-              if (!hasStepsOrContext) {
-                suggestions.push('- Consider adding context or steps to reproduce to support planning.');
-              }
-              const suggestionBlock = suggestions.length
-                ? '\n**Optional improvements:**\n' + suggestions.join('\n') + '\n'
-                : '';
 
-              const commentLines = [
-                '## Intake & Triage — Passed',
-                '',
-                'This issue has been triaged and looks ready for planning.',
-                suggestionBlock,
-                'The **planning stage** will start automatically now.',
-                '',
-                '---',
-                '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake → planning***',
-              ];
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: commentLines.join('\n'),
-              });
+              // Only transition to planning if the issue is not already in a later stage
+              const inLaterStage =
+                currentLabels.includes('stage:planning') ||
+                currentLabels.includes('stage:awaiting-approval') ||
+                currentLabels.includes('stage:approved');
+
+              if (!inLaterStage) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['stage:planning'],
+                });
+
+                const hasAcceptanceCriteria = /accept(ance criteria|ed when)|given.*when.*then/i.test(body);
+                const hasStepsOrContext = /step|reproduce|context|background|problem|goal|why|what/i.test(body);
+                const suggestions = [];
+                if (!hasAcceptanceCriteria) {
+                  suggestions.push('- Consider adding acceptance criteria (GIVEN / WHEN / THEN) to help scope the implementation.');
+                }
+                if (!hasStepsOrContext) {
+                  suggestions.push('- Consider adding context or steps to reproduce to support planning.');
+                }
+                const suggestionBlock = suggestions.length
+                  ? '\n**Optional improvements:**\n' + suggestions.join('\n') + '\n'
+                  : '';
+
+                const heading = isRetrigger
+                  ? '## Intake & Triage (Re-evaluation) — Passed ✅'
+                  : '## Intake & Triage — Passed';
+                const intro = isRetrigger
+                  ? 'The issue has been re-evaluated and now meets quality standards.'
+                  : 'This issue has been triaged and looks ready for planning.';
+                const commentLines = [
+                  heading,
+                  '',
+                  intro,
+                  suggestionBlock,
+                  'The **planning stage** will start automatically now.',
+                  '',
+                  '---',
+                  '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake → planning***',
+                ];
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: commentLines.join('\n'),
+                });
+              }
             }

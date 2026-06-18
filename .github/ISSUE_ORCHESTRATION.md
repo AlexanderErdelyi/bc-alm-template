@@ -9,18 +9,18 @@ This document describes the automated issue-to-implementation pipeline in this r
 When a GitHub Issue is opened, three GitHub Actions workflows collaborate to guide it from raw idea through triage, planning, manual approval, and into an implementation-ready pull request.
 
 ```
-Issue opened
+Issue opened / edited / label removed / reopened
      │
      ▼
 ┌─────────────────┐
 │  Intake/Triage  │  ← issue-orchestrator.yml
-│  stage:intake   │
+│  stage:intake   │     triggers: opened, edited, unlabeled, reopened
 └────────┬────────┘
          │  quality OK?
     ┌────┴────┐
     │ YES     │ NO → adds needs-info label + comment
-    ▼         │      (human updates issue, maintainer removes needs-info
-┌─────────────────┐   and manually adds stage:planning to re-trigger)
+    ▼         │      (author edits title/body OR removes needs-info
+┌─────────────────┐   → triage re-runs automatically)
 │    Planning     │  ← issue-planning.yml
 │ stage:planning  │
 └────────┬────────┘
@@ -64,7 +64,7 @@ All labels are created automatically on first workflow run — no manual setup r
 
 | File | Trigger | Purpose |
 |---|---|---|
-| `.github/workflows/issue-orchestrator.yml` | `issues: opened` | Intake, quality check, label transitions |
+| `.github/workflows/issue-orchestrator.yml` | `issues: opened, edited, unlabeled, reopened` | Intake, quality check, label transitions |
 | `.github/workflows/issue-planning.yml` | `issues: labeled` (`stage:planning`) | Generate draft plan comment |
 | `.github/workflows/issue-implementation.yml` | `issues: labeled` (`stage:approved`) | Create branch, spec folder, draft PR |
 
@@ -93,11 +93,20 @@ This immediately triggers the implementation workflow.
 
 If triage fails quality checks, the issue receives the `needs-info` label and a comment explaining what is missing.
 
-**To re-trigger planning after the author updates the issue:**
+**Triage re-runs automatically when:**
 
-1. Verify the issue body now meets quality standards (title ≥ 10 chars, body ≥ 50 chars).
-2. Remove the `needs-info` label.
-3. Manually add the `stage:planning` label to start the planning workflow.
+- The issue title or body is **edited** — no manual action needed.
+- The **`needs-info`** label is removed — triage fires immediately on label removal.
+- A `stage:` label is removed — triage re-evaluates and reapplies the correct stage.
+- The issue is **reopened**.
+
+**What happens on re-evaluation:**
+
+- If the issue now meets quality standards: `needs-info` is removed, `stage:planning` is applied, and a ✅ comment is posted.
+- If the issue still has gaps: `needs-info` remains (or is re-applied if missing) and a brief re-check comment is posted only if the failure state changed.
+- Issues already at `stage:implementation` are never reset by a re-trigger.
+
+> **No manual `stage:planning` label is required** — simply update the issue or remove `needs-info` and the pipeline continues automatically.
 
 ---
 
