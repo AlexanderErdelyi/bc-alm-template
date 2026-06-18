@@ -1,0 +1,111 @@
+name: Issue Orchestrator — Planning
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  planning:
+    name: Generate Plan
+    if: github.event.label.name == 'stage:planning'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate and publish plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = (issue.body || '').trim();
+            const title = (issue.title || '').trim();
+            const url = issue.html_url;
+            const now = new Date().toISOString().split('T')[0];
+
+            const truncatedBody = body.length > 800
+              ? body.slice(0, 800) + '\n... (truncated — see issue for full text)'
+              : body;
+
+            const planLines = [
+              '## Planning — Draft Plan',
+              '',
+              `> **Issue:** [#${issue.number} ${title}](${url})`,
+              `> **Generated:** ${now}`,
+              '',
+              '---',
+              '',
+              '### 1. Summary',
+              '',
+              '> _(A maintainer or Copilot agent should refine this section before approving.)_',
+              '',
+              '---',
+              '',
+              '### 2. Scope',
+              '',
+              '| In Scope | Out of Scope |',
+              '|---|---|',
+              '| _(to be filled)_ | _(to be filled)_ |',
+              '',
+              '---',
+              '',
+              '### 3. Proposed Implementation Approach',
+              '',
+              '- [ ] Identify affected AL objects / areas',
+              '- [ ] Create or update spec documents under `specs/<ticket-id>-<short-name>/`',
+              '  - `brief.md`',
+              '  - `plan.md`',
+              '  - `acceptance-criteria.md`',
+              '- [ ] Open a feature branch: `feature/<ticket-id>-<short-name>`',
+              '- [ ] Implement AL changes per [coding standards](.github/instructions/al-coding-standards.instructions.md)',
+              '- [ ] Write GIVEN/WHEN/THEN test codeunit',
+              '- [ ] Bump `app.json` version (minor for feature, build for fix)',
+              '',
+              '---',
+              '',
+              '### 4. Issue Description (reference)',
+              '',
+              '```',
+              truncatedBody,
+              '```',
+              '',
+              '---',
+              '',
+              '### 5. Risk & Notes',
+              '',
+              '- _No risks identified at this stage — update before approving._',
+              '',
+              '---',
+              '',
+              '### How to approve',
+              '',
+              'A maintainer must review this plan and apply the `stage:approved` label to the issue to authorise implementation.',
+              '',
+              '> **Do not apply `stage:approved` until the plan above has been reviewed and refined.**',
+              '',
+              '---',
+              `*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **planning***`,
+            ];
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: planLines.join('\n'),
+            });
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                name: 'stage:planning',
+              });
+            } catch (_) {}
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['stage:awaiting-approval'],
+            });
