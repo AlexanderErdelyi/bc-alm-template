@@ -1,0 +1,257 @@
+name: Issue Orchestrator — Implementation
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  implementation:
+    name: Start Implementation
+    if: github.event.label.name == 'stage:approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create feature branch
+        id: branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueNum = issue.number;
+            const slug = issue.title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+              .slice(0, 40);
+            const branch = `feature/${issueNum}-${slug}`;
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issueNum, name: 'stage:approved',
+              });
+            } catch (_) {}
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issueNum, name: 'stage:awaiting-approval',
+              });
+            } catch (_) {}
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: issueNum, labels: ['stage:implementation'],
+            });
+
+            const { data: ref } = await github.rest.git.getRef({
+              owner: context.repo.owner, repo: context.repo.repo,
+              ref: `heads/${context.payload.repository.default_branch}`,
+            });
+            const sha = ref.object.sha;
+
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner, repo: context.repo.repo,
+                ref: `refs/heads/${branch}`,
+                sha,
+              });
+            } catch (err) {
+              if (err.status !== 422) throw err;
+            }
+
+            core.setOutput('branch', branch);
+            core.setOutput('issue_number', String(issueNum));
+            core.setOutput('slug', slug);
+
+      - name: Create spec folder stub
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.branch.outputs.branch }}';
+            const issueNum = '${{ steps.branch.outputs.issue_number }}';
+            const slug = '${{ steps.branch.outputs.slug }}';
+            const issue = context.payload.issue;
+            const today = new Date().toISOString().split('T')[0];
+            const specFolder = `specs/${issueNum}-${slug}`;
+            const issueBody = (issue.body || '').trim().slice(0, 600);
+
+            const briefLines = [
+              `# Brief — #${issueNum} ${issue.title}`,
+              '',
+              '## Background',
+              '',
+              '> _(Summarise the business context and motivation for this change.)_',
+              '',
+              '## Problem Statement',
+              '',
+              issueBody || '> _(Copied from issue — please expand.)_',
+              '',
+              '## Proposed Solution',
+              '',
+              '> _(Describe the intended solution at a high level.)_',
+              '',
+              '## Scope',
+              '',
+              '- **In scope:**',
+              '- **Out of scope:**',
+              '',
+              '## References',
+              '',
+              `- Issue: ${issue.html_url}`,
+              '- ADO Ticket: <!-- AB#ID -->',
+            ];
+
+            const planLines = [
+              `# Plan — #${issueNum} ${issue.title}`,
+              '',
+              '## AL Objects',
+              '',
+              '| Object Type | Object ID | Object Name | Action |',
+              '|---|---|---|---|',
+              '| | | | |',
+              '',
+              '## Test Codeunit',
+              '',
+              '```al',
+              `codeunit XXXXX "${issue.title.slice(0, 40)} Test"`,
+              '{',
+              '    // GIVEN / WHEN / THEN stubs go here',
+              '}',
+              '```',
+              '',
+              '## Checklist',
+              '',
+              '- [ ] Brief reviewed',
+              '- [ ] Acceptance criteria defined',
+              '- [ ] Objects identified',
+              '- [ ] `app.json` version bump planned',
+              '- [ ] Test codeunit stubbed',
+            ];
+
+            const acLines = [
+              `# Acceptance Criteria — #${issueNum} ${issue.title}`,
+              '',
+              '## Scenarios',
+              '',
+              '### Scenario 1',
+              '',
+              '**GIVEN** ...',
+              '**WHEN** ...',
+              '**THEN** ...',
+              '',
+              '---',
+              '',
+              '> _Add more scenarios as needed._',
+            ];
+
+            const changelogLines = [
+              `# Change Log — #${issueNum} ${issue.title}`,
+              '',
+              '| Date | Author | Change |',
+              '|---|---|---|',
+              `| ${today} | (agent) | Spec folder created from issue #${issueNum} |`,
+            ];
+
+            const files = [
+              { path: `${specFolder}/brief.md`,               content: briefLines.join('\n')     },
+              { path: `${specFolder}/plan.md`,                content: planLines.join('\n')      },
+              { path: `${specFolder}/acceptance-criteria.md`, content: acLines.join('\n')        },
+              { path: `${specFolder}/change-log.md`,          content: changelogLines.join('\n') },
+            ];
+
+            for (const file of files) {
+              const encoded = Buffer.from(file.content).toString('base64');
+              try {
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  path: file.path,
+                  message: `chore: add spec stub for #${issueNum} [${file.path.split('/').pop()}]`,
+                  content: encoded,
+                  branch,
+                });
+              } catch (err) {
+                core.warning(`Could not create ${file.path}: ${err.message}`);
+              }
+            }
+
+      - name: Open draft PR and notify issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.branch.outputs.branch }}';
+            const issueNum = Number('${{ steps.branch.outputs.issue_number }}');
+            const slug = '${{ steps.branch.outputs.slug }}';
+            const issue = context.payload.issue;
+            const specFolder = `specs/${issueNum}-${slug}`;
+
+            const prBodyLines = [
+              '## Summary',
+              '',
+              `Automated spec scaffold for issue #${issueNum}: **${issue.title}**`,
+              '',
+              'This draft PR was created automatically by the Issue Orchestrator after a maintainer approved the plan.',
+              '',
+              '## Linked Issue',
+              '',
+              `Resolves #${issueNum}`,
+              '',
+              '## What Is Included',
+              '',
+              `- \`${specFolder}/brief.md\` — Background and problem statement`,
+              `- \`${specFolder}/plan.md\` — Implementation plan stub`,
+              `- \`${specFolder}/acceptance-criteria.md\` — Acceptance criteria stub`,
+              `- \`${specFolder}/change-log.md\` — Change log`,
+              '',
+              '## Next Steps',
+              '',
+              '1. A developer (or the **bc-dev** Copilot agent) should flesh out the spec documents.',
+              '2. Implement AL objects following the [coding standards](.github/instructions/al-coding-standards.instructions.md).',
+              '3. Run the **bc-pr** agent before requesting review.',
+            ];
+
+            let pr;
+            try {
+              const { data } = await github.rest.pulls.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: `feat: #${issueNum} ${issue.title}`,
+                head: branch,
+                base: context.payload.repository.default_branch,
+                body: prBodyLines.join('\n'),
+                draft: true,
+              });
+              pr = data;
+            } catch (err) {
+              core.warning(`Could not create PR: ${err.message}`);
+              return;
+            }
+
+            const commentLines = [
+              '## Implementation Started',
+              '',
+              'The plan has been approved and the implementation stage is now underway.',
+              '',
+              '| Item | Detail |',
+              '|---|---|',
+              `| Feature branch | \`${branch}\` |`,
+              `| Draft PR | ${pr.html_url} |`,
+              `| Spec folder | \`${specFolder}/\` |`,
+              '',
+              '**Next steps for the developer:**',
+              `1. Check out \`${branch}\``,
+              '2. Open the spec documents and complete them with the **bc-dev** agent',
+              '3. Implement AL objects and tests',
+              '4. Mark the PR ready for review when done',
+              '',
+              '---',
+              `*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **implementation***`,
+            ];
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: issueNum,
+              body: commentLines.join('\n'),
+            });

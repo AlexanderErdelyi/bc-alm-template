@@ -1,0 +1,138 @@
+name: Issue Orchestrator — Intake & Triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  intake:
+    name: Intake & Triage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'stage:intake',           color: '0075ca', description: 'Issue is being triaged' },
+              { name: 'stage:planning',          color: 'e4e669', description: 'Issue is ready for planning' },
+              { name: 'stage:awaiting-approval', color: 'f9d0c4', description: 'Plan is ready — awaiting manual approval' },
+              { name: 'stage:approved',          color: '0e8a16', description: 'Plan approved — ready for implementation' },
+              { name: 'stage:implementation',    color: '6f42c1', description: 'Implementation in progress' },
+              { name: 'needs-info',              color: 'd93f0b', description: 'More information required from the author' },
+            ];
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ...label,
+                });
+              } catch (err) {
+                if (err.status === 422) {
+                  await github.rest.issues.updateLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ...label,
+                  });
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+      - name: Triage issue quality
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = (issue.body || '').trim();
+            const title = (issue.title || '').trim();
+            const problems = [];
+
+            if (title.length < 10) {
+              problems.push('**Title is too short** — please provide a descriptive title (at least 10 characters).');
+            }
+            if (body.length < 50) {
+              problems.push('**Description is missing or too short** — please describe the issue in at least a sentence or two.');
+            }
+
+            const hasAcceptanceCriteria = /accept(ance criteria|ed when)|given.*when.*then/i.test(body);
+            const hasStepsOrContext = /step|reproduce|context|background|problem|goal|why|what/i.test(body);
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['stage:intake'],
+            });
+
+            if (problems.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['needs-info'],
+              });
+
+              const bullets = problems.map(p => `- ${p}`).join('\n');
+              const commentLines = [
+                '## Intake & Triage — Action Required',
+                '',
+                'Thank you for opening this issue!',
+                '',
+                'The automated triage check found the following quality gaps before planning can begin:',
+                '',
+                bullets,
+                '',
+                'Please update the issue with the missing information.',
+                'Once addressed, a maintainer can remove the `needs-info` label and add `stage:planning` to re-trigger the pipeline.',
+                '',
+                '---',
+                '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake***',
+              ];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: commentLines.join('\n'),
+              });
+            } else {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['stage:planning'],
+              });
+
+              const suggestions = [];
+              if (!hasAcceptanceCriteria) {
+                suggestions.push('- Consider adding acceptance criteria (GIVEN / WHEN / THEN) to help scope the implementation.');
+              }
+              if (!hasStepsOrContext) {
+                suggestions.push('- Consider adding context or steps to reproduce to support planning.');
+              }
+              const suggestionBlock = suggestions.length
+                ? '\n**Optional improvements:**\n' + suggestions.join('\n') + '\n'
+                : '';
+
+              const commentLines = [
+                '## Intake & Triage — Passed',
+                '',
+                'This issue has been triaged and looks ready for planning.',
+                suggestionBlock,
+                'The **planning stage** will start automatically now.',
+                '',
+                '---',
+                '*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **intake → planning***',
+              ];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: commentLines.join('\n'),
+              });
+            }
