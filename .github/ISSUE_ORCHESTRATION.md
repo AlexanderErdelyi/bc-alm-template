@@ -64,8 +64,8 @@ All labels are created automatically on first workflow run — no manual setup r
 
 | File | Trigger | Purpose |
 |---|---|---|
-| `.github/workflows/issue-orchestrator.yml` | `issues: opened, edited, unlabeled, reopened` | Intake, quality check, label transitions |
-| `.github/workflows/issue-planning.yml` | `issues: labeled` (`stage:planning`) | Generate draft plan comment |
+| `.github/workflows/issue-orchestrator.yml` | `issues: opened, edited, unlabeled, reopened` | Intake, quality check, label transitions, and inline plan generation |
+| `.github/workflows/issue-planning.yml` | `issues: labeled` (`stage:planning`) | Generate draft plan comment (for manually-added labels only) |
 | `.github/workflows/issue-implementation.yml` | `issues: labeled` (`stage:approved`) | Create branch, spec folder, draft PR |
 
 ---
