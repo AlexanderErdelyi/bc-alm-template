@@ -21,6 +21,12 @@ jobs:
        (github.event.label.name == 'needs-info' ||
         startsWith(github.event.label.name, 'stage:')))
     runs-on: ubuntu-latest
+    # Queue concurrent runs for the same issue rather than letting them race.
+    # This prevents duplicate comments and label-flip races when title and
+    # description are saved in quick succession (two 'edited' events).
+    concurrency:
+      group: issue-orchestrator-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
       - name: Ensure labels exist
         uses: actions/github-script@v7
@@ -55,6 +61,7 @@ jobs:
             }
 
       - name: Triage issue quality
+        id: triage
         uses: actions/github-script@v7
         with:
           script: |
@@ -71,8 +78,16 @@ jobs:
               problems.push('**Description is missing or too short** — please describe the issue in at least a sentence or two.');
             }
 
-            // Labels present on the issue at event time
-            const currentLabels = issue.labels.map(l => l.name);
+            // Fetch live labels from the API rather than using the stale event
+            // payload. Without this, concurrent runs (e.g. title + description
+            // edited in quick succession) both see an empty label list and each
+            // try to add stage:planning, causing duplicate comments and races.
+            const { data: liveIssue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+            });
+            const currentLabels = liveIssue.labels.map(l => l.name);
 
             // Do not reset issues that have already reached implementation
             if (currentLabels.includes('stage:implementation')) {
@@ -210,5 +225,113 @@ jobs:
                   issue_number: issue.number,
                   body: commentLines.join('\n'),
                 });
+
+                // Signal to the next step that planning should run inline.
+                // GitHub Actions does not trigger workflows from events fired by
+                // GITHUB_TOKEN (anti-recursion guard), so we cannot rely on the
+                // stage:planning labeled event to start issue-planning.yml.
+                core.setOutput('planning_needed', 'true');
               }
             }
+
+      - name: Generate and publish plan
+        # Runs inline because GitHub Actions does not fire workflow triggers for
+        # events (like 'labeled') that are created by GITHUB_TOKEN. The
+        # issue-planning.yml workflow still handles the case where a maintainer
+        # manually adds the stage:planning label.
+        if: steps.triage.outputs.planning_needed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = (issue.body || '').trim();
+            const title = (issue.title || '').trim();
+            const url = issue.html_url;
+            const now = new Date().toISOString().split('T')[0];
+
+            const truncatedBody = body.length > 800
+              ? body.slice(0, 800) + '\n... (truncated — see issue for full text)'
+              : body;
+
+            const planLines = [
+              '## Planning — Draft Plan',
+              '',
+              `> **Issue:** [#${issue.number} ${title}](${url})`,
+              `> **Generated:** ${now}`,
+              '',
+              '---',
+              '',
+              '### 1. Summary',
+              '',
+              '> _(A maintainer or Copilot agent should refine this section before approving.)_',
+              '',
+              '---',
+              '',
+              '### 2. Scope',
+              '',
+              '| In Scope | Out of Scope |',
+              '|---|---|',
+              '| _(to be filled)_ | _(to be filled)_ |',
+              '',
+              '---',
+              '',
+              '### 3. Proposed Implementation Approach',
+              '',
+              '- [ ] Identify affected AL objects / areas',
+              '- [ ] Create or update spec documents under `specs/<ticket-id>-<short-name>/`',
+              '  - `brief.md`',
+              '  - `plan.md`',
+              '  - `acceptance-criteria.md`',
+              '- [ ] Open a feature branch: `feature/<ticket-id>-<short-name>`',
+              '- [ ] Implement AL changes per [coding standards](.github/instructions/al-coding-standards.instructions.md)',
+              '- [ ] Write GIVEN/WHEN/THEN test codeunit',
+              '- [ ] Bump `app.json` version (minor for feature, build for fix)',
+              '',
+              '---',
+              '',
+              '### 4. Issue Description (reference)',
+              '',
+              '```',
+              truncatedBody,
+              '```',
+              '',
+              '---',
+              '',
+              '### 5. Risk & Notes',
+              '',
+              '- _No risks identified at this stage — update before approving._',
+              '',
+              '---',
+              '',
+              '### How to approve',
+              '',
+              'A maintainer must review this plan and apply the `stage:approved` label to the issue to authorise implementation.',
+              '',
+              '> **Do not apply `stage:approved` until the plan above has been reviewed and refined.**',
+              '',
+              '---',
+              `*Automated by the [Issue Orchestrator](.github/ISSUE_ORCHESTRATION.md) — stage: **planning***`,
+            ];
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: planLines.join('\n'),
+            });
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                name: 'stage:planning',
+              });
+            } catch (_) {}
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['stage:awaiting-approval'],
+            });
