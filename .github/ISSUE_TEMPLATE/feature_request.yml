@@ -1,0 +1,60 @@
+name: ✨ Feature / Change Request
+description: Request a new Business Central feature or a change to existing behaviour.
+title: "[Feature] <short, descriptive summary>"
+labels: ["stage:intake"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for raising a request. A clear title and description help the automated
+        [Issue Orchestrator](../blob/main/.github/ISSUE_ORCHESTRATION.md) triage this
+        without sending it back for more info.
+  - type: input
+    id: ado
+    attributes:
+      label: ADO ticket (optional)
+      description: Linked Azure DevOps work item, e.g. ABC-123.
+      placeholder: ABC-123
+    validations:
+      required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / business need
+      description: What does the customer or user need, and why? Plain business language.
+      placeholder: As a credit controller, I need ... so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe what the solution should do. Mention affected areas if known.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria (GIVEN / WHEN / THEN)
+      description: How will we know this is done? Add one or more testable criteria.
+      value: |
+        - GIVEN ...
+          WHEN ...
+          THEN ...
+    validations:
+      required: true
+  - type: input
+    id: priority
+    attributes:
+      label: Priority
+      description: P1 Critical / P2 Standard / P3 Backlog
+      placeholder: P2 Standard
+    validations:
+      required: false
+  - type: textarea
+    id: outofscope
+    attributes:
+      label: Out of scope (optional)
+      description: Anything explicitly NOT covered by this request.
+    validations:
+      required: false

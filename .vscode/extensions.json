@@ -1,0 +1,22 @@
+{
+  // Recommended VS Code extensions for Business Central AL development.
+  // VS Code prompts (does not force) each developer to install these when the
+  // workspace is opened, so the whole team shares one consistent toolchain.
+  // Verify IDs at https://marketplace.visualstudio.com before adding more.
+  "recommendations": [
+    // --- Core AL toolset ---
+    "ms-dynamics-smb.al",                     // AL Language (official) — compile, debug, IntelliSense
+    "andrzejzwierzchowski.al-code-outline",   // AZ AL Dev Tools / Code Outline — navigation, object wizards
+    "waldo.crs-al-language-extension",        // CRS AL Language Extension — file renaming, snippets, utilities
+    "vjeko.vjeko-al-objid",                   // AL Object ID Ninja — zero-collision object IDs (Copilot/MCP-native)
+    "nabsolutions.nab-al-tools",              // NAB AL Tools — XLIFF/translation, permission sets, docs
+    "jamespearson.al-test-runner",            // AL Test Runner — run/debug tests, code coverage
+
+    // --- General developer productivity ---
+    "ms-azuretools.vscode-docker",            // Docker — local BC containers for build/test
+    "eamodio.gitlens",                        // GitLens — richer Git history and blame
+    "humao.rest-client",                      // REST Client — exercise BC APIs / webhooks
+    "github.copilot",                         // GitHub Copilot — powers the agents/skills in this template
+    "github.copilot-chat"                     // GitHub Copilot Chat — custom agents + skills
+  ]
+}

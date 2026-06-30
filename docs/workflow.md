@@ -7,8 +7,8 @@ This document describes all stages of the Business Central ALM workflow, from re
 ## Overview
 
 ```
-Stage 1:  ADO Ticket Received
-Stage 2:  Spec Drafting (BC PM Agent)
+Stage 1:  ADO Ticket Received (BC PM Agent — intake/triage)
+Stage 2:  Spec Drafting (BC Plan + BC Spec Agents)
 Stage 3:  Spec Review & Approval
 Stage 4:  Feature Branch Created
 Stage 5:  AL Implementation (BC Developer Agent)
@@ -28,25 +28,25 @@ Stage 12: PROD Deployment (BC Deploy Agent)
 **Owner:** Project Manager / Functional Consultant  
 **Input:** Customer request, bug report, or change request in Azure DevOps  
 **Output:** ADO work item with title, description, and priority  
-**Agent:** None at this stage
+**Agent:** [BC PM](.github/agents/bc-pm.agent.md) — intake, triage, prioritization
 
 The process starts with a ticket in Azure DevOps. The ticket should include:
 - What the customer wants or what the bug is
 - Which BC environment or module is affected
 - Business priority (P1 critical / P2 standard / P3 backlog)
 
-If the ADO MCP server is configured in `.vscode/mcp.json`, the PM agent can read tickets directly.
+If the ADO MCP server is configured in `.vscode/mcp.json`, the **BC PM agent** can read tickets directly to triage and groom the backlog.
 
 ---
 
 ## Stage 2 — Spec Drafting
 
-**Owner:** Developer / Functional Consultant with BC PM Agent  
-**Input:** ADO ticket ID  
+**Owner:** Developer / Functional Consultant with BC Plan + BC Spec Agents  
+**Input:** Triaged ADO ticket ID  
 **Output:** `specs/ABC-{ID}/` folder with 4 documents  
-**Agent:** [BC PM](.github/agents/bc-pm.agent.md)
+**Agent:** [BC Plan](.github/agents/bc-plan.agent.md) (user story + acceptance criteria), then [BC Spec](.github/agents/bc-spec.agent.md) (technical spec)
 
-Use the **BC PM agent** and provide the ticket ID (e.g. `ABC-123`). The agent will:
+Start with the **BC Plan agent** to shape the user story and acceptance criteria, then switch to the **BC Spec agent** with the ticket ID (e.g. `ABC-123`). Together they will:
 
 1. Read the ADO ticket (via MCP) or ask you to paste the ticket content
 2. Create `specs/ABC-{ID}-short-description/` folder
@@ -83,7 +83,7 @@ The spec is the contract between PM, developer, and customer. Changes to scope a
 **Owner:** Developer  
 **Input:** Merged spec  
 **Output:** `feature/ABC-{ID}-short-description` branch  
-**Agent:** [BC Workflow](.github/agents/bc-workflow.agent.md) or [BC Developer](.github/agents/bc-dev.agent.md)
+**Agent:** [BC Orchestrator](.github/agents/bc-orchestrator.agent.md) or [BC Developer](.github/agents/bc-dev.agent.md)
 
 Branch naming convention:
 
@@ -260,10 +260,10 @@ Final deployment to PROD via BC Admin Center API. After successful deployment:
 
 | Stage | Name | Owner | Agent |
 |---|---|---|---|
-| 1 | ADO Ticket Received | PM | — |
-| 2 | Spec Drafting | PM + Dev | BC PM |
+| 1 | ADO Ticket Received | PM | BC PM |
+| 2 | Spec Drafting | PM + Dev | BC Plan + BC Spec |
 | 3 | Spec Review | Senior Dev | — (human) |
-| 4 | Feature Branch | Dev | BC Workflow |
+| 4 | Feature Branch | Dev | BC Orchestrator |
 | 5 | AL Implementation | Dev | BC Developer |
 | 6 | Pull Request | Dev | BC PR |
 | 7 | Code Review | Senior Dev | — (human) |

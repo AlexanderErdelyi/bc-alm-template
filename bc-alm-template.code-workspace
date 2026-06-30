@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "name": "App",
+      "path": "app"
+    },
+    {
+      "name": "Test",
+      "path": "test"
+    }
+  ],
+  "settings": {
+    "al.packageCachePath": ".alpackages",
+    "al.enableCodeAnalysis": true,
+    "al.codeAnalyzers": [
+      "${CodeCop}",
+      "${UICop}",
+      "${PerTenantExtensionCop}"
+    ],
+    "editor.formatOnSave": true,
+    "files.eol": "\r\n"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-dynamics-smb.al"
+    ]
+  }
+}

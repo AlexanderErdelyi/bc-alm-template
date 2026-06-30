@@ -43,11 +43,12 @@ When you open your code PR, reference the spec folder:
 
 | Agent | What it reads |
 |---|---|
-| BC PM | Creates all 4 files |
+| BC Plan | Drafts `brief.md`, `acceptance-criteria.md` (user story) |
+| BC Spec | Creates/completes all 4 files |
 | BC Developer | `plan.md`, `acceptance-criteria.md` |
 | BC PR | `brief.md`, `plan.md` |
 | BC Doc | All 4 files |
-| BC Workflow | Checks folder exists |
+| BC Orchestrator | Checks folder exists |
 
 ---
 

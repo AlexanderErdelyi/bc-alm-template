@@ -132,13 +132,15 @@ This pipeline is designed to work alongside the existing Copilot agents in this 
 
 | Stage | Relevant Agent |
 |---|---|
-| Planning review / refinement | `bc-pm` — reads brief, produces spec documents |
+| Intake / triage | `bc-pm` — triages and grooms the work item |
+| Planning | `bc-plan` — produces user story + acceptance criteria |
+| Spec | `bc-spec` — authors the spec documents |
 | Implementation | `bc-dev` — reads spec, implements AL objects |
 | PR preparation | `bc-pr` — generates PR description, runs quality checklist |
 | Documentation | `bc-doc` — generates customer-facing docs from spec |
-| Orchestration | `bc-workflow` — routes to the right agent at each stage |
+| Orchestration | `bc-orchestrator` — routes to the right agent at each stage |
 
-Once the implementation branch is created, hand off to `bc-workflow` with the issue/ticket ID.
+Once the implementation branch is created, hand off to `bc-orchestrator` with the issue/ticket ID.
 
 ---
 

@@ -132,7 +132,7 @@ Every spec starts at `v1.0`. Changes requested during testing increment the vers
 ## Spec Lifecycle
 
 ```
-1. BC PM agent creates spec files in specs/ABC-{ID}/
+1. BC Spec agent creates spec files in specs/ABC-{ID}/ (after BC Plan shapes the user story)
          │
          ▼
 2. Spec PR opened (separate from code PR)
@@ -173,12 +173,14 @@ Each agent knows where to find spec documents by convention:
 
 | Agent | What it reads | Why |
 |---|---|---|
-| **BC PM** | ADO ticket | Creates all 4 spec documents |
+| **BC PM** | ADO ticket / backlog | Triages, prioritizes, and grooms work items |
+| **BC Plan** | Triaged ticket | Shapes the user story + acceptance criteria |
+| **BC Spec** | User story + ticket | Authors all 4 spec documents |
 | **BC Developer** | `plan.md` + `acceptance-criteria.md` | Understands what to build and what done looks like |
 | **BC PR** | `brief.md` + `plan.md` | Generates PR description and checks implementation against spec |
 | **BC Deploy** | `change-log.md` + `plan.md` | Verifies spec is approved before including in release |
 | **BC Doc** | All 4 documents + git diff | Generates customer documentation and changelog |
-| **BC Workflow** | Checks if `specs/ABC-{ID}/` exists | Determines current workflow stage |
+| **BC Orchestrator** | Checks if `specs/ABC-{ID}/` exists | Determines current workflow stage |
 
 Agents reference the spec folder by ticket ID. When you tell `bc-dev` to "work on ABC-123", it automatically looks for `specs/ABC-123-*/` using glob matching.
 
@@ -209,7 +211,7 @@ Skipping approval gates is allowed only for P1 hotfixes, and only the code PR ga
 
 3. Open a spec PR before starting development
 
-4. Use the **BC PM agent** to help fill in the spec from an ADO ticket:
+4. Use the **BC Spec agent** to help fill in the spec from an ADO ticket:
    > "Create a spec for ABC-123" — the agent will draft all 4 documents
 
 5. Reference the spec folder in your feature PR:

@@ -1,0 +1,15 @@
+{
+    "al.enableCodeAnalysis": true,
+    "al.codeAnalyzers": [
+        "${CodeCop}",
+        "${UICop}",
+        "${PerTenantExtensionCop}"
+    ],
+    "al.packageCachePath": ".alpackages",
+    "al.assemblyProbingPaths": [
+        ".netpackages"
+    ],
+    "al.enableCodeActions": true,
+    "editor.formatOnSave": true,
+    "files.eol": "\r\n"
+}
