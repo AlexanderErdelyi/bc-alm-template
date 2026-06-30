@@ -10,14 +10,19 @@
     `internalsVisibleTo` / `propagateDependencies`, and the per-project symbol caches are
     supplied via --packagecachepath.
 
-    An LSP *host* (the agent runtime or editor) normally spawns this command itself and talks
-    to it over stdio. Run this script directly only to smoke-test the server or to wire its
-    exact invocation into a host that lets you specify a custom language-server command.
+    An LSP *host* (the agent runtime or editor) normally spawns the AL server itself and talks
+    to it over stdio. IMPORTANT: a host must invoke `al launchlspserver` **directly** — do NOT
+    place this PowerShell wrapper in the host's stdio path, because an intermediate shell
+    applies text-mode/encoding translation that corrupts the binary JSON-RPC framing. Run this
+    script directly only to smoke-test the server interactively, or to print the exact `al`
+    invocation (emitted to stderr) to copy into your host's language-server configuration.
 
     Requires the AL Development Tools package (provides the `al` command) AND a build new
-    enough to expose `launchlspserver` (BC 2026 release wave 1+). Install / update with:
-        dotnet tool install  --global Microsoft.Dynamics.BusinessCentral.Development.Tools
-        dotnet tool update   --global Microsoft.Dynamics.BusinessCentral.Development.Tools
+    enough to expose `launchlspserver`. The verb currently ships only in PRERELEASE/beta
+    builds (verified working on 18.0.37-beta; the latest *stable* channel is 17.x and does
+    NOT have it), so install / update with --prerelease:
+        dotnet tool install  --global Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease
+        dotnet tool update   --global Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease
 
     A reachable package cache (.app symbols) is required for full language intelligence. Use
     VS Code's "AL: Download Symbols" or fetch from the public feed first
@@ -59,10 +64,13 @@ if (-not $al) {
 $alPath = if ($al -is [System.Management.Automation.CommandInfo]) { $al.Source } else { [string]$al }
 
 # --- verify launchlspserver is available in this ALTool build ---
-$help = & $alPath --help 2>&1
+# Out-String collapses the multi-line help to a single string so -match returns a scalar
+# boolean (on an array, -notmatch returns non-matching elements and is always truthy here).
+$help = (& $alPath --help 2>&1 | Out-String)
 if ($help -notmatch 'launchlspserver') {
-    Write-Warning "This ALTool build does not expose 'launchlspserver' (it is BC 2026 wave 1+)."
-    Write-Warning "Update it with: dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools"
+    Write-Warning "This ALTool build does not expose 'launchlspserver'."
+    Write-Warning "It currently ships only in PRERELEASE builds (verified on 18.0.37-beta; stable 17.x lacks it)."
+    Write-Warning "Update it with: dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease"
     throw "launchlspserver not supported by the installed 'al' tool."
 }
 
@@ -85,6 +93,8 @@ $alArgs = @('launchlspserver', $appProj, $testProj, '--loglevel', $LogLevel)
 if (Test-Path $wsPath) { $alArgs += @('--workspacefile', $wsPath) }
 if ($caches) { $alArgs += @('--packagecachepath', ($caches -join ';')) }
 
-Write-Host "Launching AL LSP server (stdio JSON-RPC). Press Ctrl+C to stop." -ForegroundColor Cyan
-Write-Host ("  {0} {1}" -f $alPath, ($alArgs -join ' ')) -ForegroundColor DarkGray
+# Banners go to STDERR so stdout stays a pure JSON-RPC stream if this is ever piped.
+[Console]::Error.WriteLine("Launching AL LSP server (stdio JSON-RPC). Press Ctrl+C to stop.")
+[Console]::Error.WriteLine("Host config should invoke this command DIRECTLY (not via this script):")
+[Console]::Error.WriteLine(("  {0} {1}" -f $alPath, ($alArgs -join ' ')))
 & $alPath @alArgs
