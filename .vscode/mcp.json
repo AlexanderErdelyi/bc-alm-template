@@ -1,20 +1,27 @@
 {
-  "_readme": "MCP server configuration for BC ALM workflow. Configure the azure-devops server with your organization and project details. The github server uses your existing GitHub authentication. See https://docs.github.com/en/copilot/customizing-copilot/using-model-context-protocol for MCP setup instructions.",
+  "_readme": "MCP server configuration for the BC ALM workflow. The azure-devops server is Microsoft's official Azure DevOps MCP server (https://github.com/microsoft/azure-devops-mcp), run locally via npx over stdio. You will be prompted for your ADO organization name on first use, and it authenticates with your signed-in Azure CLI session (run 'az login' first). The github server is GitHub's hosted remote MCP server and uses your existing GitHub authentication. The 'al' server is Microsoft's AL MCP Server (al_build, al_compile, al_publish, al_downloadsymbols, al_symbolsearch, al_getdiagnostics, ...) for headless/agent-driven AL work - see docs/al-agent-tools.md. It requires the AL Dev Tools: 'dotnet tool install --global Microsoft.Dynamics.BusinessCentral.Development.Tools'. It is commented-out below by default; uncomment it once the 'al' tool is on your PATH. See https://docs.github.com/en/copilot/customizing-copilot/using-model-context-protocol for setup instructions.",
+  "inputs": [
+    {
+      "id": "ado_org",
+      "type": "promptString",
+      "description": "Azure DevOps organization name (e.g. contoso, not the full URL)"
+    }
+  ],
   "servers": {
     "azure-devops": {
-      "type": "http",
-      "url": "https://api.github.com/mcp",
-      "note": "Replace with your Azure DevOps MCP server URL. Community MCP server for ADO: https://github.com/microsoft/azure-devops-mcp",
-      "env": {
-        "AZURE_DEVOPS_ORG": "your-organization",
-        "AZURE_DEVOPS_PROJECT": "your-project",
-        "AZURE_PERSONAL_ACCESS_TOKEN": "${env:AZURE_DEVOPS_PAT}"
-      }
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${input:ado_org}"]
     },
     "github": {
       "type": "http",
-      "url": "https://api.github.com/mcp",
-      "note": "GitHub MCP server — uses your existing GitHub Copilot authentication. No additional configuration needed."
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "_al": {
+      "_comment": "Microsoft AL MCP Server. Remove the leading underscore from the key (rename '_al' -> 'al') to enable, after installing the AL Dev Tools. See docs/al-agent-tools.md.",
+      "type": "stdio",
+      "command": "al",
+      "args": ["launchmcpserver", "--transport", "stdio"]
     }
   }
 }
