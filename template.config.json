@@ -1,0 +1,62 @@
+{
+  "_readme": "Single source of truth for the project-specific values baked into this template. 'values' holds the CURRENT values (template defaults until you initialize). Run scripts/Initialize-Template.ps1 (or the 'bc-init' Copilot agent) to replace them across the repo and rewrite this file with your choices. 'tokens' documents what each value means and where it appears.",
+  "initialized": false,
+  "values": {
+    "appPrefix": "ABC",
+    "ticketPrefix": "ABC",
+    "appName": "ABC Payment Tolerance",
+    "publisher": "ABC",
+    "objectIdFrom": 50100,
+    "objectIdTo": 50199,
+    "repoSlug": "AlexanderErdelyi/bc-alm-template",
+    "adoOrg": "your-organization",
+    "adoProject": "",
+    "workItemSystem": "ADO",
+    "defaultBranch": "main",
+    "branchingStrategy": "feature-release-selective",
+    "commitConvention": "conventional",
+    "environments": ["TEST", "PROD"],
+    "bcVersion": {
+      "application": "28.0.0.0",
+      "platform": "28.0.0.0",
+      "runtime": "16.0"
+    },
+    "bcQuality": {
+      "enabled": false,
+      "mode": "vendor",
+      "path": "vendor/bcquality"
+    }
+  },
+  "models": {
+    "_readme": "Model assigned to each agent's frontmatter 'model:' field. Each value MUST match a name in your Copilot model picker exactly (e.g. 'Claude Sonnet 4.6', 'Claude Opus 4.8', 'GPT-5.5'). Some environments need a ' (copilot)' suffix — add it if VS Code flags the model as unknown. Run scripts/Initialize-Template.ps1 or the 'bc-init' agent to write these into .github/agents/*.agent.md.",
+    "bc-orchestrator": "Claude Sonnet 4.6",
+    "bc-pm": "Claude Sonnet 4.6",
+    "bc-plan": "Claude Sonnet 4.6",
+    "bc-spec": "Claude Opus 4.8",
+    "bc-dev": "Claude Sonnet 4.6",
+    "bc-pr": "Claude Opus 4.8",
+    "bc-deploy": "Claude Sonnet 4.6",
+    "bc-doc": "Claude Sonnet 4.6",
+    "bc-workflow": "Claude Sonnet 4.6",
+    "bc-init": "Claude Sonnet 4.6"
+  },
+  "tokens": {
+    "appPrefix": "BC partner/app object-name prefix. Appears in AL object names ('ABC Payment ...'), identifiers, file names, app.json publisher-style prefix, instructions and docs.",
+    "ticketPrefix": "Work-item / spec key used in 'PREFIX-123' references and 'specs/PREFIX-{ID}-*' folders. Often equal to appPrefix but can differ (e.g. ADO project key).",
+    "appName": "Display name of the sample AL extension (app.json 'name').",
+    "publisher": "app.json 'publisher' — your company / partner name.",
+    "objectIdFrom": "Lower bound of your assigned AL object ID range. The initializer shifts every sample object ID by (new from - old from).",
+    "objectIdTo": "Upper bound of your assigned AL object ID range.",
+    "repoSlug": "GitHub 'owner/repo' slug. Appears in app.json url, issue-template config, docs.",
+    "adoOrg": "Azure DevOps organization name (used by .vscode/mcp.json and docs).",
+    "adoProject": "Azure DevOps project name (optional).",
+    "workItemSystem": "'ADO' or 'GitHub'. When 'GitHub', the initializer converts ADO 'AB#123' commit-linking syntax to GitHub '#123'.",
+    "defaultBranch": "Production branch name (default 'main').",
+    "branchingStrategy": "Identifier for the branching model documented in docs/branching-strategy.md. Default 'feature-release-selective'.",
+    "commitConvention": "Commit message convention. Default 'conventional' (Conventional Commits).",
+    "environments": "Ordered list of BC environment names referenced by the deploy workflow (default TEST -> PROD).",
+    "bcVersion": "Target Business Central version for the sample AL app. 'application'/'platform' are app.json minimums (e.g. '28.0.0.0' for 2026 wave 1) and 'runtime' is the AL runtime (e.g. '16.0'). The initializer writes these into app/app.json and test/app.json. Symbols are pulled from the public MSSymbolsV2 feed (see docs/al-agent-tools.md). Bump these when you move to a newer BC release.",
+    "bcQuality": "Optional Microsoft BCQuality knowledge base (https://github.com/microsoft/BCQuality) used to back AL review. 'enabled' on/off; 'mode' is 'vendor' (tracked copy in this repo) or 'submodule'; 'path' is the checkout folder. Run scripts/Add-BCQuality.ps1 to fetch it. See docs/bcquality.md."
+  },
+  "modelsToken": "The 'models' object maps each agent file name (without .agent.md) to the model written into its 'model:' frontmatter line. Edit values here, then re-run the initializer to apply them across .github/agents/."
+}
