@@ -310,9 +310,24 @@ is pre-wired for it. Full guide: **[docs/al-agent-tools.md](docs/al-agent-tools.
 | **AL LSP Server** ([`launchlspserver`](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-al-tool#al-lsp)) | Semantic go-to-definition, find-references (cross-project), rename, type hierarchy — follows `internalsVisibleTo` / `propagateDependencies` instead of regex | Spawned by your agent/editor as a child process; repo-specific launch command + config in [docs](docs/al-agent-tools.md#2b-enable-the-al-lsp-server-for-agents) |
 | **ALTool CLI** ([`al` / ALTool](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-al-tool)) | `al workspace compile`, `al compile`, headless symbol fetch + build | `dotnet tool install --global Microsoft.Dynamics.BusinessCentral.Development.Tools`; works against the shipped `bc-alm-template.code-workspace` |
 
-> The AL **LSP** server (`launchlspserver`) is newer than the MCP server — it requires BC 2026
-> wave 1+ ALTool. If `al launchlspserver --help` is unknown, run
-> `dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools`.
+> **Enabling the AL LSP server (verified).** `launchlspserver` is newer than the MCP server and
+> currently ships **only in prerelease ALTool builds** — confirmed working on **`18.0.37-beta`**
+> (the latest *stable* channel is `17.x`, which does not have it). Install/update with the
+> `--prerelease` flag, then confirm the verb is listed:
+>
+> ```powershell
+> dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease
+> al --help        # 'launchlspserver' should appear in the command list
+> pwsh ./scripts/Start-ALLanguageServer.ps1   # interactive smoke-test (Ctrl+C to stop)
+> ```
+>
+> Smoke-tested against this repo's `app/` + `test/`: both projects load as one cross-project
+> component and the server registers 24 LSP endpoints (definition, references, rename, type
+> hierarchy, `workspace/symbol`, hover, completion, …). **Note:** an LSP *host* must spawn
+> `al launchlspserver` **directly** — don't route the JSON-RPC stream through a shell wrapper,
+> which corrupts the binary framing. The wrapper script prints the exact direct command (to
+> stderr) to copy into your host config. See
+> [docs/al-agent-tools.md](docs/al-agent-tools.md#2b-enable-the-al-lsp-server-for-agents).
 
 ---
 
