@@ -11,6 +11,10 @@
 *.g.xlf
 rad.json
 
+# AL editor cache (VS Code AL extension)
+.alcache/
+**/.vscode/.alcache/
+
 # Local AL cache
 .al/
 
