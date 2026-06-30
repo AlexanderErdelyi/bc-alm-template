@@ -1,0 +1,60 @@
+name: 🐞 Bug Report
+description: Report incorrect behaviour in a Business Central extension.
+title: "[Bug] <short, descriptive summary>"
+labels: ["stage:intake"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide enough detail to reproduce. A clear title and description help the
+        automated [Issue Orchestrator](../blob/main/.github/ISSUE_ORCHESTRATION.md) triage
+        this without sending it back for more info.
+  - type: input
+    id: ado
+    attributes:
+      label: ADO ticket (optional)
+      placeholder: ABC-123
+    validations:
+      required: false
+  - type: textarea
+    id: summary
+    attributes:
+      label: What's wrong?
+      description: Describe the incorrect behaviour and the impact.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What did you expect to happen, and what happened instead?
+      value: |
+        **Expected:**
+        **Actual:**
+    validations:
+      required: true
+  - type: input
+    id: bcversion
+    attributes:
+      label: BC version / environment
+      description: e.g. BC 25 (2025 Wave 1), Sandbox.
+      placeholder: BC 25 — Sandbox
+    validations:
+      required: false
+  - type: input
+    id: appversion
+    attributes:
+      label: Extension version (app.json)
+      placeholder: 1.2.3.0
+    validations:
+      required: false

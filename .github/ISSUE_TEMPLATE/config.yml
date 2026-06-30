@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Workflow & process questions
+    url: https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/docs/workflow.md
+    about: Read the full BC development lifecycle before opening an issue.
+  - name: 🤖 Issue automation guide
+    url: https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/.github/ISSUE_ORCHESTRATION.md
+    about: How the automated intake → planning → implementation pipeline works.
