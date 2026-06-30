@@ -128,9 +128,13 @@ al launchmcpserver --transport stdio        # MCP server
 al launchlspserver                          # LSP server (JSON-RPC on stdio)
 ```
 
-> **Version note:** `launchmcpserver` ships in current ALTool builds. `launchlspserver` is
-> newer (BC 2026 wave 1+ tooling). If `al launchlspserver --help` reports an unknown command,
-> update the tool: `dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools`.
+> **Version note (important):** `launchmcpserver` ships in current ALTool builds.
+> `launchlspserver` is newer and currently ships **only in prerelease/beta** ALTool builds —
+> **verified working on `18.0.37-beta`**; the latest *stable* channel is `17.x`, which does
+> **not** have it. If `al launchlspserver --help` reports an unknown command, update with the
+> `--prerelease` flag:
+> `dotnet tool update --global Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease`
+> Confirm with `al --help` (the `launchlspserver` verb should be listed).
 
 ---
 
@@ -146,7 +150,9 @@ string, and follows AL-specific relationships such as `internalsVisibleTo` and
 
 Unlike the MCP server, the LSP server is **spawned by an LSP host** (an agent runtime or
 editor) as a child process — there's no `mcp.json`-style registry for it. Wire ALTool into
-your host's language-server/plugin configuration so it invokes, from the repo root:
+your host's language-server/plugin configuration so it invokes, from the repo root, the `al`
+executable **directly** (do *not* route it through a shell wrapper — an intermediate process
+applies text-mode/encoding translation that corrupts the binary JSON-RPC framing):
 
 ```powershell
 # Pass both projects so cross-project find-references works; point it at the symbol caches.
@@ -165,13 +171,22 @@ symbols) is **required** for full language intelligence — run **AL: Download S
 Code or fetch them from the feed (see section 1) first.
 
 For convenience this template ships
-[`scripts/Start-ALLanguageServer.ps1`](../scripts/Start-ALLanguageServer.ps1), which runs the
-command above with both projects + symbol caches resolved for you (and warns if your ALTool
-build predates `launchlspserver`):
+[`scripts/Start-ALLanguageServer.ps1`](../scripts/Start-ALLanguageServer.ps1) as an
+**interactive smoke-test**: it resolves both projects + symbol caches, runs the command above,
+prints the exact direct `al` invocation to **stderr** (copy that into your host config), and
+warns — with the `--prerelease` update hint — if your ALTool build predates `launchlspserver`.
+Use it to confirm the server starts; don't put it in a host's stdio path (see the warning
+above).
 
 ```powershell
 pwsh ./scripts/Start-ALLanguageServer.ps1
 ```
+
+> **Verified:** on ALTool `18.0.37-beta` this server starts and completes a full LSP
+> `initialize` handshake against `app/` + `test/`, advertising `definitionProvider`,
+> `referencesProvider`, `renameProvider`, `typeHierarchyProvider`, `workspaceSymbolProvider`,
+> `hoverProvider`, `completionProvider`, `implementationProvider`, `signatureHelpProvider`,
+> `inlayHintProvider`, and `codeActionProvider`.
 
 ---
 
