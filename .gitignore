@@ -1,0 +1,32 @@
+# --- Business Central / AL ---
+# Compiled app packages
+*.app
+
+# Downloaded symbol packages
+.alpackages/
+.altestrunner/
+
+# AL language server / build artifacts
+.snapshots/
+*.g.xlf
+rad.json
+
+# Local AL cache
+.al/
+
+# --- Editor / OS ---
+.vs/
+*.user
+.DS_Store
+Thumbs.db
+
+# --- Secrets / local config ---
+# Never commit credentials, PATs, or environment secrets
+*.env
+.env
+.env.local
+launchsettings.local.json
+
+# --- Node (only if you add tooling) ---
+node_modules/
+npm-debug.log*
