@@ -23,6 +23,7 @@ you want to understand *why* it is structured the way it is before adapting it.
 |---|---|---|
 | **Instructions** | [`instructions/`](instructions) | Always-on coding standards (`applyTo` globs). |
 | **Skills** | [`skills/`](skills) | Reusable, trigger-fired procedures (the "how"). |
+| **Prompts** | [`prompts/`](prompts) | Explicitly-invoked, parameterized tasks (`/onboard-app`, `/onboarding-plan`). |
 | **Agents** | [`agents/`](agents) | Personas with a tool profile + `handoffs:` (the "who"). |
 | **Orchestrator** | [`agents/bc-orchestrator.agent.md`](agents/bc-orchestrator.agent.md) | Stage detection + routing. |
 | **Templates** | `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md` | Quality gates at intake and PR. |
