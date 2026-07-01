@@ -8,6 +8,9 @@
 #   * updateModels        - when false, your agent 'model:' choices are re-applied
 #   * updateExtensions    - when false, your .vscode/extensions.json is kept
 #   * updateInstructions  - when false, your .github/instructions is kept
+#   * include             - per-category switches (metaDocs, referenceDocs, issueOps,
+#                           specs, prTemplate); a category set to false is never
+#                           copied or re-added
 #
 # Everything NOT listed here (and not excluded by a sync toggle) is "template-managed"
 # and will be refreshed from the template (agents, skills, instructions, scripts,

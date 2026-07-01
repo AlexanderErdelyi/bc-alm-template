@@ -198,46 +198,59 @@ your own copy. Don't clone directly — the template structure is what you're co
 ### 1b. Or: add the template to an existing repo
 
 Already have a BC repo? Overlay the template instead of starting fresh — **no clone required**.
-From the root of your existing repo, run the bootstrap one-liner (it downloads the template,
-runs the overlay installer against the current folder, and cleans up after itself):
+It's a **two-step flow**: first choose *where* the Copilot customizations live and *which* content
+categories you want, then execute the copy. Run both from the root of your existing repo:
 
 ```powershell
-# Preview first (writes nothing):
 $b = irm https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/bootstrap.ps1
+# 1. Configure — answer a few prompts; writes template.config.json, copies nothing:
+& ([scriptblock]::Create($b)) -Configure -Interactive
+# 2. Execute — copies core + the categories you enabled (-WhatIf to preview first):
 & ([scriptblock]::Create($b)) -WhatIf
-# Then run it for real (drop -WhatIf); add -IncludeSampleApp to also copy the demo app/ + test/:
 & ([scriptblock]::Create($b))
 ```
 
-Prefer to see the files first? Clone the template and run the overlay installer directly:
+Prefer flags over prompts (or a one-shot with the lean defaults)? Everything is a switch:
 
 ```powershell
-pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-existing-repo -WhatIf
-# review the plan, then run it for real (drop -WhatIf)
+# One-shot, customizations under app/, also pull the docs/ library:
+& ([scriptblock]::Create($b)) -CustomizationsPath app -IncludeReferenceDocs
 ```
 
-The installer copies the agents, skills, instructions, meta-docs, `docs/`, the initializer, and
-`template.config.json` into your repo. It **never clobbers your existing files**:
+Prefer to see the files first? Clone the template and run the overlay installer directly — same
+`-Configure` / execute split:
 
-- **New paths** (agents, skills, instructions, …) are added; anything you already have is skipped
-  (use `-Force` to overwrite).
-- **Merge-sensitive files** (`.github/copilot-instructions.md`, `PULL_REQUEST_TEMPLATE.md`,
-  `.vscode/*`, `.gitignore`) are written next to yours with a `.template` suffix so you can diff
-  and merge by hand.
-- The **sample AL app** (the `app/` and `test/` projects) is **not** copied unless you pass
-  `-IncludeSampleApp` — your own AL code is left untouched.
+```powershell
+pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-repo -Configure -Interactive
+pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-repo -WhatIf   # then drop -WhatIf
+```
+
+**You pick what gets copied.** Only the *core* — agents, skills, instructions,
+`copilot-instructions.md`, `template.config.json`, and the sync workflow + scripts — is always
+installed. Everything else is an opt-in/opt-out **content category**, and your choice is saved to
+`template.config.json` (`sync.include`) so later syncs honor it and never re-add what you excluded:
+
+| Category | Flag | Default (existing repo) |
+| --- | --- | --- |
+| Agent meta-docs (`AGENT-ARCHITECTURE` / `WHEN-TO-USE` / `SKILLS.md`) | `-IncludeMetaDocs` | off |
+| Reference docs (`docs/`: bcquality, branching, workflow, …) | `-IncludeReferenceDocs` | off |
+| Issue-ops pipeline (`issue-*.yml` + `ISSUE_TEMPLATE` + `ISSUE_ORCHESTRATION.md`) | `-IncludeIssueOps` | off |
+| Spec scaffold (`specs/_TEMPLATE`) | `-NoSpecs` to drop | on |
+| PR template (`PULL_REQUEST_TEMPLATE.md`) | `-NoPrTemplate` to drop | on |
+| Sample AL app (`app/` + `test/` + workspace) | `-IncludeSampleApp` | off |
+
+It **never clobbers your existing files**: new paths are added (anything you already have is skipped
+— `-Force` overwrites); merge-sensitive files (`.github/copilot-instructions.md`,
+`PULL_REQUEST_TEMPLATE.md`, `.vscode/*`, `.gitignore`) are written next to yours with a `.template`
+suffix so you can diff and merge by hand.
 
 **Keep the customizations in your app folder instead of the repo root?** Pass
 `-CustomizationsPath app` (or any subfolder). The agents, skills, instructions, and
-`copilot-instructions.md` are placed under `app/.github/` — handy when you open a subfolder
-directly in VS Code — while the GitHub platform files (workflows, issue/PR templates, meta-docs)
-always stay at the repo root, because GitHub Actions and Copilot on github.com only read the
-root `.github/`. The installer records your choice in `template.config.json` (`sync.customizationsPath`)
-so later syncs keep writing to the same place:
-
-```powershell
-pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-repo -CustomizationsPath app -WhatIf
-```
+`copilot-instructions.md` are placed under `app/.github/` — handy when you open a subfolder directly
+in VS Code — while the GitHub platform files (workflows, issue/PR templates, meta-docs) always stay
+at the repo root, because GitHub Actions and Copilot on github.com only read the root `.github/`.
+The choice is recorded in `template.config.json` (`sync.customizationsPath`) so later syncs keep
+writing to the same place.
 
 Then continue with step 2 (run the initializer) inside your repo. The overlay also drops in
 [`.templatesyncignore`](.templatesyncignore) and `scripts/Update-FromTemplate.ps1` so you can
@@ -339,7 +352,15 @@ your local customizations even as you pull template improvements:
   "customizationsPath": ".",   // where your agents/skills/instructions live ("." = root, or e.g. "app")
   "updateModels": false,        // false = re-apply your agent model choices after refreshing the file
   "updateExtensions": false,    // false = keep your .vscode/extensions.json (your toolset)
-  "updateInstructions": true    // false = keep your .github/instructions untouched
+  "updateInstructions": true,   // false = keep your .github/instructions untouched
+  "include": {                  // per-category switches — off = never copied or re-added
+    "metaDocs": true,           // .github/AGENT-ARCHITECTURE.md, WHEN-TO-USE.md, SKILLS.md
+    "referenceDocs": true,      // the docs/ library
+    "issueOps": true,           // issue-*.yml + ISSUE_TEMPLATE + ISSUE_ORCHESTRATION.md
+    "specs": true,              // specs/_TEMPLATE scaffold
+    "prTemplate": true,         // .github/PULL_REQUEST_TEMPLATE.md
+    "sampleApp": false          // demo app/ + test/ (install-time only)
+  }
 }
 ```
 
@@ -349,6 +370,7 @@ your local customizations even as you pull template improvements:
 | `updateModels` | `false` | When `false`, sync refreshes each agent's prompt/handoffs **but re-applies your `model:`** from `template.config.json` afterward, so a template change never resets your model picks. Set `true` to also adopt the template's models. |
 | `updateExtensions` | `false` | When `false`, your [`.vscode/extensions.json`](.vscode/extensions.json) is left alone — change your toolchain freely without sync reverting it. Set `true` to track the template's recommended extensions. |
 | `updateInstructions` | `true` | When `false`, `.github/instructions` (your AL coding standards) is not refreshed. |
+| `include.*` | see above | Per-category on/off switches for optional content (meta-docs, `docs/`, issue-ops pipeline, specs scaffold, PR template, sample app). A category set to `false` is **never copied by the installer and never re-added by sync** — so a repo that opted out of, say, the docs library or the GitHub issue-ops pipeline stays lean. The template ships them all on; `Install-IntoExistingRepo.ps1` writes a leaner profile (meta-docs / docs / issue-ops / sample app off) that you pick during its `-Configure` step. |
 
 The values map (`models` in `template.config.json`) is the single source of truth for `updateModels: false`
 re-application — update a model there once and every sync keeps it.
