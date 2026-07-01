@@ -1,0 +1,38 @@
+name: Template sync
+
+# Pulls new commits from the bc-alm-template repository and opens a pull request
+# with the changes. Project-owned files (your AL code, configured tokens, specs)
+# are protected by .templatesyncignore and are never touched.
+#
+# Runs on a weekly schedule and can also be triggered manually from the Actions tab
+# (Run workflow). Review the PR it opens, resolve any conflicts, then merge.
+
+on:
+  schedule:
+    # 06:00 UTC every Monday
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  template-sync:
+    runs-on: ubuntu-latest
+    # Don't sync the template against itself.
+    if: github.repository != 'AlexanderErdelyi/bc-alm-template'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync from template
+        uses: AndreasAugustin/actions-template-sync@v2
+        with:
+          source_repo_path: AlexanderErdelyi/bc-alm-template
+          upstream_branch: main
+          pr_title: "chore(template): sync updates from bc-alm-template"
+          pr_labels: template-sync
+          pr_commit_msg: "chore(template): sync updates from bc-alm-template"

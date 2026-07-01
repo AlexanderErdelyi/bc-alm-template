@@ -1,0 +1,36 @@
+# .templatesyncignore
+# Paths listed here are NEVER overwritten when syncing updates from the
+# bc-alm-template repository (used by .github/workflows/template-sync.yml and
+# by scripts/Update-FromTemplate.ps1). These are "project-owned" files: your
+# real code and the values written by the one-time initializer.
+#
+# Everything NOT listed here is "template-managed" and will be updated from the
+# template (agents, skills, instructions, scripts, meta-docs, workflows).
+# Syntax is .gitignore-style.
+
+# --- Your AL source (the sample app is only a starting point) ---
+app/
+test/
+
+# --- One-time initializer output / configured values ---
+template.config.json
+PROJECT.md
+.github/copilot-instructions.md
+.vscode/launch.json
+.vscode/mcp.json
+.vscode/settings.json
+*.code-workspace
+
+# --- Your specs (keep the blank template, ignore real specs) ---
+specs/*
+!specs/_TEMPLATE/
+!specs/_TEMPLATE/**
+
+# --- Repo identity / meta you own ---
+README.md
+LICENSE
+.git*
+
+# --- The sync workflow keeps updating itself; that's intentional, so it is
+#     NOT ignored. Remove the leading '#' below if you want to pin your own copy.
+# .github/workflows/template-sync.yml
