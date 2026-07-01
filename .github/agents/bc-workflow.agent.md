@@ -1,7 +1,7 @@
 ---
 description: "BC Workflow Engineer - authors and maintains CI/CD pipelines for Business Central (GitHub Actions and AL-Go for GitHub). Use when: set up CI/CD, create a GitHub Actions workflow, configure AL-Go for GitHub, add a build/test/publish pipeline, fix a failing workflow, add a deployment environment, automate AL compile and test, set up the .AL-Go settings."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'edit/editFiles', 'search/textSearch', 'web/githubRepo', 'web/fetch', 'execute/runInTerminal']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'github/*']
 handoffs:
   - label: "SHIP · Hand the pipeline to deploy"
     agent: "bc-deploy"

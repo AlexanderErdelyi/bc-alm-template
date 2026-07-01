@@ -1,7 +1,7 @@
 ---
 description: "BC Project Manager - handles ticket intake, triage, and backlog management for Business Central work. Use when: triage a ticket, groom the backlog, prioritize work items, label or categorize an issue, check for duplicates, intake a new request, manage ADO or GitHub work items, prepare the backlog for planning."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'edit/editFiles']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "PLAN · Shape the triaged ticket into a story"
     agent: "bc-plan"
