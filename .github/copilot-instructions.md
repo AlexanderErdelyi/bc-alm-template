@@ -16,6 +16,9 @@ Business Central** AL development. It combines:
   (`bc-*/SKILL.md`) that hold the procedure for each lifecycle phase and fire automatically on
   matching requests. Each agent is backed by one. See [`.github/WHEN-TO-USE.md`](WHEN-TO-USE.md)
   and [`.github/AGENT-ARCHITECTURE.md`](AGENT-ARCHITECTURE.md).
+- **Prompt files** (`.github/prompts/`) — explicitly-invoked, parameterized tasks (`/onboarding-plan`,
+  `/onboard-app`, `/generate-copilot-instructions`) for onboarding people and projects and for
+  generating repository instructions. See [`.github/prompts/README.md`](prompts/README.md).
 - **Spec-driven development** (`specs/`) — every ticket gets a spec folder
   (`brief.md`, `plan.md`, `acceptance-criteria.md`, `change-log.md`) before AL is written.
 - **Issue orchestration** (`.github/workflows/`) — automated intake → planning → approval →

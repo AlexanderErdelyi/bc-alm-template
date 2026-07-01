@@ -12,6 +12,7 @@ Combines spec-driven development, GitHub Copilot custom agents for every workflo
 |---|---|
 | **10 Copilot agents** | Roles across the lifecycle — orchestrator, PM (triage), plan, spec, dev, PR, deploy, doc, plus CI/CD and setup utilities — routed via `handoffs:` |
 | **Reusable skills** | [Copilot Agent Skills](.github/skills) — portable, trigger-fired procedures for each lifecycle phase (the "how" behind the agents) |
+| **Prompt files** | Invokable onboarding tasks — [`/onboard-app`, `/generate-copilot-instructions`, `/onboarding-plan`](.github/prompts) — for onboarding projects and people |
 | **Spec-driven development** | Structured spec folder per ticket: brief → plan → acceptance criteria → change log |
 | **Branching strategy** | Documented model: `feature/*` from `main`, `release/*` composed selectively |
 | **AL coding standards** | Always-on Copilot instructions applied to every `.al` file |
@@ -134,6 +135,23 @@ See [`.github/SKILLS.md`](.github/SKILLS.md) for the index and
 > with or override plugin skills — the two stack: `bc-*` drives *what* to do per phase, your
 > `al-*` plugin skills inform *how* the AL should look. Keep trigger phrases distinct to avoid
 > loading redundant context.
+
+---
+
+## The Prompt Files
+
+[Prompt files](https://docs.github.com/en/copilot/concepts/prompting/response-customization#about-prompt-files)
+(`.github/prompts/*.prompt.md`) are **explicitly-invoked, parameterized tasks** — the third
+customization type alongside agents (personas) and skills (auto-firing procedures). Run one in
+VS Code Copilot Chat by typing `/` and the file name; it prompts you for any inputs it declares.
+
+| Prompt | Invoke | Purpose |
+|---|---|---|
+| [`onboard-app`](.github/prompts/onboard-app.prompt.md) | `/onboard-app` | Bring a new/existing AL app under the template: capture the ALM decisions, apply them via the initializer, scaffold instructions + the first spec |
+| [`generate-copilot-instructions`](.github/prompts/generate-copilot-instructions.prompt.md) | `/generate-copilot-instructions` | Analyze the codebase and write/refresh `.github/copilot-instructions.md` + path-scoped `.github/instructions/*.instructions.md` |
+| [`onboarding-plan`](.github/prompts/onboarding-plan.prompt.md) | `/onboarding-plan` | Build a phased, personalized onboarding plan for a new team member |
+
+See [`.github/prompts/README.md`](.github/prompts/README.md) for details and how to add your own.
 
 ---
 
@@ -322,7 +340,7 @@ Open GitHub Copilot Chat in VS Code or GitHub.com and select an agent from the d
 - **Ready to ship?** → `BC PR` → `BC Deploy` → `BC Doc` → `BC Deploy`
 
 > **Agents not showing in the Copilot dropdown?** VS Code discovers `.github/agents`,
-> `skills`, and `instructions` per *workspace-folder root*. Two situations hide them:
+> `skills`, `prompts`, and `instructions` per *workspace-folder root*. Two situations hide them:
 > - **You opened the `*.code-workspace`.** Its roots are the `app/` and `test/` projects, so the
 >   repo-level `.github/` folder sits *above* them. The shipped
 >   `bc-alm-template.code-workspace` already sets
@@ -339,6 +357,21 @@ Open GitHub Copilot Chat in VS Code or GitHub.com and select an agent from the d
 >
 > None of this affects **GitHub Actions / Copilot on github.com**: they always read the repo's
 > committed `.github/` files directly, regardless of any local VS Code setting.
+
+### 6b. Onboard people and new projects (prompt files)
+
+Three [prompt files](.github/prompts/README.md) turn onboarding into one-line commands in VS Code
+Copilot Chat:
+
+- **New app or project?** Run **`/onboard-app`** — it reads the current `app.json`/config, asks you
+  for the prefix, object-ID range, publisher, BC version, work-item system and branching/commit
+  conventions, then applies them with the initializer and scaffolds your instructions and first spec.
+- **Need repository instructions?** Run **`/generate-copilot-instructions`** — it analyzes the code
+  and writes/refreshes `.github/copilot-instructions.md` plus path-scoped
+  [`.github/instructions/*.instructions.md`](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)
+  so Copilot is grounded in *your* conventions.
+- **New team member?** Hand them **`/onboarding-plan`** — a phased, personalized ramp-up plan
+  grounded in this repo.
 
 ### 7. Keep in sync with the template
 
@@ -596,6 +629,11 @@ bc-alm-template/
 │   │   └── bc-init-template/SKILL.md       ← Backs the bc-init setup agent
 │   ├── instructions/
 │   │   └── al-coding-standards.instructions.md
+│   ├── prompts/                            ← Invokable prompt files (/onboard-app, /onboarding-plan…)
+│   │   ├── README.md
+│   │   ├── onboard-app.prompt.md
+│   │   ├── generate-copilot-instructions.prompt.md
+│   │   └── onboarding-plan.prompt.md
 │   ├── ISSUE_TEMPLATE/                     ← Feature + bug issue forms
 │   ├── workflows/                          ← Issue orchestration pipeline + template-sync (auto-PR)
 │   ├── ISSUE_ORCHESTRATION.md
@@ -653,6 +691,11 @@ BC/AL-Go branching model informed by [microsoft/AL-Go](https://github.com/micros
   [`scripts/Add-BCQuality.ps1`](scripts/Add-BCQuality.ps1) — see [docs/bcquality.md](docs/bcquality.md).
 - **AL development toolchain** — [AL Language extension](https://marketplace.visualstudio.com/items?itemName=ms-dynamics-smb.al)
   and the recommended team extensions in [`.vscode/extensions.json`](.vscode/extensions.json).
+- **Copilot customization** — [Prompt files](https://docs.github.com/en/copilot/concepts/prompting/response-customization#about-prompt-files)
+  ([VS Code guide](https://code.visualstudio.com/docs/copilot/customization/prompt-files)) ·
+  [Repository custom instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) ·
+  [Onboarding-plan example](https://docs.github.com/en/copilot/tutorials/customization-library/prompt-files/onboarding-plan) ·
+  [Awesome GitHub Copilot](https://github.com/github/awesome-copilot).
 
 ---
 
