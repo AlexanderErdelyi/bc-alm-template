@@ -81,6 +81,10 @@ if (-not $BranchingStrategy){ $BranchingStrategy= Read-Value 'Branching strategy
 if (-not $CommitConvention) { $CommitConvention = Read-Value 'Commit convention'                   $cur.commitConvention }
 if (-not $Environments)     { $Environments     = (Read-Value 'Environments (comma separated)'     ($cur.environments -join ',')) -split '\s*,\s*' }
 
+# Normalize Environments so a single comma-joined value (e.g. "TEST,PROD" passed by a VS Code
+# task input or CI) is split into individual names just like the interactive prompt does.
+if ($Environments) { $Environments = @($Environments | ForEach-Object { $_ -split '\s*,\s*' } | Where-Object { $_ }) }
+
 if ($ObjectIdTo -lt $ObjectIdFrom) { throw "ObjectIdTo ($ObjectIdTo) must be >= ObjectIdFrom ($ObjectIdFrom)." }
 
 $oldFrom = [int]$cur.objectIdFrom

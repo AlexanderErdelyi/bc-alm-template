@@ -132,6 +132,7 @@ $mergeFiles = @(
     '.vscode/settings.json',
     '.vscode/mcp.json',
     '.vscode/launch.json',
+    '.vscode/tasks.json',
     '.gitignore'
 )
 
@@ -155,6 +156,7 @@ Write-Host "`nNext steps:" -ForegroundColor White
 Write-Host "  1. Resolve any '*.template' files (diff against your existing file, then delete the .template)."
 Write-Host "  2. cd '$TargetRepo'"
 Write-Host "  3. pwsh ./scripts/Initialize-Template.ps1 -Interactive   # replace ABC / range / org tokens"
+Write-Host "     (or, in VS Code: Terminal -> Run Task... -> 'BC: Initialize project (guided)' for a form-style wizard)"
 Write-Host "  4. Review 'git status' / 'git diff', then commit."
 if (-not $IncludeSampleApp) {
     Write-Host "  (Sample AL app skipped - your existing app/ and test/ code was left untouched.)" -ForegroundColor DarkGray
