@@ -2,21 +2,40 @@
   // Recommended VS Code extensions for Business Central AL development.
   // VS Code prompts (does not force) each developer to install these when the
   // workspace is opened, so the whole team shares one consistent toolchain.
-  // Verify IDs at https://marketplace.visualstudio.com before adding more.
+  // IDs verified against a working BC dev machine; check
+  // https://marketplace.visualstudio.com before adding more.
   "recommendations": [
-    // --- Core AL toolset ---
-    "ms-dynamics-smb.al",                     // AL Language (official) — compile, debug, IntelliSense
-    "andrzejzwierzchowski.al-code-outline",   // AZ AL Dev Tools / Code Outline — navigation, object wizards
-    "waldo.crs-al-language-extension",        // CRS AL Language Extension — file renaming, snippets, utilities
-    "vjeko.vjeko-al-objid",                   // AL Object ID Ninja — zero-collision object IDs (Copilot/MCP-native)
-    "nabsolutions.nab-al-tools",              // NAB AL Tools — XLIFF/translation, permission sets, docs
-    "jamespearson.al-test-runner",            // AL Test Runner — run/debug tests, code coverage
+    // --- Core AL toolset (official + must-have) ---
+    "ms-dynamics-smb.al",                       // AL Language (official) — compile, debug, IntelliSense
+    "andrzejzwierzchowski.al-code-outline",     // AZ AL Dev Tools / Code Outline — navigation, object wizards
+    "waldo.crs-al-language-extension",          // CRS AL Language Extension — file renaming, snippets, utilities
+    "vjeko.vjeko-al-objid",                     // AL Object ID Ninja — zero-collision object IDs (Copilot/MCP-native)
+    "jamespearson.al-test-runner",              // AL Test Runner — run/debug tests, code coverage
+
+    // --- AL quality & formatting ---
+    "stefanmaron.businesscentral-lintercop",    // BusinessCentral.LinterCop — extra AL code-quality analyzer rules
+    "rasmus.al-formatter",                      // AL Formatter — consistent, opinionated AL formatting
+    "davidfeldhoff.al-codeactions",             // AL CodeActions — extract-to-procedure, create handlers, quick fixes
+
+    // --- AL productivity ---
+    "wbrakowski.al-navigator",                  // AL Navigator — jump to fields/keys/actions, definition helpers
+    "rasmus.al-var-helper",                     // AL Variable Helper — declare/sort variables quickly
+    "365businessdevelopment.bdev-al-xml-doc",   // AL XML Documentation — generate/maintain object XML docs
+    "nwallace.createguid",                      // Create GUID — insert a fresh GUID (e.g. app.json 'id')
+
+    // --- Translation & documentation ---
+    "nabsolutions.nab-al-tools",                // NAB AL Tools — XLIFF/translation, permission sets, docs
+    "rvanbekkum.xliff-sync",                    // XLIFF Sync — keep translation files in sync across languages
 
     // --- General developer productivity ---
-    "ms-azuretools.vscode-docker",            // Docker — local BC containers for build/test
-    "eamodio.gitlens",                        // GitLens — richer Git history and blame
-    "humao.rest-client",                      // REST Client — exercise BC APIs / webhooks
-    "github.copilot",                         // GitHub Copilot — powers the agents/skills in this template
-    "github.copilot-chat"                     // GitHub Copilot Chat — custom agents + skills
+    "ms-azuretools.vscode-docker",              // Docker — local BC containers for build/test
+    "ms-vscode.powershell",                     // PowerShell — edit/run the template's .ps1 scripts
+    "redhat.vscode-yaml",                       // YAML — GitHub Actions workflows / AL-Go pipelines
+    "eamodio.gitlens",                          // GitLens — richer Git history and blame
+    "github.vscode-pull-request-github",        // GitHub Pull Requests — review/create PRs in-editor
+    "humao.rest-client",                        // REST Client — exercise BC APIs / webhooks
+    "streetsidesoftware.code-spell-checker",    // Code Spell Checker — catch typos in code, comments, docs
+    "github.copilot",                           // GitHub Copilot — powers the agents/skills in this template
+    "github.copilot-chat"                       // GitHub Copilot Chat — custom agents + skills
   ]
 }
