@@ -35,7 +35,8 @@
         "-BranchingStrategy", "${input:branchingStrategy}",
         "-CommitConvention", "${input:commitConvention}",
         "-Environments", "${input:environments}",
-        "-CleanupTemplateFiles:${input:cleanupTemplateFiles}"
+        "-CleanupTemplateFiles:${input:cleanupTemplateFiles}",
+        "-Prune:${input:pruneContent}"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -68,6 +69,7 @@
         "-CommitConvention", "${input:commitConvention}",
         "-Environments", "${input:environments}",
         "-CleanupTemplateFiles:${input:cleanupTemplateFiles}",
+        "-Prune:${input:pruneContent}",
         "-WhatIf"
       ],
       "problemMatcher": [],
@@ -191,6 +193,16 @@
       "options": [
         { "label": "Yes — write a project README and remove template-only files", "value": "true" },
         { "label": "No — keep all template files as-is", "value": "false" }
+      ],
+      "default": "true"
+    },
+    {
+      "id": "pruneContent",
+      "type": "pickString",
+      "description": "Content profile for a new project. 'Lean' removes the agent authoring meta-docs (AGENT-ARCHITECTURE / WHEN-TO-USE / SKILLS.md) and records the choice in template.config.json so template sync won't re-add them; docs, issue-ops, specs, PR template and the sample app are kept. For finer control (e.g. also drop docs or the sample app) run scripts/Initialize-Template.ps1 -Interactive.",
+      "options": [
+        { "label": "Lean — drop agent meta-docs, keep everything else", "value": "true" },
+        { "label": "Keep all — prune nothing", "value": "false" }
       ],
       "default": "true"
     }
