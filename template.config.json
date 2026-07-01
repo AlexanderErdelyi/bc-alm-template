@@ -25,6 +25,12 @@
       "enabled": false,
       "mode": "vendor",
       "path": "vendor/bcquality"
+    },
+    "sync": {
+      "customizationsPath": ".",
+      "updateModels": false,
+      "updateExtensions": false,
+      "updateInstructions": true
     }
   },
   "models": {
@@ -56,7 +62,8 @@
     "commitConvention": "Commit message convention. Default 'conventional' (Conventional Commits).",
     "environments": "Ordered list of BC environment names referenced by the deploy workflow (default TEST -> PROD).",
     "bcVersion": "Target Business Central version for the sample AL app. 'application'/'platform' are app.json minimums (e.g. '28.0.0.0' for 2026 wave 1) and 'runtime' is the AL runtime (e.g. '16.0'). The initializer writes these into app/app.json and test/app.json. Symbols are pulled from the public MSSymbolsV2 feed (see docs/al-agent-tools.md). Bump these when you move to a newer BC release.",
-    "bcQuality": "Optional Microsoft BCQuality knowledge base (https://github.com/microsoft/BCQuality) used to back AL review. 'enabled' on/off; 'mode' is 'vendor' (tracked copy in this repo) or 'submodule'; 'path' is the checkout folder. Run scripts/Add-BCQuality.ps1 to fetch it. See docs/bcquality.md."
+    "bcQuality": "Optional Microsoft BCQuality knowledge base (https://github.com/microsoft/BCQuality) used to back AL review. 'enabled' on/off; 'mode' is 'vendor' (tracked copy in this repo) or 'submodule'; 'path' is the checkout folder. Run scripts/Add-BCQuality.ps1 to fetch it. See docs/bcquality.md.",
+    "sync": "Controls how template updates are applied by scripts/Update-FromTemplate.ps1 and .github/workflows/template-sync.yml. 'customizationsPath' is the folder that holds the VS Code-discoverable Copilot customizations (.github/agents, .github/skills, .github/instructions and .github/copilot-instructions.md): '.' keeps them at the repo root (default); set it to a subfolder (e.g. 'app') to place them under <path>/.github so they are discovered when you open that folder directly. GitHub platform files (.github/workflows, ISSUE_TEMPLATE, PULL_REQUEST_TEMPLATE) always stay at the repo root so Actions and Copilot on github.com keep working. 'updateModels' false = keep your agent 'model:' choices (re-applied from this file after each sync); true = accept the template's model recommendations. 'updateExtensions' false = keep your .vscode/extensions.json toolset; true = pull the template's recommended list. 'updateInstructions' true = pull AL coding-standard instruction updates; false = keep your edited instructions."
   },
   "modelsToken": "The 'models' object maps each agent file name (without .agent.md) to the model written into its 'model:' frontmatter line. Edit values here, then re-run the initializer to apply them across .github/agents/."
 }

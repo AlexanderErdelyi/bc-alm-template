@@ -1,12 +1,17 @@
 # .templatesyncignore
-# Paths listed here are NEVER overwritten when syncing updates from the
-# bc-alm-template repository (used by .github/workflows/template-sync.yml and
-# by scripts/Update-FromTemplate.ps1). These are "project-owned" files: your
-# real code and the values written by the one-time initializer.
+# The human-readable manifest of "project-owned" paths that are NEVER overwritten
+# when syncing updates from the bc-alm-template repository: your real code and the
+# values written by the one-time initializer. scripts/Update-FromTemplate.ps1 (run
+# locally, and by .github/workflows/template-sync.yml) enforces this same set, and
+# additionally honors the 'sync' block in template.config.json:
+#   * customizationsPath - where agents/skills/instructions live (root or app/)
+#   * updateModels        - when false, your agent 'model:' choices are re-applied
+#   * updateExtensions    - when false, your .vscode/extensions.json is kept
+#   * updateInstructions  - when false, your .github/instructions is kept
 #
-# Everything NOT listed here is "template-managed" and will be updated from the
-# template (agents, skills, instructions, scripts, meta-docs, workflows).
-# Syntax is .gitignore-style.
+# Everything NOT listed here (and not excluded by a sync toggle) is "template-managed"
+# and will be refreshed from the template (agents, skills, instructions, scripts,
+# meta-docs, workflows). Syntax is .gitignore-style.
 
 # --- Your AL source (the sample app is only a starting point) ---
 app/
