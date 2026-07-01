@@ -31,6 +31,12 @@ README.md
 LICENSE
 .git*
 
+# --- Template-repo-only files (a derived repo doesn't need these; the initializer
+#     removes them during cleanup, and this keeps sync from re-adding them) ---
+CONTRIBUTING.md
+bootstrap.ps1
+scripts/Install-IntoExistingRepo.ps1
+
 # --- The sync workflow keeps updating itself; that's intentional, so it is
 #     NOT ignored. Remove the leading '#' below if you want to pin your own copy.
 # .github/workflows/template-sync.yml
