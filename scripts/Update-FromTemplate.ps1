@@ -58,7 +58,7 @@ $managedFiles = @(
     'scripts/Add-BCQuality.ps1',
     'scripts/Start-ALLanguageServer.ps1',
     'scripts/Update-FromTemplate.ps1',
-    'scripts/Install-IntoExistingRepo.ps1',
+    'scripts/Enable-CopilotCustomizations.ps1',
     '.vscode/extensions.json',
     '.vscode/tasks.json',
     '.templatesyncignore'
