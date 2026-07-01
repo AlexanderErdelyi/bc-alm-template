@@ -197,8 +197,19 @@ your own copy. Don't clone directly — the template structure is what you're co
 
 ### 1b. Or: add the template to an existing repo
 
-Already have a BC repo? Overlay the template instead of starting fresh. From a clone of *this*
-template, run:
+Already have a BC repo? Overlay the template instead of starting fresh — **no clone required**.
+From the root of your existing repo, run the bootstrap one-liner (it downloads the template,
+runs the overlay installer against the current folder, and cleans up after itself):
+
+```powershell
+# Preview first (writes nothing):
+$b = irm https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/bootstrap.ps1
+& ([scriptblock]::Create($b)) -WhatIf
+# Then run it for real (drop -WhatIf); add -IncludeSampleApp to also copy the demo app/ + test/:
+& ([scriptblock]::Create($b))
+```
+
+Prefer to see the files first? Clone the template and run the overlay installer directly:
 
 ```powershell
 pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-existing-repo -WhatIf
@@ -230,6 +241,12 @@ advance). You can also use the **`bc-init`** Copilot agent or
 [Customizing This Template](#customizing-this-template) for details. Do this once, before your
 first feature.
 
+> **Cleanup:** when you ran the guided wizard from a repo **created via "Use this template"**, the
+> initializer offers to replace this template's `README.md` with a short project README and remove
+> template-only files (`CONTRIBUTING.md`, `bootstrap.ps1`, `scripts/Install-IntoExistingRepo.ps1`).
+> Accept it (or pass `-CleanupTemplateFiles`) so your repo doesn't ship the template's own docs. It
+> is skipped automatically when run inside the template repo itself.
+
 ### 3. Copy the spec template for your first ticket
 
 ```bash
@@ -259,12 +276,24 @@ Open GitHub Copilot Chat in VS Code or GitHub.com and select an agent from the d
 - **Implementing?** → `BC Developer` — tell it to work on `specs/ABC-123/`
 - **Ready to ship?** → `BC PR` → `BC Deploy` → `BC Doc` → `BC Deploy`
 
-> **Opening via the `*.code-workspace`?** The workspace roots are the `app/` and `test/`
-> projects, so the `.github/` folder (which holds the agents, skills, and instructions) is not
-> itself a workspace root. The shipped `bc-alm-template.code-workspace` sets
-> **`"chat.useCustomizationsInParentRepositories": true`** so VS Code walks up to the repo root
-> and discovers them anyway. If your agents don't appear in the Copilot dropdown, add that setting
-> to your workspace's `settings` block (or open the repo root as a folder instead).
+> **Agents not showing in the Copilot dropdown?** VS Code discovers `.github/agents`,
+> `skills`, and `instructions` per *workspace-folder root*. Two situations hide them:
+> - **You opened the `*.code-workspace`.** Its roots are the `app/` and `test/` projects, so the
+>   repo-level `.github/` folder sits *above* them. The shipped
+>   `bc-alm-template.code-workspace` already sets
+>   **`"chat.useCustomizationsInParentRepositories": true`** so VS Code walks up to the repo root
+>   and finds them.
+> - **You opened a subfolder (e.g. `app/`) directly.** The workspace-file setting doesn't apply,
+>   so enable the same discovery in your **VS Code User settings** — once, and it works however you
+>   open folders:
+>   ```powershell
+>   pwsh ./scripts/Enable-CopilotCustomizations.ps1 -Scope User
+>   ```
+>   (or run the **"BC: Enable Copilot customizations (User settings)"** task, or open the repo root
+>   as a folder). This only sets a discovery flag — the `bc-*` agents keep living in each repo.
+>
+> None of this affects **GitHub Actions / Copilot on github.com**: they always read the repo's
+> committed `.github/` files directly, regardless of any local VS Code setting.
 
 ### 7. Keep in sync with the template
 
@@ -437,6 +466,7 @@ bc-alm-template/
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── .gitignore
+├── bootstrap.ps1                           ← No-clone installer: overlay the template into an existing repo
 ├── app/                                    ← Sample production app (app.json + src/)
 ├── test/                                   ← Sample test app (app.json + src/, depends on app/)
 ├── bc-alm-template.code-workspace          ← Multi-root workspace (app/ + test/); enables parent-repo customization discovery
@@ -446,6 +476,7 @@ bc-alm-template/
 │   ├── Initialize-Template.ps1             ← Guided/CI setup: replace tokens across the repo
 │   ├── Install-IntoExistingRepo.ps1        ← Overlay the template onto an existing repo
 │   ├── Update-FromTemplate.ps1             ← Pull later template updates (template-managed files only)
+│   ├── Enable-CopilotCustomizations.ps1    ← Make bc-* agents discoverable (VS Code User settings)
 │   ├── Start-ALLanguageServer.ps1          ← Launch the AL LSP server for agents (repo-tuned)
 │   └── Add-BCQuality.ps1                   ← Optional: add Microsoft's BCQuality review knowledge base
 ├── docs/

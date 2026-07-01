@@ -34,7 +34,8 @@
         "-DefaultBranch", "${input:defaultBranch}",
         "-BranchingStrategy", "${input:branchingStrategy}",
         "-CommitConvention", "${input:commitConvention}",
-        "-Environments", "${input:environments}"
+        "-Environments", "${input:environments}",
+        "-CleanupTemplateFiles:${input:cleanupTemplateFiles}"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -66,7 +67,26 @@
         "-BranchingStrategy", "${input:branchingStrategy}",
         "-CommitConvention", "${input:commitConvention}",
         "-Environments", "${input:environments}",
+        "-CleanupTemplateFiles:${input:cleanupTemplateFiles}",
         "-WhatIf"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "BC: Enable Copilot customizations (User settings)",
+      "detail": "Make the bc-* agents discoverable however you open folders (writes your VS Code User settings).",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/Enable-CopilotCustomizations.ps1",
+        "-Scope", "User"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -163,6 +183,16 @@
       "type": "promptString",
       "description": "14/14  Deployment environments, comma-separated, in promotion order.",
       "default": "TEST,PROD"
+    },
+    {
+      "id": "cleanupTemplateFiles",
+      "type": "pickString",
+      "description": "Post-setup cleanup: replace the template README with a project README and remove template-only files (CONTRIBUTING, installer, bootstrap). Recommended when this repo was created FROM the template.",
+      "options": [
+        { "label": "Yes — write a project README and remove template-only files", "value": "true" },
+        { "label": "No — keep all template files as-is", "value": "false" }
+      ],
+      "default": "true"
     }
   ]
 }
