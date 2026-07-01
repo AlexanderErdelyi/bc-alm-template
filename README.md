@@ -266,11 +266,31 @@ advance). You can also use the **`bc-init`** Copilot agent or
 [Customizing This Template](#customizing-this-template) for details. Do this once, before your
 first feature.
 
-> **Cleanup:** when you ran the guided wizard from a repo **created via "Use this template"**, the
-> initializer offers to replace this template's `README.md` with a short project README and remove
-> template-only files (`CONTRIBUTING.md`, `bootstrap.ps1`, `scripts/Install-IntoExistingRepo.ps1`).
-> Accept it (or pass `-CleanupTemplateFiles`) so your repo doesn't ship the template's own docs. It
-> is skipped automatically when run inside the template repo itself.
+> **Cleanup & content pruning:** when you ran the guided wizard from a repo **created via "Use this
+> template"**, the initializer replaces this template's `README.md` with a short project README,
+> removes template-only files (`CONTRIBUTING.md`, `bootstrap.ps1`,
+> `scripts/Install-IntoExistingRepo.ps1`), and — with the **Content profile** set to *Lean*
+> (default) — **prunes content a working project doesn't need**. GitHub's "Use this template" copies
+> the *whole* tree, so this is where a new repo gets slimmed down. Lean drops the agent authoring
+> meta-docs (`AGENT-ARCHITECTURE.md`, `WHEN-TO-USE.md`, `SKILLS.md`) and keeps the `docs/` library,
+> issue-ops pipeline, spec scaffold, PR template and the sample AL app. The choice is written to
+> `template.config.json` (`values.sync.include`) so later [template syncs](#7-staying-in-sync-with-the-template)
+> never re-add what you pruned.
+>
+> For finer control, run the initializer directly and mix in category switches:
+>
+> ```powershell
+> # keep everything (no pruning):
+> ./scripts/Initialize-Template.ps1 -CleanupTemplateFiles -Prune:$false
+> # lean, and also drop the docs library, issue-ops pipeline and the sample app:
+> ./scripts/Initialize-Template.ps1 -CleanupTemplateFiles -NoReferenceDocs -NoIssueOps -NoSampleApp
+> # keep the meta-docs after all:
+> ./scripts/Initialize-Template.ps1 -CleanupTemplateFiles -IncludeMetaDocs
+> ```
+>
+> Category flags: `-IncludeMetaDocs` (kept off by default) and `-NoReferenceDocs` / `-NoIssueOps` /
+> `-NoSpecs` / `-NoPrTemplate` / `-NoSampleApp` (each kept on by default). `-Interactive` prompts for
+> every category. Pruning is skipped automatically when run inside the template repo itself.
 
 ### 3. Copy the spec template for your first ticket
 
