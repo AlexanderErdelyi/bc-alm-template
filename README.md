@@ -560,6 +560,21 @@ Agent patterns inspired by [github/awesome-copilot](https://github.com/github/aw
 
 BC/AL-Go branching model informed by [microsoft/AL-Go](https://github.com/microsoft/AL-Go) conventions for Business Central extensions.
 
+### References & further reading
+
+- **AL Agent Tools (AL MCP & AL LSP) + ALTool** — Microsoft Learn:
+  [overview](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/al-agent-tools/al-agent-tools-overview) ·
+  [`al` / ALTool reference](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-al-tool) ·
+  [AL LSP (`launchlspserver`)](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-al-tool#al-lsp) ·
+  [AL MCP (`launchmcpserver`)](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-al-tool#almcp).
+  See [docs/al-agent-tools.md](docs/al-agent-tools.md) for how this template wires them up.
+- **[microsoft/BCQuality](https://github.com/microsoft/BCQuality/tree/main)** — Microsoft's AL quality
+  and review knowledge base (its README also links out to further BC quality resources, per-tool
+  guidance, and the AppSourceCop/PerTenantExtensionCop/UICop analyzer rules). Wired in via
+  [`scripts/Add-BCQuality.ps1`](scripts/Add-BCQuality.ps1) — see [docs/bcquality.md](docs/bcquality.md).
+- **AL development toolchain** — [AL Language extension](https://marketplace.visualstudio.com/items?itemName=ms-dynamics-smb.al)
+  and the recommended team extensions in [`.vscode/extensions.json`](.vscode/extensions.json).
+
 ---
 
 ## Contributing
