@@ -227,6 +227,18 @@ The installer copies the agents, skills, instructions, meta-docs, `docs/`, the i
 - The **sample AL app** (the `app/` and `test/` projects) is **not** copied unless you pass
   `-IncludeSampleApp` — your own AL code is left untouched.
 
+**Keep the customizations in your app folder instead of the repo root?** Pass
+`-CustomizationsPath app` (or any subfolder). The agents, skills, instructions, and
+`copilot-instructions.md` are placed under `app/.github/` — handy when you open a subfolder
+directly in VS Code — while the GitHub platform files (workflows, issue/PR templates, meta-docs)
+always stay at the repo root, because GitHub Actions and Copilot on github.com only read the
+root `.github/`. The installer records your choice in `template.config.json` (`sync.customizationsPath`)
+so later syncs keep writing to the same place:
+
+```powershell
+pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo C:\path\to\your-repo -CustomizationsPath app -WhatIf
+```
+
 Then continue with step 2 (run the initializer) inside your repo. The overlay also drops in
 [`.templatesyncignore`](.templatesyncignore) and `scripts/Update-FromTemplate.ps1` so you can
 [pull later template updates](#7-keep-in-sync-with-the-template) the same way.
@@ -307,14 +319,39 @@ pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf   # preview, then drop -WhatIf
 ```
 
 Or let it come to you as a pull request: [`.github/workflows/template-sync.yml`](.github/workflows/template-sync.yml)
-(powered by [`actions-template-sync`](https://github.com/AndreasAugustin/actions-template-sync))
-runs weekly — and on demand from the **Actions** tab — and opens a PR with the latest template
-changes. Review and merge it.
+runs `Update-FromTemplate.ps1` weekly — and on demand from the **Actions** tab — then opens a PR
+(via [`create-pull-request`](https://github.com/peter-evans/create-pull-request)) with the latest
+template changes. Review and merge it. Because the Action runs the same script, it honors every
+`sync` setting below identically to a local run.
 
 Both respect [`.templatesyncignore`](.templatesyncignore): your AL source (`app/`, `test/`), your
 specs, `PROJECT.md`, `template.config.json`, `copilot-instructions.md`, and the token-injected
 `.vscode` files are **never overwritten**. Everything else (agents, skills, instructions,
 workflows, meta-docs, scripts) is template-managed and gets refreshed.
+
+#### Control what sync touches
+
+Sync is driven by the `sync` block in [`template.config.json`](template.config.json), so you keep
+your local customizations even as you pull template improvements:
+
+```jsonc
+"sync": {
+  "customizationsPath": ".",   // where your agents/skills/instructions live ("." = root, or e.g. "app")
+  "updateModels": false,        // false = re-apply your agent model choices after refreshing the file
+  "updateExtensions": false,    // false = keep your .vscode/extensions.json (your toolset)
+  "updateInstructions": true    // false = keep your .github/instructions untouched
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `customizationsPath` | `.` | Folder holding `.github/agents`, `.github/skills`, `.github/instructions`, and `copilot-instructions.md`. Set to `app` (or any subfolder) to relocate them; platform files stay at the repo root either way. |
+| `updateModels` | `false` | When `false`, sync refreshes each agent's prompt/handoffs **but re-applies your `model:`** from `template.config.json` afterward, so a template change never resets your model picks. Set `true` to also adopt the template's models. |
+| `updateExtensions` | `false` | When `false`, your [`.vscode/extensions.json`](.vscode/extensions.json) is left alone — change your toolchain freely without sync reverting it. Set `true` to track the template's recommended extensions. |
+| `updateInstructions` | `true` | When `false`, `.github/instructions` (your AL coding standards) is not refreshed. |
+
+The values map (`models` in `template.config.json`) is the single source of truth for `updateModels: false`
+re-application — update a model there once and every sync keeps it.
 
 This template includes a small, working AL extension so you can see the conventions applied
 to real code (and have something that compiles from day one). It is structured as a
