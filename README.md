@@ -216,7 +216,9 @@ The installer copies the agents, skills, instructions, meta-docs, `docs/`, the i
 - The **sample AL app** (the `app/` and `test/` projects) is **not** copied unless you pass
   `-IncludeSampleApp` — your own AL code is left untouched.
 
-Then continue with step 2 (run the initializer) inside your repo.
+Then continue with step 2 (run the initializer) inside your repo. The overlay also drops in
+[`.templatesyncignore`](.templatesyncignore) and `scripts/Update-FromTemplate.ps1` so you can
+[pull later template updates](#7-keep-in-sync-with-the-template) the same way.
 
 ### 2. Initialize the template for your project
 
@@ -257,9 +259,33 @@ Open GitHub Copilot Chat in VS Code or GitHub.com and select an agent from the d
 - **Implementing?** → `BC Developer` — tell it to work on `specs/ABC-123/`
 - **Ready to ship?** → `BC PR` → `BC Deploy` → `BC Doc` → `BC Deploy`
 
----
+> **Opening via the `*.code-workspace`?** The workspace roots are the `app/` and `test/`
+> projects, so the `.github/` folder (which holds the agents, skills, and instructions) is not
+> itself a workspace root. The shipped `bc-alm-template.code-workspace` sets
+> **`"chat.useCustomizationsInParentRepositories": true`** so VS Code walks up to the repo root
+> and discovers them anyway. If your agents don't appear in the Copilot dropdown, add that setting
+> to your workspace's `settings` block (or open the repo root as a folder instead).
 
-## The Sample AL App
+### 7. Keep in sync with the template
+
+The repo you created stays connected to the template so you can pull improvements later — new
+agents, sharper instructions, script fixes — **without touching your own code**. Two ways:
+
+```powershell
+# On demand, from your machine — refreshes only template-managed files, commits nothing:
+pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf   # preview, then drop -WhatIf
+# review 'git diff', then commit what you want
+```
+
+Or let it come to you as a pull request: [`.github/workflows/template-sync.yml`](.github/workflows/template-sync.yml)
+(powered by [`actions-template-sync`](https://github.com/AndreasAugustin/actions-template-sync))
+runs weekly — and on demand from the **Actions** tab — and opens a PR with the latest template
+changes. Review and merge it.
+
+Both respect [`.templatesyncignore`](.templatesyncignore): your AL source (`app/`, `test/`), your
+specs, `PROJECT.md`, `template.config.json`, `copilot-instructions.md`, and the token-injected
+`.vscode` files are **never overwritten**. Everything else (agents, skills, instructions,
+workflows, meta-docs, scripts) is template-managed and gets refreshed.
 
 This template includes a small, working AL extension so you can see the conventions applied
 to real code (and have something that compiles from day one). It is structured as a
@@ -413,11 +439,13 @@ bc-alm-template/
 ├── .gitignore
 ├── app/                                    ← Sample production app (app.json + src/)
 ├── test/                                   ← Sample test app (app.json + src/, depends on app/)
-├── bc-alm-template.code-workspace          ← Multi-root workspace (app/ + test/)
+├── bc-alm-template.code-workspace          ← Multi-root workspace (app/ + test/); enables parent-repo customization discovery
 ├── template.config.json                    ← Project tokens (prefix, range, org…) for the initializer
+├── .templatesyncignore                     ← Project-owned paths never overwritten by template updates
 ├── scripts/
 │   ├── Initialize-Template.ps1             ← Guided/CI setup: replace tokens across the repo
 │   ├── Install-IntoExistingRepo.ps1        ← Overlay the template onto an existing repo
+│   ├── Update-FromTemplate.ps1             ← Pull later template updates (template-managed files only)
 │   ├── Start-ALLanguageServer.ps1          ← Launch the AL LSP server for agents (repo-tuned)
 │   └── Add-BCQuality.ps1                   ← Optional: add Microsoft's BCQuality review knowledge base
 ├── docs/
@@ -459,7 +487,7 @@ bc-alm-template/
 │   ├── instructions/
 │   │   └── al-coding-standards.instructions.md
 │   ├── ISSUE_TEMPLATE/                     ← Feature + bug issue forms
-│   ├── workflows/                          ← Issue orchestration pipeline
+│   ├── workflows/                          ← Issue orchestration pipeline + template-sync (auto-PR)
 │   ├── ISSUE_ORCHESTRATION.md
 │   └── PULL_REQUEST_TEMPLATE.md
 ├── specs/
