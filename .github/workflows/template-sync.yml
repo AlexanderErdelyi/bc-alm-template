@@ -1,11 +1,16 @@
 name: Template sync
 
-# Pulls new commits from the bc-alm-template repository and opens a pull request
-# with the changes. Project-owned files (your AL code, configured tokens, specs)
-# are protected by .templatesyncignore and are never touched.
+# Pulls updates from the bc-alm-template repository and opens a pull request with
+# the changes. This runs scripts/Update-FromTemplate.ps1, so it honors the 'sync'
+# block in template.config.json exactly like a local run:
+#   * customizationsPath - refreshes the relocated .github/agents|skills|instructions
+#   * updateModels        - re-applies your agent 'model:' choices when false
+#   * updateExtensions    - keeps your .vscode/extensions.json when false
+#   * updateInstructions  - keeps your .github/instructions when false
+# Your AL code, specs, PROJECT.md and token-injected files are never touched.
 #
-# Runs on a weekly schedule and can also be triggered manually from the Actions tab
-# (Run workflow). Review the PR it opens, resolve any conflicts, then merge.
+# Runs weekly and on demand from the Actions tab (Run workflow). Review the PR it
+# opens, resolve anything you want to keep, then merge.
 
 on:
   schedule:
@@ -28,11 +33,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sync from template
-        uses: AndreasAugustin/actions-template-sync@v2
+      - name: Refresh template-managed files (honors template.config.json sync block)
+        shell: pwsh
+        run: ./scripts/Update-FromTemplate.ps1 -Branch main
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
         with:
-          source_repo_path: AlexanderErdelyi/bc-alm-template
-          upstream_branch: main
-          pr_title: "chore(template): sync updates from bc-alm-template"
-          pr_labels: template-sync
-          pr_commit_msg: "chore(template): sync updates from bc-alm-template"
+          branch: chore/template-sync
+          delete-branch: true
+          commit-message: "chore(template): sync updates from bc-alm-template"
+          title: "chore(template): sync updates from bc-alm-template"
+          labels: template-sync
+          body: |
+            Automated update from
+            [bc-alm-template](https://github.com/AlexanderErdelyi/bc-alm-template).
+
+            Refreshed via `scripts/Update-FromTemplate.ps1`, which honors the `sync`
+            block in `template.config.json` (customizations location + model/toolset
+            toggles). Your AL code, specs, and configured values are untouched.
+
+            Review the diff and merge what you want to keep.
