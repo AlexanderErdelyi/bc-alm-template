@@ -13,11 +13,20 @@
         $b = irm https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/bootstrap.ps1
         & ([scriptblock]::Create($b)) -WhatIf     # preview; drop -WhatIf to apply
 
+    Two-step (recommended): choose WHERE customizations live and WHICH content
+    categories to include first, then execute:
+
+        & ([scriptblock]::Create($b)) -Configure -Interactive   # writes template.config.json
+        & ([scriptblock]::Create($b))                           # copies the enabled content
+
 .EXAMPLE
     pwsh ./bootstrap.ps1 -WhatIf
 
 .EXAMPLE
-    pwsh ./bootstrap.ps1 -Force -IncludeSampleApp
+    pwsh ./bootstrap.ps1 -Configure -Interactive
+
+.EXAMPLE
+    pwsh ./bootstrap.ps1 -CustomizationsPath app -IncludeReferenceDocs -Force
 #>
 [CmdletBinding()]
 param(
@@ -27,11 +36,28 @@ param(
     # Template branch/tag to pull. Defaults to main.
     [string] $Ref = 'main',
 
+    # Step 1 only: write the sync/include config into the target, copy nothing.
+    # Run the one-liner again without -Configure to execute the copy.
+    [switch] $Configure,
+
+    # Prompt for each choice during -Configure instead of using flags/defaults.
+    [switch] $Interactive,
+
     # Overwrite existing files instead of skipping / writing .template.
     [switch] $Force,
 
-    # Also copy the sample AL app (app/ and test/ projects).
+    # Where the discoverable customizations go ('.' = repo root, or e.g. 'app').
+    [string] $CustomizationsPath = '.',
+
+    # Opt IN to categories that are off by default for an existing repo.
+    [switch] $IncludeMetaDocs,
+    [switch] $IncludeReferenceDocs,
+    [switch] $IncludeIssueOps,
     [switch] $IncludeSampleApp,
+
+    # Opt OUT of categories that are on by default.
+    [switch] $NoSpecs,
+    [switch] $NoPrTemplate,
 
     # Preview only - pass through to the installer's -WhatIf.
     [switch] $WhatIf
@@ -61,7 +87,22 @@ try {
     if (-not (Test-Path $installer)) { throw "Installer not found in the downloaded template: $installer" }
 
     Write-Host "Running overlay installer...`n" -ForegroundColor White
-    & $installer -TargetRepo $TargetRepo -SourceRoot $srcRoot.FullName -Force:$Force -IncludeSampleApp:$IncludeSampleApp -WhatIf:$WhatIf
+    $installArgs = @{
+        TargetRepo         = $TargetRepo
+        SourceRoot         = $srcRoot.FullName
+        Force              = $Force
+        Configure          = $Configure
+        Interactive        = $Interactive
+        CustomizationsPath = $CustomizationsPath
+        IncludeMetaDocs    = $IncludeMetaDocs
+        IncludeReferenceDocs = $IncludeReferenceDocs
+        IncludeIssueOps    = $IncludeIssueOps
+        IncludeSampleApp   = $IncludeSampleApp
+        NoSpecs            = $NoSpecs
+        NoPrTemplate       = $NoPrTemplate
+        WhatIf             = $WhatIf
+    }
+    & $installer @installArgs
 }
 finally {
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
