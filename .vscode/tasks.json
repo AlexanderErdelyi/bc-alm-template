@@ -1,0 +1,168 @@
+{
+  // Guided template setup as a native VS Code wizard.
+  //
+  //   Terminal -> Run Task... -> "BC: Initialize project (guided)"
+  //
+  // VS Code pops a text box at the top of the window for each value in turn:
+  // type your answer (or accept the shown default) and press Enter to advance to
+  // the next field. The last field runs scripts/Initialize-Template.ps1 with your
+  // answers. Use the "(preview)" task first to see the changes with -WhatIf.
+  //
+  // The defaults below mirror template.config.json. Editing this file is optional;
+  // the script always writes your final choices back to template.config.json.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "BC: Initialize project (guided)",
+      "detail": "Form-style setup wizard — fill each field, press Enter, then it initializes the repo.",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/Initialize-Template.ps1",
+        "-AppPrefix", "${input:appPrefix}",
+        "-TicketPrefix", "${input:ticketPrefix}",
+        "-AppName", "${input:appName}",
+        "-Publisher", "${input:publisher}",
+        "-ObjectIdFrom", "${input:objectIdFrom}",
+        "-ObjectIdTo", "${input:objectIdTo}",
+        "-RepoSlug", "${input:repoSlug}",
+        "-AdoOrg", "${input:adoOrg}",
+        "-AdoProject", "${input:adoProject}",
+        "-WorkItemSystem", "${input:workItemSystem}",
+        "-DefaultBranch", "${input:defaultBranch}",
+        "-BranchingStrategy", "${input:branchingStrategy}",
+        "-CommitConvention", "${input:commitConvention}",
+        "-Environments", "${input:environments}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "BC: Initialize project (preview / -WhatIf)",
+      "detail": "Same wizard, but only previews the changes (no files written).",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/Initialize-Template.ps1",
+        "-AppPrefix", "${input:appPrefix}",
+        "-TicketPrefix", "${input:ticketPrefix}",
+        "-AppName", "${input:appName}",
+        "-Publisher", "${input:publisher}",
+        "-ObjectIdFrom", "${input:objectIdFrom}",
+        "-ObjectIdTo", "${input:objectIdTo}",
+        "-RepoSlug", "${input:repoSlug}",
+        "-AdoOrg", "${input:adoOrg}",
+        "-AdoProject", "${input:adoProject}",
+        "-WorkItemSystem", "${input:workItemSystem}",
+        "-DefaultBranch", "${input:defaultBranch}",
+        "-BranchingStrategy", "${input:branchingStrategy}",
+        "-CommitConvention", "${input:commitConvention}",
+        "-Environments", "${input:environments}",
+        "-WhatIf"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "appPrefix",
+      "type": "promptString",
+      "description": "1/14  App / object prefix (2-4 chars). Appears in every AL object name, identifier and file name.",
+      "default": "ABC"
+    },
+    {
+      "id": "ticketPrefix",
+      "type": "promptString",
+      "description": "2/14  Ticket / spec prefix (used in PREFIX-123 references and specs/PREFIX-*). Often same as the app prefix.",
+      "default": "ABC"
+    },
+    {
+      "id": "appName",
+      "type": "promptString",
+      "description": "3/14  App display name (app.json 'name').",
+      "default": "ABC Payment Tolerance"
+    },
+    {
+      "id": "publisher",
+      "type": "promptString",
+      "description": "4/14  Publisher / company name (app.json 'publisher').",
+      "default": "ABC"
+    },
+    {
+      "id": "objectIdFrom",
+      "type": "promptString",
+      "description": "5/14  AL object ID range - FROM (lower bound of your assigned range). Sample IDs are shifted into this range.",
+      "default": "50100"
+    },
+    {
+      "id": "objectIdTo",
+      "type": "promptString",
+      "description": "6/14  AL object ID range - TO (upper bound of your assigned range).",
+      "default": "50199"
+    },
+    {
+      "id": "repoSlug",
+      "type": "promptString",
+      "description": "7/14  GitHub repository slug (owner/repo).",
+      "default": "owner/repo"
+    },
+    {
+      "id": "adoOrg",
+      "type": "promptString",
+      "description": "8/14  Azure DevOps organization name (used by .vscode/mcp.json and docs). Leave default if you only use GitHub.",
+      "default": "your-organization"
+    },
+    {
+      "id": "adoProject",
+      "type": "promptString",
+      "description": "9/14  Azure DevOps project name (optional - leave blank if not used).",
+      "default": ""
+    },
+    {
+      "id": "workItemSystem",
+      "type": "pickString",
+      "description": "10/14  Work-item system. 'GitHub' converts ADO 'AB#123' commit links to '#123'.",
+      "options": ["ADO", "GitHub"],
+      "default": "ADO"
+    },
+    {
+      "id": "defaultBranch",
+      "type": "promptString",
+      "description": "11/14  Default (production) branch name.",
+      "default": "main"
+    },
+    {
+      "id": "branchingStrategy",
+      "type": "pickString",
+      "description": "12/14  Branching strategy (see docs/branching-strategy.md).",
+      "options": ["feature-release-selective", "github-flow", "gitflow", "trunk"],
+      "default": "feature-release-selective"
+    },
+    {
+      "id": "commitConvention",
+      "type": "pickString",
+      "description": "13/14  Commit message convention.",
+      "options": ["conventional", "freeform"],
+      "default": "conventional"
+    },
+    {
+      "id": "environments",
+      "type": "promptString",
+      "description": "14/14  Deployment environments, comma-separated, in promotion order.",
+      "default": "TEST,PROD"
+    }
+  ]
+}

@@ -221,7 +221,9 @@ Then continue with step 2 (run the initializer) inside your repo.
 ### 2. Initialize the template for your project
 
 Run the guided initializer to replace the sample prefix, object ID range, publisher, repo slug,
-and work-item style with your own — either the **`bc-init`** Copilot agent or
+and work-item style with your own. Easiest in VS Code: **Terminal → Run Task… → "BC: Initialize
+project (guided)"** — a form-style wizard pops a text box for each value (type, press Enter to
+advance). You can also use the **`bc-init`** Copilot agent or
 `./scripts/Initialize-Template.ps1 -Interactive`. See
 [Customizing This Template](#customizing-this-template) for details. Do this once, before your
 first feature.
@@ -353,10 +355,17 @@ After creating your repo from the template, run the **guided initializer** — i
 prefix, object ID range, publisher, repo slug, ADO org, and work-item style across the whole repo
 (and renames the sample AL files) in one pass.
 
-**Option A — Copilot agent (conversational):** open Copilot Chat and select the **`BC Template
-Initializer`** (`bc-init`) agent. It interviews you, previews the changes, then applies them.
+**Option A — VS Code task (form-style wizard, recommended):** **Terminal → Run Task… → "BC:
+Initialize project (guided)"**. VS Code shows a text box at the top of the window for each value
+in turn — type your answer (or accept the shown default) and press Enter to advance; the last
+field runs the initializer. Run **"BC: Initialize project (preview / -WhatIf)"** first to see the
+changes without writing anything. (Defined in [`.vscode/tasks.json`](.vscode/tasks.json).)
 
-**Option B — PowerShell script:** run it interactively, or pass values for CI:
+**Option B — Copilot agent (conversational):** open Copilot Chat and select the **`BC Template
+Initializer`** (`bc-init`) agent. It offers the task above, or interviews you in chat, previews
+the changes, then applies them.
+
+**Option C — PowerShell script:** run it interactively, or pass values for CI:
 
 ```powershell
 # Interactive — prompts for each value (Enter accepts the default)
@@ -464,6 +473,7 @@ bc-alm-template/
     ├── extensions.json                      ← Recommended AL extensions (team toolchain)
     ├── mcp.json
     ├── settings.json
+    ├── tasks.json                           ← "BC: Initialize project" guided-setup wizard
     └── launch.json
 ```
 
