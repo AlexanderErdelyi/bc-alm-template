@@ -46,6 +46,9 @@ param(
 
     [switch] $Interactive,
     [switch] $SkipModels,
+    # Remove template-only files (CONTRIBUTING, installer, bootstrap) and replace the
+    # template README with a project README. Intended for repos created FROM the template.
+    [switch] $CleanupTemplateFiles,
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
@@ -84,6 +87,12 @@ if (-not $Environments)     { $Environments     = (Read-Value 'Environments (com
 # Normalize Environments so a single comma-joined value (e.g. "TEST,PROD" passed by a VS Code
 # task input or CI) is split into individual names just like the interactive prompt does.
 if ($Environments) { $Environments = @($Environments | ForEach-Object { $_ -split '\s*,\s*' } | Where-Object { $_ }) }
+
+# Offer template cleanup when interactive and not explicitly specified on the command line.
+if ($Interactive -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles')) {
+    $ans = Read-Host 'Remove template-only files (CONTRIBUTING, installer, bootstrap) and write a project README? [Y/n]'
+    $CleanupTemplateFiles = [string]::IsNullOrWhiteSpace($ans) -or ($ans -match '^(y|yes)$')
+}
 
 if ($ObjectIdTo -lt $ObjectIdFrom) { throw "ObjectIdTo ($ObjectIdTo) must be >= ObjectIdFrom ($ObjectIdFrom)." }
 
@@ -304,6 +313,69 @@ $linkLine
 "@
 if ($PSCmdlet.ShouldProcess((Join-Path $RepoRoot 'PROJECT.md'), 'Write PROJECT.md')) {
     Set-Content -Path (Join-Path $RepoRoot 'PROJECT.md') -Value $projectMd
+}
+
+# --- Optional: clean up template-only files in a repo created FROM the template ---
+if ($CleanupTemplateFiles) {
+    $templateRepo = 'AlexanderErdelyi/bc-alm-template'
+    $originUrl = ''
+    try { $originUrl = (& git -C $RepoRoot remote get-url origin 2>$null) } catch { }
+    if ($originUrl -and ($originUrl -match [regex]::Escape($templateRepo))) {
+        Write-Host "`nSkipping template cleanup: this looks like the template repo itself ($originUrl)." -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "`nCleaning up template-only files" -ForegroundColor Cyan
+        $removeList = @('CONTRIBUTING.md', 'scripts/Install-IntoExistingRepo.ps1', 'bootstrap.ps1')
+        foreach ($rel in $removeList) {
+            $p = Join-Path $RepoRoot $rel
+            if (Test-Path $p) {
+                if ($PSCmdlet.ShouldProcess($p, 'Remove template-only file')) { Remove-Item $p -Force }
+                Write-Host "  removed    $rel" -ForegroundColor DarkGray
+            }
+        }
+
+        $wsFile = Get-ChildItem -Path $RepoRoot -Filter '*.code-workspace' -File | Select-Object -First 1
+        $wsName = if ($wsFile) { $wsFile.Name } else { 'the .code-workspace' }
+        $readmePath = Join-Path $RepoRoot 'README.md'
+        $projectReadme = @"
+# $AppName
+
+$Publisher — a Microsoft Dynamics 365 Business Central extension.
+
+Built with the [BC ALM workflow](docs/workflow.md): spec-driven development, GitHub Copilot
+agents for every lifecycle stage, a documented [branching strategy](docs/branching-strategy.md),
+and enforced [AL coding standards](.github/instructions/al-coding-standards.instructions.md).
+
+## Project facts
+
+See [PROJECT.md](PROJECT.md) for this project's prefix (``$AppPrefix``), object ID range
+(``$ObjectIdFrom``-``$ObjectIdTo``), branching strategy, and commit convention.
+
+## Getting started
+
+1. Open ``$wsName`` in VS Code and install the recommended AL extensions when prompted.
+2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$TicketPrefix-123-short-name/``, fill in
+   ``brief.md``, open a spec PR, then implement.
+3. Open GitHub Copilot Chat and choose a ``bc-*`` agent — start with **BC Orchestrator** and give
+   it a ticket ID.
+
+## Staying up to date
+
+This repository was created from
+[bc-alm-template](https://github.com/$templateRepo). Pull later template improvements with:
+
+``````powershell
+pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf   # preview, then drop -WhatIf
+``````
+
+…or let the **Template sync** GitHub Action (``.github/workflows/template-sync.yml``) open a PR
+for you. Your AL code and configured values are never overwritten (see ``.templatesyncignore``).
+"@
+        if ($PSCmdlet.ShouldProcess($readmePath, 'Replace template README with a project README')) {
+            Set-Content -Path $readmePath -Value $projectReadme
+        }
+        Write-Host "  wrote      README.md  (project README; template docs remain at github.com/$templateRepo)" -ForegroundColor Green
+    }
 }
 
 Write-Host "`nTemplate initialized." -ForegroundColor Green

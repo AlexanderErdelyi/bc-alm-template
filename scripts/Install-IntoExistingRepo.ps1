@@ -122,6 +122,7 @@ $addFiles = @(
     'scripts/Add-BCQuality.ps1',
     'scripts/Start-ALLanguageServer.ps1',
     'scripts/Update-FromTemplate.ps1',
+    'scripts/Enable-CopilotCustomizations.ps1',
     '.templatesyncignore',
     'template.config.json'
 )
@@ -163,6 +164,8 @@ Write-Host "  4. Review 'git status' / 'git diff', then commit."
 Write-Host "  5. If you open your AL projects via a multi-root *.code-workspace, add this to its"
 Write-Host "     'settings' block so Copilot finds the agents/skills at the repo root:"
 Write-Host '        "chat.useCustomizationsInParentRepositories": true' -ForegroundColor Cyan
+Write-Host "     Or make it apply however you open folders (User settings):"
+Write-Host "        pwsh ./scripts/Enable-CopilotCustomizations.ps1"
 Write-Host "  6. Later, pull template updates any time with: pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf"
 Write-Host "     (or let the '.github/workflows/template-sync.yml' Action open a PR for you)."
 if (-not $IncludeSampleApp) {
