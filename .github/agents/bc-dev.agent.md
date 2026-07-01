@@ -1,7 +1,7 @@
 ---
 description: "BC Developer - AL implementation specialist. Use when: implement an AL feature, write AL code, build from a spec, create a tableextension/codeunit/page, add a field, bump app.json, generate a test codeunit, fix AL code."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'edit/editFiles', 'search/textSearch', 'web/githubRepo', 'execute/runInTerminal']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "REVIEW · Self-review before the PR"
     agent: "bc-pr"

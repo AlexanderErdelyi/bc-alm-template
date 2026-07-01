@@ -1,7 +1,7 @@
 ---
 description: "BC Documentation - generates customer-facing functional docs before PROD deployment. Use when: write functional docs, document a feature for the customer, update the changelog, PROD documentation gate, end-user how-to for a BC feature."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'edit/editFiles', 'search/textSearch', 'web/githubRepo']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'github/*']
 handoffs:
   - label: "SHIP · Return to deploy after docs merge"
     agent: "bc-deploy"

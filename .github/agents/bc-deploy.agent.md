@@ -1,7 +1,7 @@
 ---
 description: "BC Deploy - manages release branches and BC environment deployments. Use when: compose a release branch, build a release wave, deploy to TEST or PROD, cut a release, select features for a wave, BC Admin Center deployment, hotfix deployment."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'execute/runInTerminal']
+tools: ['search/codebase', 'search/textSearch', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "DOCS · Generate docs before PROD (gate)"
     agent: "bc-doc"

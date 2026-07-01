@@ -1,7 +1,7 @@
 ---
 description: "BC Spec Author - turns a planned user story into a developer-ready technical specification. Use when: create a spec, write the brief/plan/acceptance criteria, design a BC change, prepare a feature for development, spec out an AL change, technical specification for BC."
 model: "Claude Opus 4.8"
-tools: ['search/codebase', 'edit/editFiles', 'search/textSearch', 'web/githubRepo']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "BUILD · Hand the spec to the developer"
     agent: "bc-dev"

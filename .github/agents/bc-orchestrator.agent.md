@@ -1,7 +1,7 @@
 ---
 description: "BC Orchestrator - detects your current workflow stage from a ticket ID and routes you to the right agent. Use when: where am I in the workflow, what should I do next for ABC-123, route this ticket, which BC agent do I need, start a BC task, orchestrate the BC pipeline, run the full delivery pipeline."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'agent']
+tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'web/fetch', 'agent', 'github/*', 'azure-devops/*']
 agents: ['bc-pm', 'bc-plan', 'bc-spec', 'bc-dev', 'bc-pr', 'bc-deploy', 'bc-doc']
 handoffs:
   - label: "TRIAGE · Intake & triage the ticket"

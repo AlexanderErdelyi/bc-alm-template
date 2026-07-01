@@ -1,7 +1,7 @@
 ---
 description: "BC Planner - shapes a raw request or triaged ticket into a crisp user story with testable acceptance criteria, ready to be specced. Use when: plan a BC feature, write a user story, break down a ticket into a story, clarify requirements, draft acceptance criteria, what should this feature do, confirm scope before design."
 model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'edit/editFiles', 'search/textSearch', 'web/githubRepo']
+tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "SPEC · Hand the story to the spec author"
     agent: "bc-spec"

@@ -315,6 +315,30 @@ if (-not $SkipModels -and $config.models) {
     }
 }
 
+# --- Trim the unused work-item MCP group from agent tools ---
+# When the project tracks work in GitHub Issues (not Azure DevOps Boards), the
+# azure-devops/* MCP tools are dead weight in every agent's tool profile. Strip
+# them so derived repos ship a lean, relevant toolset. (github/* is always kept:
+# code + PRs live on GitHub regardless of the work-item system.)
+if ($WorkItemSystem -eq 'GitHub') {
+    $agentsDir = Join-Path $RepoRoot '.github/agents'
+    if (Test-Path $agentsDir) {
+        Get-ChildItem $agentsDir -Filter *.agent.md | ForEach-Object {
+            $aText = Get-Content $_.FullName -Raw
+            $newText = $aText.
+                Replace(", 'azure-devops/*'", '').
+                Replace("'azure-devops/*', ", '').
+                Replace("'azure-devops/*'", '')
+            if ($newText -ne $aText) {
+                if ($PSCmdlet.ShouldProcess($_.FullName, 'Remove azure-devops/* from tools (GitHub work items)')) {
+                    Set-Content -Path $_.FullName -Value $newText -NoNewline
+                }
+                Write-Host ("  tools    trimmed azure-devops/* from {0}" -f $_.Name)
+            }
+        }
+    }
+}
+
 # --- Persist chosen values back to template.config.json ---
 $config.initialized = $true
 $config.values.appPrefix        = $AppPrefix
