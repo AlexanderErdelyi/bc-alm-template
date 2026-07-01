@@ -102,7 +102,8 @@ Write-Host "  include: metaDocs=$($inc.metaDocs), referenceDocs=$($inc.reference
 # Customization trees are VS Code-discoverable and follow customizationsPath.
 $customTrees = @(
     '.github/agents',
-    '.github/skills'
+    '.github/skills',
+    '.github/prompts'
 )
 if ($sync.updateInstructions) { $customTrees += '.github/instructions' }
 
@@ -156,7 +157,7 @@ function Get-Hash([string] $path) {
 # discoverable customizations under $custRoot when configured).
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|instructions)(/|$)')) {
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)')) {
         return "$custRoot/$r"
     }
     return $r

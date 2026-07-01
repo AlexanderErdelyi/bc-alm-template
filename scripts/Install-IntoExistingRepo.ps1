@@ -217,7 +217,7 @@ $script:added = 0; $script:skipped = 0; $script:merged = 0
 
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|instructions)(/|$)' -or $r -eq '.github/copilot-instructions.md')) {
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $r -eq '.github/copilot-instructions.md')) {
         return "$custRoot/$r"
     }
     return $r
@@ -268,7 +268,7 @@ function Copy-Tree([string] $relDir, [string] $policy) {
 }
 
 # Core: always copied (the point of the template + the sync machinery).
-$addTrees = @('.github/agents', '.github/skills', '.github/instructions')
+$addTrees = @('.github/agents', '.github/skills', '.github/prompts', '.github/instructions')
 $addFiles = @(
     '.github/workflows/template-sync.yml',
     'scripts/Initialize-Template.ps1',
