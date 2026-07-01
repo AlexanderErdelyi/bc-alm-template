@@ -14,8 +14,24 @@
     Use -Interactive to be prompted for each value, or pass parameters directly
     (ideal for CI / non-interactive use). Use -WhatIf to preview without writing.
 
+    A repo created via GitHub "Use this template" receives the WHOLE tree. When
+    -CleanupTemplateFiles is on (the "created FROM the template" path), this script
+    also PRUNES the content categories a working project doesn't need, and records
+    the choice in template.config.json ('values.sync.include') so later template
+    syncs never re-add them. Category keep-defaults for a new project: agent
+    meta-docs (AGENT-ARCHITECTURE / WHEN-TO-USE / SKILLS.md) are removed; the docs
+    library, issue-ops pipeline, spec scaffold, PR template and the sample AL app
+    are kept. Override with -IncludeMetaDocs / -NoReferenceDocs / -NoIssueOps /
+    -NoSpecs / -NoPrTemplate / -NoSampleApp, or disable pruning with -Prune:$false.
+
 .EXAMPLE
     pwsh ./scripts/Initialize-Template.ps1 -Interactive
+
+.EXAMPLE
+    # New project: keep everything except the agent meta-docs (the default), plus
+    # drop the issue-ops pipeline and the sample app:
+    pwsh ./scripts/Initialize-Template.ps1 -AppPrefix XYZ -CleanupTemplateFiles `
+        -NoIssueOps -NoSampleApp
 
 .EXAMPLE
     pwsh ./scripts/Initialize-Template.ps1 -AppPrefix XYZ -TicketPrefix PROJ `
@@ -49,6 +65,19 @@ param(
     # Remove template-only files (CONTRIBUTING, installer, bootstrap) and replace the
     # template README with a project README. Intended for repos created FROM the template.
     [switch] $CleanupTemplateFiles,
+
+    # Prune the content categories a working project doesn't need (see -CleanupTemplateFiles
+    # in .DESCRIPTION). Defaults to the value of -CleanupTemplateFiles; pass -Prune:$false to
+    # keep every file, or -Prune to force pruning without the other cleanup steps.
+    [switch] $Prune,
+    # Keep the agent meta-docs (AGENT-ARCHITECTURE / WHEN-TO-USE / SKILLS.md); pruned by default.
+    [switch] $IncludeMetaDocs,
+    # Opt OUT of categories kept by default for a new project.
+    [switch] $NoReferenceDocs,
+    [switch] $NoIssueOps,
+    [switch] $NoSpecs,
+    [switch] $NoPrTemplate,
+    [switch] $NoSampleApp,
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
@@ -66,6 +95,17 @@ function Read-Value([string] $prompt, $default) {
     $answer = Read-Host "$prompt [$shown]"
     if ([string]::IsNullOrWhiteSpace($answer)) { return $default }
     return $answer
+}
+
+function Read-YesNo([string] $prompt, [bool] $default) {
+    if (-not $Interactive) { return $default }
+    $hint = if ($default) { 'Y/n' } else { 'y/N' }
+    while ($true) {
+        $a = (Read-Host "$prompt [$hint]").Trim()
+        if ([string]::IsNullOrWhiteSpace($a)) { return $default }
+        switch -Regex ($a) { '^(y|yes)$' { return $true }; '^(n|no)$' { return $false } }
+        Write-Host "  please answer y or n" -ForegroundColor DarkYellow
+    }
 }
 
 # --- Resolve effective values (param > interactive prompt > current default) ---
@@ -92,6 +132,28 @@ if ($Environments) { $Environments = @($Environments | ForEach-Object { $_ -spli
 if ($Interactive -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles')) {
     $ans = Read-Host 'Remove template-only files (CONTRIBUTING, installer, bootstrap) and write a project README? [Y/n]'
     $CleanupTemplateFiles = [string]::IsNullOrWhiteSpace($ans) -or ($ans -match '^(y|yes)$')
+}
+
+# --- Resolve the content-prune profile (which categories a new project keeps) ---
+# Keep-defaults for a NEW project: drop the authoring meta-docs; keep everything else
+# (the docs library and generated README/PROJECT.md link to it, and the sample app IS
+# the project's starting point, so it is never auto-deleted unless -NoSampleApp).
+$doPrune = if ($PSBoundParameters.ContainsKey('Prune')) { [bool]$Prune } else { [bool]$CleanupTemplateFiles }
+$keep = [ordered]@{ metaDocs = $false; referenceDocs = $true; issueOps = $true; specs = $true; prTemplate = $true; sampleApp = $true }
+if ($IncludeMetaDocs)  { $keep.metaDocs      = $true }
+if ($NoReferenceDocs)  { $keep.referenceDocs = $false }
+if ($NoIssueOps)       { $keep.issueOps      = $false }
+if ($NoSpecs)          { $keep.specs         = $false }
+if ($NoPrTemplate)     { $keep.prTemplate    = $false }
+if ($NoSampleApp)      { $keep.sampleApp     = $false }
+if ($doPrune -and $Interactive) {
+    Write-Host "`nContent categories to keep in this project (Enter accepts the default):" -ForegroundColor White
+    if (-not $PSBoundParameters.ContainsKey('IncludeMetaDocs')) { $keep.metaDocs      = Read-YesNo '  Keep agent meta-docs (AGENT-ARCHITECTURE / WHEN-TO-USE / SKILLS.md)?' $keep.metaDocs }
+    if (-not $PSBoundParameters.ContainsKey('NoReferenceDocs')) { $keep.referenceDocs = Read-YesNo '  Keep the docs/ reference library?' $keep.referenceDocs }
+    if (-not $PSBoundParameters.ContainsKey('NoIssueOps'))      { $keep.issueOps      = Read-YesNo '  Keep the GitHub issue-ops pipeline (issue-*.yml + ISSUE_TEMPLATE)?' $keep.issueOps }
+    if (-not $PSBoundParameters.ContainsKey('NoSpecs'))         { $keep.specs         = Read-YesNo '  Keep the spec scaffold (specs/_TEMPLATE)?' $keep.specs }
+    if (-not $PSBoundParameters.ContainsKey('NoPrTemplate'))    { $keep.prTemplate    = Read-YesNo '  Keep the PR template (PULL_REQUEST_TEMPLATE.md)?' $keep.prTemplate }
+    if (-not $PSBoundParameters.ContainsKey('NoSampleApp'))     { $keep.sampleApp     = Read-YesNo '  Keep the sample AL app (app/ + test/ + workspace)?' $keep.sampleApp }
 }
 
 if ($ObjectIdTo -lt $ObjectIdFrom) { throw "ObjectIdTo ($ObjectIdTo) must be >= ObjectIdFrom ($ObjectIdFrom)." }
@@ -269,6 +331,18 @@ $config.values.defaultBranch    = $DefaultBranch
 $config.values.branchingStrategy= $BranchingStrategy
 $config.values.commitConvention = $CommitConvention
 $config.values.environments     = $Environments
+# Record the kept content categories so later template syncs never re-add what we pruned.
+if ($doPrune) {
+    if (-not $config.values.PSObject.Properties['sync']) {
+        $config.values | Add-Member -NotePropertyName sync -NotePropertyValue ([pscustomobject]@{ customizationsPath = '.'; updateModels = $false; updateExtensions = $false; updateInstructions = $true })
+    }
+    $incObj = [pscustomobject]@{
+        metaDocs = $keep.metaDocs; referenceDocs = $keep.referenceDocs; issueOps = $keep.issueOps
+        specs    = $keep.specs;    prTemplate    = $keep.prTemplate;    sampleApp = $keep.sampleApp
+    }
+    if ($config.values.sync.PSObject.Properties['include']) { $config.values.sync.include = $incObj }
+    else { $config.values.sync | Add-Member -NotePropertyName include -NotePropertyValue $incObj }
+}
 if ($PSCmdlet.ShouldProcess($configPath, 'Write updated config')) {
     $config | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath
 }
@@ -315,12 +389,15 @@ if ($PSCmdlet.ShouldProcess((Join-Path $RepoRoot 'PROJECT.md'), 'Write PROJECT.m
     Set-Content -Path (Join-Path $RepoRoot 'PROJECT.md') -Value $projectMd
 }
 
+# --- Detect whether this is the template repo itself (never prune/clean it) ---
+$templateRepo = 'AlexanderErdelyi/bc-alm-template'
+$originUrl = ''
+try { $originUrl = (& git -C $RepoRoot remote get-url origin 2>$null) } catch { }
+$isTemplateRepo = [bool]($originUrl -and ($originUrl -match [regex]::Escape($templateRepo)))
+
 # --- Optional: clean up template-only files in a repo created FROM the template ---
 if ($CleanupTemplateFiles) {
-    $templateRepo = 'AlexanderErdelyi/bc-alm-template'
-    $originUrl = ''
-    try { $originUrl = (& git -C $RepoRoot remote get-url origin 2>$null) } catch { }
-    if ($originUrl -and ($originUrl -match [regex]::Escape($templateRepo))) {
+    if ($isTemplateRepo) {
         Write-Host "`nSkipping template cleanup: this looks like the template repo itself ($originUrl)." -ForegroundColor Yellow
     }
     else {
@@ -337,14 +414,35 @@ if ($CleanupTemplateFiles) {
         $wsFile = Get-ChildItem -Path $RepoRoot -Filter '*.code-workspace' -File | Select-Object -First 1
         $wsName = if ($wsFile) { $wsFile.Name } else { 'the .code-workspace' }
         $readmePath = Join-Path $RepoRoot 'README.md'
+
+        # Adapt the intro + getting-started to the content that survives pruning.
+        $builtLine = if ($keep.referenceDocs) {
+            'Built with the [BC ALM workflow](docs/workflow.md): spec-driven development, GitHub Copilot' + "`n" +
+            'agents for every lifecycle stage, a documented [branching strategy](docs/branching-strategy.md),' + "`n" +
+            'and enforced [AL coding standards](.github/instructions/al-coding-standards.instructions.md).'
+        } else {
+            'Built with a spec-driven BC ALM workflow: GitHub Copilot agents for every lifecycle stage' + "`n" +
+            'and enforced [AL coding standards](.github/instructions/al-coding-standards.instructions.md).'
+        }
+        $gettingSteps = New-Object System.Collections.Generic.List[string]
+        if ($keep.sampleApp) {
+            $gettingSteps.Add("1. Open ``$wsName`` in VS Code and install the recommended AL extensions when prompted.")
+        } else {
+            $gettingSteps.Add("1. Add your AL project(s) and open the repo (or a ``*.code-workspace``) in VS Code; install the recommended AL extensions when prompted.")
+        }
+        if ($keep.specs) {
+            $gettingSteps.Add("2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$TicketPrefix-123-short-name/``, fill in")
+            $gettingSteps.Add("   ``brief.md``, open a spec PR, then implement.")
+        }
+        $gettingSteps.Add("$($gettingSteps.Count + 1). Open GitHub Copilot Chat and choose a ``bc-*`` agent — start with **BC Orchestrator** and give")
+        $gettingSteps.Add("   it a ticket ID.")
+        $gettingStarted = $gettingSteps -join "`n"
         $projectReadme = @"
 # $AppName
 
 $Publisher — a Microsoft Dynamics 365 Business Central extension.
 
-Built with the [BC ALM workflow](docs/workflow.md): spec-driven development, GitHub Copilot
-agents for every lifecycle stage, a documented [branching strategy](docs/branching-strategy.md),
-and enforced [AL coding standards](.github/instructions/al-coding-standards.instructions.md).
+$builtLine
 
 ## Project facts
 
@@ -353,11 +451,7 @@ See [PROJECT.md](PROJECT.md) for this project's prefix (``$AppPrefix``), object 
 
 ## Getting started
 
-1. Open ``$wsName`` in VS Code and install the recommended AL extensions when prompted.
-2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$TicketPrefix-123-short-name/``, fill in
-   ``brief.md``, open a spec PR, then implement.
-3. Open GitHub Copilot Chat and choose a ``bc-*`` agent — start with **BC Orchestrator** and give
-   it a ticket ID.
+$gettingStarted
 
 ## Staying up to date
 
@@ -375,6 +469,44 @@ for you. Your AL code and configured values are never overwritten (see ``.templa
             Set-Content -Path $readmePath -Value $projectReadme
         }
         Write-Host "  wrote      README.md  (project README; template docs remain at github.com/$templateRepo)" -ForegroundColor Green
+    }
+}
+
+# --- Prune content categories a working project doesn't need (config-driven) ---
+if ($doPrune) {
+    if ($isTemplateRepo) {
+        Write-Host "`nSkipping content prune: this looks like the template repo itself." -ForegroundColor Yellow
+    }
+    else {
+        # Category -> paths (mirrors sync.include in Install-IntoExistingRepo / Update-FromTemplate).
+        $categoryPaths = [ordered]@{
+            metaDocs      = @('.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
+            referenceDocs = @('docs')
+            issueOps      = @('.github/ISSUE_TEMPLATE', '.github/ISSUE_ORCHESTRATION.md',
+                '.github/workflows/issue-implementation.yml', '.github/workflows/issue-orchestrator.yml',
+                '.github/workflows/issue-planning.yml')
+            specs         = @('specs/_TEMPLATE')
+            prTemplate    = @('.github/PULL_REQUEST_TEMPLATE.md')
+            sampleApp     = @('app', 'test', 'bc-alm-template.code-workspace')
+        }
+        $pruned = 0
+        Write-Host "`nPruning unused content categories" -ForegroundColor Cyan
+        foreach ($cat in $categoryPaths.Keys) {
+            if ($keep[$cat]) { continue }
+            foreach ($rel in $categoryPaths[$cat]) {
+                $p = Join-Path $RepoRoot $rel
+                if (Test-Path $p) {
+                    if ($PSCmdlet.ShouldProcess($p, "Remove ($cat)")) { Remove-Item $p -Recurse -Force }
+                    Write-Host ("  removed    {0,-45} ({1})" -f $rel, $cat) -ForegroundColor DarkGray
+                    $pruned++
+                }
+            }
+        }
+        $kept = @($keep.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key })
+        $dropped = @($keep.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
+        if ($pruned -eq 0) { Write-Host "  nothing to prune (all selected categories kept)." -ForegroundColor DarkGray }
+        Write-Host ("  kept: {0}" -f ($(if ($kept) { $kept -join ', ' } else { '(none)' }))) -ForegroundColor Green
+        if ($dropped) { Write-Host ("  dropped: {0}  (recorded in template.config.json sync.include; sync won't re-add them)" -f ($dropped -join ', ')) -ForegroundColor DarkGray }
     }
 }
 
