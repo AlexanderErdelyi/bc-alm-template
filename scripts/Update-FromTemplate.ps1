@@ -26,6 +26,10 @@
         toolset) untouched. true pulls the template's recommended list.
       * updateInstructions - true (default) refreshes .github/instructions. false
         keeps your edited AL coding standards.
+      * include           - per-category on/off switches (metaDocs, referenceDocs,
+        issueOps, specs, prTemplate). A category set to false is never refreshed or
+        re-added, so an existing repo that opted out of, say, the docs/ library or
+        the GitHub issue-ops pipeline stays that way across every sync.
 
     This mirrors the split used by the GitHub Action
     (.github/workflows/template-sync.yml), which runs this same script. Use the
@@ -58,6 +62,13 @@ $sync = [pscustomobject]@{
     updateModels       = $false
     updateExtensions   = $false
     updateInstructions = $true
+    include            = [pscustomobject]@{
+        metaDocs      = $true
+        referenceDocs = $true
+        issueOps      = $true
+        specs         = $true
+        prTemplate    = $true
+    }
 }
 $config = $null
 $configPath = Join-Path $RepoRoot 'template.config.json'
@@ -69,6 +80,11 @@ if (Test-Path $configPath) {
         if ($s.PSObject.Properties['updateModels'])       { $sync.updateModels       = [bool]$s.updateModels }
         if ($s.PSObject.Properties['updateExtensions'])   { $sync.updateExtensions   = [bool]$s.updateExtensions }
         if ($s.PSObject.Properties['updateInstructions']) { $sync.updateInstructions = [bool]$s.updateInstructions }
+        if ($s.PSObject.Properties['include'] -and $s.include) {
+            foreach ($k in 'metaDocs', 'referenceDocs', 'issueOps', 'specs', 'prTemplate') {
+                if ($s.include.PSObject.Properties[$k]) { $sync.include.$k = [bool]$s.include.$k }
+            }
+        }
     }
 }
 
@@ -79,6 +95,8 @@ if ($sync.customizationsPath -and $sync.customizationsPath -ne '.') {
 }
 
 Write-Host "Sync config: customizationsPath='$($sync.customizationsPath)', updateModels=$($sync.updateModels), updateExtensions=$($sync.updateExtensions), updateInstructions=$($sync.updateInstructions)" -ForegroundColor DarkGray
+$inc = $sync.include
+Write-Host "  include: metaDocs=$($inc.metaDocs), referenceDocs=$($inc.referenceDocs), issueOps=$($inc.issueOps), specs=$($inc.specs), prTemplate=$($inc.prTemplate)" -ForegroundColor DarkGray
 
 # --- Template-managed paths ------------------------------------------------------
 # Customization trees are VS Code-discoverable and follow customizationsPath.
@@ -88,19 +106,16 @@ $customTrees = @(
 )
 if ($sync.updateInstructions) { $customTrees += '.github/instructions' }
 
-# Root-only trees/files always land at the repo root (GitHub reads them there).
-$rootTrees = @(
-    '.github/ISSUE_TEMPLATE',
-    '.github/workflows',
-    'docs',
-    'specs/_TEMPLATE'
-)
+# Root-only trees always land at the repo root (GitHub reads them there). Optional
+# content categories are gated by sync.include so excluded content is never re-added.
+$rootTrees = @()
+if ($inc.referenceDocs) { $rootTrees += 'docs' }
+if ($inc.specs)         { $rootTrees += 'specs/_TEMPLATE' }
+if ($inc.issueOps)      { $rootTrees += '.github/ISSUE_TEMPLATE' }
+
+# Core files always refreshed (the sync machinery + shared scripts/config).
 $rootFiles = @(
-    '.github/AGENT-ARCHITECTURE.md',
-    '.github/WHEN-TO-USE.md',
-    '.github/SKILLS.md',
-    '.github/ISSUE_ORCHESTRATION.md',
-    '.github/PULL_REQUEST_TEMPLATE.md',
+    '.github/workflows/template-sync.yml',
     'scripts/Initialize-Template.ps1',
     'scripts/Add-BCQuality.ps1',
     'scripts/Start-ALLanguageServer.ps1',
@@ -110,6 +125,16 @@ $rootFiles = @(
     '.vscode/tasks.json',
     '.templatesyncignore'
 )
+if ($inc.metaDocs) {
+    $rootFiles += '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md'
+}
+if ($inc.issueOps) {
+    $rootFiles += '.github/ISSUE_ORCHESTRATION.md',
+    '.github/workflows/issue-implementation.yml',
+    '.github/workflows/issue-orchestrator.yml',
+    '.github/workflows/issue-planning.yml'
+}
+if ($inc.prTemplate)       { $rootFiles += '.github/PULL_REQUEST_TEMPLATE.md' }
 if ($sync.updateExtensions) { $rootFiles += '.vscode/extensions.json' }
 
 $git = Get-Command git -ErrorAction SilentlyContinue
@@ -210,6 +235,13 @@ finally {
 Write-Host "`nSummary: $added added, $updated updated, $remodeled models re-applied, $unchanged already current." -ForegroundColor White
 if (-not $sync.updateExtensions) { Write-Host "Kept your .vscode/extensions.json (sync.updateExtensions = false)." -ForegroundColor DarkGray }
 if (-not $sync.updateInstructions) { Write-Host "Kept your .github/instructions (sync.updateInstructions = false)." -ForegroundColor DarkGray }
+$excluded = @()
+if (-not $inc.metaDocs)      { $excluded += 'metaDocs' }
+if (-not $inc.referenceDocs) { $excluded += 'referenceDocs' }
+if (-not $inc.issueOps)      { $excluded += 'issueOps' }
+if (-not $inc.specs)         { $excluded += 'specs' }
+if (-not $inc.prTemplate)    { $excluded += 'prTemplate' }
+if ($excluded.Count) { Write-Host ("Skipped disabled content categories (sync.include): {0}." -f ($excluded -join ', ')) -ForegroundColor DarkGray }
 Write-Host "Project-owned files (app/, test/, specs/, PROJECT.md, template.config.json," -ForegroundColor DarkGray
 Write-Host "copilot-instructions.md, .vscode/launch.json|mcp.json|settings.json) were left untouched." -ForegroundColor DarkGray
 Write-Host "`nNext: review 'git diff', then commit the updates you want to keep." -ForegroundColor White
