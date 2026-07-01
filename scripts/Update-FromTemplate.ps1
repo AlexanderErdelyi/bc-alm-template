@@ -11,9 +11,25 @@
     copilot-instructions.md, and the token-injected .vscode files (launch.json,
     mcp.json, settings.json).
 
-    This mirrors the .templatesyncignore split used by the GitHub Action
-    (.github/workflows/template-sync.yml). Use the Action for automatic PRs; use
-    this script when you want to pull updates on demand from your machine.
+    The 'sync' block in template.config.json steers the refresh so it respects your
+    project's choices:
+
+      * customizationsPath - '.' keeps the VS Code-discoverable customizations
+        (.github/agents, .github/skills, .github/instructions) at the repo root
+        (default). Set it to a subfolder (e.g. 'app') and those are refreshed under
+        <path>/.github instead. GitHub platform files (.github/workflows,
+        ISSUE_TEMPLATE, PULL_REQUEST_TEMPLATE) always stay at the repo root.
+      * updateModels     - false (default) re-applies your agent 'model:' choices
+        from template.config.json after the refresh, so you get template prompt/
+        handoff improvements but keep your own models. true accepts the template's.
+      * updateExtensions - false (default) leaves .vscode/extensions.json (your
+        toolset) untouched. true pulls the template's recommended list.
+      * updateInstructions - true (default) refreshes .github/instructions. false
+        keeps your edited AL coding standards.
+
+    This mirrors the split used by the GitHub Action
+    (.github/workflows/template-sync.yml), which runs this same script. Use the
+    Action for automatic PRs; use this script to pull updates on demand.
 
     Nothing is committed. After it runs, review 'git diff' and commit what you want.
 
@@ -36,19 +52,50 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path $RepoRoot).Path
 
-# Template-managed paths (refreshed from the template). Everything here is safe to
-# overwrite because none of it is token-injected or project-owned. Keep this list
-# in sync with .templatesyncignore (which is the inverse) and Install-IntoExistingRepo.ps1.
-$managedTrees = @(
+# --- Read the sync configuration (template.config.json 'values.sync') ------------
+$sync = [pscustomobject]@{
+    customizationsPath = '.'
+    updateModels       = $false
+    updateExtensions   = $false
+    updateInstructions = $true
+}
+$config = $null
+$configPath = Join-Path $RepoRoot 'template.config.json'
+if (Test-Path $configPath) {
+    try { $config = Get-Content $configPath -Raw | ConvertFrom-Json } catch { $config = $null }
+    if ($config -and $config.values -and $config.values.sync) {
+        $s = $config.values.sync
+        if ($s.PSObject.Properties['customizationsPath'] -and $s.customizationsPath) { $sync.customizationsPath = [string]$s.customizationsPath }
+        if ($s.PSObject.Properties['updateModels'])       { $sync.updateModels       = [bool]$s.updateModels }
+        if ($s.PSObject.Properties['updateExtensions'])   { $sync.updateExtensions   = [bool]$s.updateExtensions }
+        if ($s.PSObject.Properties['updateInstructions']) { $sync.updateInstructions = [bool]$s.updateInstructions }
+    }
+}
+
+# Folder that holds the VS Code-discoverable customizations. '' = repo root.
+$custRoot = ''
+if ($sync.customizationsPath -and $sync.customizationsPath -ne '.') {
+    $custRoot = $sync.customizationsPath.Trim().TrimEnd('/', '\')
+}
+
+Write-Host "Sync config: customizationsPath='$($sync.customizationsPath)', updateModels=$($sync.updateModels), updateExtensions=$($sync.updateExtensions), updateInstructions=$($sync.updateInstructions)" -ForegroundColor DarkGray
+
+# --- Template-managed paths ------------------------------------------------------
+# Customization trees are VS Code-discoverable and follow customizationsPath.
+$customTrees = @(
     '.github/agents',
-    '.github/skills',
-    '.github/instructions',
+    '.github/skills'
+)
+if ($sync.updateInstructions) { $customTrees += '.github/instructions' }
+
+# Root-only trees/files always land at the repo root (GitHub reads them there).
+$rootTrees = @(
     '.github/ISSUE_TEMPLATE',
     '.github/workflows',
     'docs',
     'specs/_TEMPLATE'
 )
-$managedFiles = @(
+$rootFiles = @(
     '.github/AGENT-ARCHITECTURE.md',
     '.github/WHEN-TO-USE.md',
     '.github/SKILLS.md',
@@ -59,10 +106,11 @@ $managedFiles = @(
     'scripts/Start-ALLanguageServer.ps1',
     'scripts/Update-FromTemplate.ps1',
     'scripts/Enable-CopilotCustomizations.ps1',
-    '.vscode/extensions.json',
+    'scripts/Install-IntoExistingRepo.ps1',
     '.vscode/tasks.json',
     '.templatesyncignore'
 )
+if ($sync.updateExtensions) { $rootFiles += '.vscode/extensions.json' }
 
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git) { throw "git is required but was not found on PATH." }
@@ -72,17 +120,28 @@ Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
 & git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp
 if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
 
-$updated = 0; $added = 0; $unchanged = 0
+$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0
 
 function Get-Hash([string] $path) {
     if (-not (Test-Path $path)) { return $null }
     return (Get-FileHash -Algorithm SHA256 -Path $path).Hash
 }
 
+# Map a source-relative path to its destination-relative path (relocating the
+# discoverable customizations under $custRoot when configured).
+function Resolve-Dest([string] $rel) {
+    $r = $rel.Replace('\', '/')
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|instructions)(/|$)')) {
+        return "$custRoot/$r"
+    }
+    return $r
+}
+
 function Update-One([string] $rel) {
     $src = Join-Path $temp $rel
     if (-not (Test-Path $src)) { return }
-    $dst = Join-Path $RepoRoot $rel
+    $destRel = Resolve-Dest $rel
+    $dst = Join-Path $RepoRoot $destRel
     $dstDir = Split-Path $dst -Parent
     $existed = Test-Path $dst
 
@@ -91,12 +150,12 @@ function Update-One([string] $rel) {
         return
     }
 
-    if ($PSCmdlet.ShouldProcess($dst, "Update $rel from template")) {
+    if ($PSCmdlet.ShouldProcess($dst, "Update $destRel from template")) {
         if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
         Copy-Item $src $dst -Force
     }
-    if ($existed) { Write-Host "  updated    $rel" -ForegroundColor Yellow; $script:updated++ }
-    else { Write-Host "  added      $rel" -ForegroundColor Green; $script:added++ }
+    if ($existed) { Write-Host "  updated    $destRel" -ForegroundColor Yellow; $script:updated++ }
+    else { Write-Host "  added      $destRel" -ForegroundColor Green; $script:added++ }
 }
 
 function Update-Tree([string] $relDir) {
@@ -108,16 +167,49 @@ function Update-Tree([string] $relDir) {
     }
 }
 
+# Re-apply each agent's 'model:' line from template.config.json (values win over
+# the template's defaults) unless the project opted into template model updates.
+function Restore-Models {
+    if ($sync.updateModels) { return }
+    if (-not ($config -and $config.models)) { return }
+    $agentsRel = if ($custRoot) { "$custRoot/.github/agents" } else { '.github/agents' }
+    $agentsDir = Join-Path $RepoRoot $agentsRel
+    if (-not (Test-Path $agentsDir)) { return }
+    foreach ($prop in $config.models.PSObject.Properties) {
+        if ($prop.Name -eq '_readme') { continue }
+        $agentPath = Join-Path $agentsDir ("{0}.agent.md" -f $prop.Name)
+        if (-not (Test-Path $agentPath)) { continue }
+        $model = [string]$prop.Value
+        $aText = Get-Content $agentPath -Raw
+        $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', ('model: "{0}"' -f $model))
+        if ($newText -ne $aText) {
+            if ($PSCmdlet.ShouldProcess($agentPath, "Re-apply model $model")) {
+                Set-Content -Path $agentPath -Value $newText -NoNewline
+            }
+            Write-Host ("  model      {0,-16} -> {1}" -f $prop.Name, $model) -ForegroundColor Magenta
+            $script:remodeled++
+        }
+    }
+}
+
 try {
     Write-Host "`nRefreshing template-managed files" -ForegroundColor White
-    foreach ($t in $managedTrees) { Update-Tree $t }
-    foreach ($f in $managedFiles) { Update-One $f }
+    foreach ($t in $customTrees) { Update-Tree $t }
+    foreach ($t in $rootTrees) { Update-Tree $t }
+    foreach ($f in $rootFiles) { Update-One $f }
+
+    if (-not $sync.updateModels) {
+        Write-Host "`nRe-applying your agent models (sync.updateModels = false)" -ForegroundColor White
+        Restore-Models
+    }
 }
 finally {
     if (Test-Path $temp) { Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-Write-Host "`nSummary: $added added, $updated updated, $unchanged already current." -ForegroundColor White
+Write-Host "`nSummary: $added added, $updated updated, $remodeled models re-applied, $unchanged already current." -ForegroundColor White
+if (-not $sync.updateExtensions) { Write-Host "Kept your .vscode/extensions.json (sync.updateExtensions = false)." -ForegroundColor DarkGray }
+if (-not $sync.updateInstructions) { Write-Host "Kept your .github/instructions (sync.updateInstructions = false)." -ForegroundColor DarkGray }
 Write-Host "Project-owned files (app/, test/, specs/, PROJECT.md, template.config.json," -ForegroundColor DarkGray
 Write-Host "copilot-instructions.md, .vscode/launch.json|mcp.json|settings.json) were left untouched." -ForegroundColor DarkGray
 Write-Host "`nNext: review 'git diff', then commit the updates you want to keep." -ForegroundColor White
