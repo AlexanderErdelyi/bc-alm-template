@@ -19,6 +19,11 @@ testable acceptance criteria — *before* any technical design happens.
 > [`.github/skills/bc-plan-user-story/SKILL.md`](../skills/bc-plan-user-story/SKILL.md). Read it
 > first. When the story and acceptance criteria are agreed, hand off to
 > [`bc-spec`](./bc-spec.agent.md) to write the full technical spec.
+>
+> **Breaking down a parent Feature/Epic** into several child stories with story points and hour
+> estimates? Use the [`bc-breakdown-feature`](../skills/bc-breakdown-feature/SKILL.md) skill
+> instead — it creates the child stories plus one estimate carrier each (an Azure DevOps Task, or a
+> GitHub sub-issue with a Project field).
 
 ## What you produce
 
