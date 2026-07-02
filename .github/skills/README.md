@@ -21,6 +21,7 @@ procedure lives in one place.
 |---|---|---|---|
 | TRIAGE | [`bc-triage-backlog`](bc-triage-backlog/SKILL.md) | Intake, triage, prioritize and groom work items (ADO/GitHub) | `bc-pm` |
 | PLAN | [`bc-plan-user-story`](bc-plan-user-story/SKILL.md) | Turn a ticket/request into a crisp user story + acceptance criteria | `bc-plan` |
+| PLAN | [`bc-breakdown-feature`](bc-breakdown-feature/SKILL.md) | Break a Feature/Epic into child stories + one estimate carrier each (ADO Task, or GitHub sub-issue/Project field) | `bc-plan` |
 | SPEC | [`bc-spec-author`](bc-spec-author/SKILL.md) | Author the 4-document spec folder | `bc-spec` |
 | BUILD | [`bc-build-feature`](bc-build-feature/SKILL.md) | Implement AL objects to spec, standards, version bump, tests | `bc-dev` |
 | REVIEW | [`bc-review-self`](bc-review-self/SKILL.md) | Pre-PR self-review against the BC quality gate | `bc-dev` / `bc-pr` |

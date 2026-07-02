@@ -8,6 +8,7 @@ its `Use when:` triggers.
 |---|---|---|
 | [`bc-triage-backlog`](skills/bc-triage-backlog/SKILL.md) | TRIAGE | Intake, triage, prioritize and groom work items (ADO/GitHub) |
 | [`bc-plan-user-story`](skills/bc-plan-user-story/SKILL.md) | PLAN | Ticket/request → user story + acceptance criteria |
+| [`bc-breakdown-feature`](skills/bc-breakdown-feature/SKILL.md) | PLAN | Break a Feature/Epic into child stories + estimate carriers (ADO Task or GitHub sub-issue/Project field) |
 | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) | SPEC | Author the 4-document spec folder |
 | [`bc-build-feature`](skills/bc-build-feature/SKILL.md) | BUILD | Implement AL objects to spec + standards + tests |
 | [`bc-review-self`](skills/bc-review-self/SKILL.md) | REVIEW | Pre-PR self-review against the AL quality gate |
