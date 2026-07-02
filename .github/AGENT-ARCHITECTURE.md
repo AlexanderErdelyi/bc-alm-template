@@ -59,18 +59,25 @@ you want to understand *why* it is structured the way it is before adapting it.
   Defaults: Sonnet 4.6 for most, Opus 4.8 for the deep-reasoning agents (`bc-spec`, `bc-pr`). If
   VS Code flags a model as unknown, add the ` (copilot)` suffix.
 - **Role-based, namespaced tool profiles.** Each agent lists a tool profile sized to its job,
-  using namespaced built-in IDs (`search/codebase`, `search/textSearch`, `edit/editFiles`,
-  `web/githubRepo`, `web/fetch`, `execute/runInTerminal`, and `agent` for the orchestrator) plus
-  MCP servers wired in via wildcard IDs from [`.vscode/mcp.json`](../.vscode/mcp.json):
-  - `github/*` — on every agent that touches issues, PRs, or repo content.
-  - `azure-devops/*` — on the work-item-facing agents (`bc-pm`, `bc-plan`, `bc-spec`, `bc-pr`,
-    `bc-dev`, `bc-deploy`, `bc-orchestrator`). If your project tracks work in GitHub Issues,
-    the initializer (`-WorkItemSystem GitHub`) strips this group automatically.
-  - `al/*` — on the AL-heavy agents (`bc-dev`, `bc-spec`, `bc-pr`, `bc-deploy`). These become
-    live only once you enable the `al` MCP server (rename `_al` → `al` in `.vscode/mcp.json`
-    after installing the AL Dev Tools); until then they show as unavailable, which is harmless.
+  using namespaced built-in IDs (`search/codebase`, `search/textSearch`, `search/usages`,
+  `edit/editFiles`, `read/problems`, `execute/runInTerminal`, `execute/runTests`, `web/githubRepo`,
+  `web/fetch`, and `agent/runSubagent` for the orchestrator) plus two kinds of provider tools:
+  - **MCP servers** via wildcard IDs from [`.vscode/mcp.json`](../.vscode/mcp.json):
+    - `github/*` — on every agent that touches issues, PRs, or repo content.
+    - `azure-devops/*` — on the work-item-facing agents (`bc-pm`, `bc-plan`, `bc-spec`, `bc-pr`,
+      `bc-dev`, `bc-deploy`, `bc-orchestrator`). If your project tracks work in GitHub Issues,
+      the initializer (`-WorkItemSystem GitHub`) strips this group automatically.
+    - `al/*` — on the AL-heavy agents. Live only once you enable the `al` MCP server (rename
+      `_al` → `al` in `.vscode/mcp.json` after installing the AL Dev Tools).
+  - **VS Code extension language-model tools** — the AL agents reference the tools contributed by
+    extensions in [`.vscode/extensions.json`](../.vscode/extensions.json), so they work in-editor
+    with no extra server: `ms-dynamics-smb.al/al_build`, `al_downloadsymbols`, `al_symbolsearch`,
+    `al_get_diagnostics`, `al_publish` (the AL extension), `vjeko.vjeko-al-objid/ninjaNextId`
+    (Object ID Ninja, for new object IDs), and `nabsolutions.nab-al-tools/*` (translation/XLF).
+    These show as unavailable until the extension is installed, which is harmless.
 
-  Trim or extend any profile per repo — the wildcard IDs are the seam for your own MCP tools.
+  Trim or extend any profile per repo — the wildcard and `extensionId/tool` IDs are the seam for
+  your own tools.
 - **Handoffs are human-in-the-loop.** A `handoffs:` entry is a labelled, one-click step to the
   next agent — the human stays in control of phase transitions.
 

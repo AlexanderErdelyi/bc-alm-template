@@ -1,7 +1,7 @@
 ---
 description: "BC Pull Request - prepares and reviews BC pull requests. Use when: open a PR, write a pull request description, run the AL quality checklist, link the ADO work item, get ready for review, update a PR description."
 model: "Claude Opus 4.8"
-tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'al/*', 'github/*', 'azure-devops/*']
+tools: ['search/codebase', 'search/textSearch', 'search/usages', 'edit/editFiles', 'execute/runInTerminal', 'execute/runTests', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_get_diagnostics', 'nabsolutions.nab-al-tools/getTextsToTranslate', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "SHIP · Compose the release after merge"
     agent: "bc-deploy"

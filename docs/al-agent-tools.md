@@ -36,6 +36,28 @@ References:
 | `al_debug` / `al_setbreakpoint` / `al_snapshotdebugging` | Debugging | VS Code |
 | `al_auth_login` / `al_auth_logout` | Browser-based MSAL auth (tokens cached on disk) | MCP |
 
+### How the agents reference these
+
+The AL agents in this template (`bc-dev`, `bc-spec`, `bc-pr`, `bc-deploy`, `bc-workflow`) list the
+tools **two ways**, so they work whether or not you run the standalone server:
+
+- **VS Code extension tools** — referenced by their extension-qualified IDs, contributed by the
+  extensions in [`.vscode/extensions.json`](../.vscode/extensions.json). No global tool needed;
+  they light up as soon as the extension is installed:
+  - `ms-dynamics-smb.al/al_build`, `al_downloadsymbols`, `al_symbolsearch`, `al_get_diagnostics`,
+    `al_publish` — the **AL Language** extension.
+  - `vjeko.vjeko-al-objid/ninjaNextId`, `ninjaUnassignId` — **Object ID Ninja** (collision-free
+    object IDs).
+  - `nabsolutions.nab-al-tools/refreshXlf`, `getTextsToTranslate`, … — **NAB AL Tools**
+    (translation / XLF).
+- **`al/*` MCP wildcard** — the same actions over stdio for headless / CI / non-VS Code agents,
+  enabled by renaming `_al` → `al` in [`.vscode/mcp.json`](../.vscode/mcp.json) after installing the
+  AL Dev Tools below.
+
+Referencing both is intentional: the extension IDs cover day-to-day in-editor work with zero extra
+setup, and `al/*` covers headless scenarios. Any ID whose provider isn't installed simply shows as
+unavailable — harmless.
+
 ---
 
 ## 1. Install the AL Dev Tools (`al` / ALTool)

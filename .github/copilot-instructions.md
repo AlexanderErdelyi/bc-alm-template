@@ -40,6 +40,29 @@ Business Central** AL development. It combines:
 - **Specs come first**: do not implement AL objects until the spec folder exists and is
   reviewed. The `bc-dev` agent reads `plan.md` and `acceptance-criteria.md`.
 
+## AL build & diagnostics (tool usage)
+
+When the AL agent tools are available (the AL Language extension or the `al` MCP server — see
+[docs/al-agent-tools.md](../docs/al-agent-tools.md)), prefer them over raw terminal commands:
+
+- **After every AL edit, check `al_get_diagnostics`** (or `#al_getdiagnostics` in chat) and resolve
+  errors before moving on. Do not rely on reading source alone to judge whether code compiles.
+- **Do not run `alc.exe` directly in the terminal** for routine work — use `al_build` to compile to
+  a `.app`, and `al_downloadsymbols` when references are missing. Reserve manual `alc` invocation
+  for CI or when the tools are unavailable.
+- **Navigate symbolically**: use `al_symbolsearch` and `search/usages` (find references) instead of
+  text search when you need to locate objects, fields, or callers — they understand AL scopes.
+- **New object IDs** come from Object ID Ninja (`ninjaNextId`); never hand-pick an ID that may
+  collide. Keep IDs inside the app's assigned range.
+
+## Work-item tools (Azure DevOps / GitHub)
+
+- Choose the work-item backend that matches the repo: Azure DevOps (`azure-devops/*`) or GitHub
+  Issues/PRs (`github/*`). The initializer wires exactly one; don't mix.
+- **Azure DevOps field formats matter**: the work-item **Description** (and other large HTML fields)
+  must be written as **HTML**, while **comments/discussion** use **Markdown**. Sending Markdown into
+  an HTML field renders raw tags. Match the field's expected format when creating or updating items.
+
 ## When responding
 
 - Name the specific agent to switch to when a task belongs to a different stage.
