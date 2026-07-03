@@ -1,7 +1,7 @@
 ---
 agent: 'agent'
 description: 'Analyze this repository and generate or refresh .github/copilot-instructions.md plus path-scoped .github/instructions/*.instructions.md files.'
-tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'github/*']
+tools: ['search', 'read/readFile', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'web/githubRepo', 'web/fetch', 'github/*', 'azure-devops/*']
 ---
 
 # Generate Repository Custom Instructions

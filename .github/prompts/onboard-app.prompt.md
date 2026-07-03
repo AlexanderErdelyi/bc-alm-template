@@ -1,7 +1,7 @@
 ---
 agent: 'agent'
 description: 'Onboard a new or existing AL app into the BC ALM template: capture the ALM decisions, apply them with the initializer, and scaffold repo instructions and the first spec.'
-tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'github/*']
+tools: ['search', 'read/readFile', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'execute/runInTerminal', 'execute/runTask', 'web/githubRepo', 'web/fetch', 'agent', 'al/*', 'github/*', 'azure-devops/*']
 ---
 
 # Onboard This App into the BC ALM Workflow

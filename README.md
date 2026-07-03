@@ -554,6 +554,25 @@ your local customizations even as you pull template improvements:
 The values map (`models` in `template.config.json`) is the single source of truth for `updateModels: false`
 re-application — update a model there once and every sync keeps it.
 
+#### Keep your own tools across syncs (`extraTools`)
+
+Agent and prompt files are template-owned, so their `tools:` lists get overwritten on every sync.
+If your team relies on extra tool IDs that aren't in the template's default lists (custom MCP
+servers, local AL tooling, etc.), record them in `values.extraTools` and both the initializer and
+`Update-FromTemplate.ps1` will **re-append them after each refresh** (additive only — never removed):
+
+```jsonc
+"extraTools": {
+  "all":     ["bc-code-intel/*"],           // added to every agent + prompt
+  "agents":  { "bc-dev": ["nab-al-tools/*"] }, // added only to .github/agents/bc-dev.agent.md
+  "prompts": { "onboard-app": ["prism/*"] }    // added only to .github/prompts/onboard-app.prompt.md
+}
+```
+
+Per-file keys are the filename without the `.agent`/`.prompt` suffix. The initializer's
+`-ExtraTools` parameter (or its interactive prompt) seeds `extraTools.all`. Keep **machine-specific**
+server IDs out of shared config — set those in your VS Code tool picker instead.
+
 This template includes a small, working AL extension so you can see the conventions applied
 to real code (and have something that compiles from day one). It is structured as a
 **two-project workspace** — a production app and a separate test app — the same layout

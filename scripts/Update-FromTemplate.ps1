@@ -32,6 +32,16 @@
         re-added, so an existing repo that opted out of, say, the docs/ library or
         the GitHub issue-ops pipeline stays that way across every sync.
 
+    After the refresh, two 'values' settings are re-applied so your customizations
+    survive the overwrite:
+
+      * extraTools - project-specific tool IDs merged (additive, de-duplicated) into
+        every agent + prompt 'tools:' list. 'all' applies everywhere; 'agents'/'prompts'
+        add per-file extras keyed by file name (e.g. 'bc-dev', 'onboard-app'). This is
+        how custom MCP servers stay in the toolsets after the template files are
+        overwritten. Also, when workItemSystem = GitHub, the azure-devops/* group the
+        template ships is trimmed back out of the agent/prompt toolsets.
+
     This mirrors the split used by the GitHub Action
     (.github/workflows/template-sync.yml), which runs this same script. Use the
     Action for automatic PRs; use this script to pull updates on demand.
@@ -149,7 +159,7 @@ Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
 & git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp
 if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
 
-$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0
+$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0; $retooled = 0; $trimmed = 0
 
 function Get-Hash([string] $path) {
     if (-not (Test-Path $path)) { return $null }
@@ -222,6 +232,76 @@ function Restore-Models {
     }
 }
 
+# Add project-specific extra tool IDs (template.config.json values.extraTools) to each
+# agent + prompt 'tools:' list. The refresh just overwrote those files with the template's
+# generic toolsets, so we re-append your custom tools (additive, de-duplicated) to keep
+# them across syncs. Mirrors Restore-Models for the 'tools:' frontmatter line.
+function Add-ExtraToolsToFile([string] $filePath, [string[]] $extra) {
+    if (-not $extra -or $extra.Count -eq 0 -or -not (Test-Path $filePath)) { return }
+    $text = Get-Content $filePath -Raw
+    $m = [regex]::Match($text, '(?m)^tools:\s*\[(.*)\]\s*$')
+    if (-not $m.Success) { return }
+    $existing = @(); foreach ($t in ($m.Groups[1].Value -split ',')) { $tt = $t.Trim().Trim("'`""); if ($tt) { $existing += $tt } }
+    $addedTools = @()
+    foreach ($e in ($extra | ForEach-Object { $_ -split '\s*,\s*' })) { $en = ([string]$e).Trim().Trim("'`""); if ($en -and ($existing -notcontains $en)) { $existing += $en; $addedTools += $en } }
+    if ($addedTools.Count -eq 0) { return }
+    $newLine = 'tools: [' + (($existing | ForEach-Object { "'$_'" }) -join ', ') + ']'
+    $newText = $text.Replace($m.Value, $newLine)
+    if ($PSCmdlet.ShouldProcess($filePath, ("Add extra tools: {0}" -f ($addedTools -join ', ')))) {
+        Set-Content -Path $filePath -Value $newText -NoNewline
+    }
+    Write-Host ("  tools      {0,-28} += {1}" -f (Split-Path $filePath -Leaf), ($addedTools -join ', ')) -ForegroundColor Cyan
+    $script:retooled++
+}
+
+function Merge-ExtraTools {
+    if (-not ($config -and $config.values -and $config.values.PSObject.Properties['extraTools'])) { return }
+    $et = $config.values.extraTools
+    $all = @(); if ($et.PSObject.Properties['all'] -and $et.all) { $all = @($et.all) }
+    $perAgent  = if ($et.PSObject.Properties['agents'])  { $et.agents }  else { $null }
+    $perPrompt = if ($et.PSObject.Properties['prompts']) { $et.prompts } else { $null }
+    if (-not ($all.Count -or $perAgent -or $perPrompt)) { return }
+    Write-Host "`nRe-applying your extra tools (values.extraTools)" -ForegroundColor White
+    $agentsDir  = if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/agents" }  else { Join-Path $RepoRoot '.github/agents' }
+    $promptsDir = if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/prompts" } else { Join-Path $RepoRoot '.github/prompts' }
+    if (Test-Path $agentsDir) {
+        Get-ChildItem $agentsDir -Filter *.agent.md | ForEach-Object {
+            $name = $_.BaseName -replace '\.agent$', ''
+            $extra = @($all); if ($perAgent -and $perAgent.PSObject.Properties[$name]) { $extra += @($perAgent.$name) }
+            Add-ExtraToolsToFile $_.FullName $extra
+        }
+    }
+    if (Test-Path $promptsDir) {
+        Get-ChildItem $promptsDir -Filter *.prompt.md | ForEach-Object {
+            $name = $_.BaseName -replace '\.prompt$', ''
+            $extra = @($all); if ($perPrompt -and $perPrompt.PSObject.Properties[$name]) { $extra += @($perPrompt.$name) }
+            Add-ExtraToolsToFile $_.FullName $extra
+        }
+    }
+}
+
+# Keep GitHub-work-item repos lean: strip the azure-devops/* MCP group the template
+# ships in agent/prompt toolsets (the refresh re-adds it). Mirrors the initializer's trim.
+function Trim-WorkItemTools {
+    if (-not ($config -and $config.values -and $config.values.PSObject.Properties['workItemSystem'])) { return }
+    if ([string]$config.values.workItemSystem -ne 'GitHub') { return }
+    $dirs = @()
+    $dirs += if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/agents" }  else { Join-Path $RepoRoot '.github/agents' }
+    $dirs += if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/prompts" } else { Join-Path $RepoRoot '.github/prompts' }
+    foreach ($d in $dirs) {
+        if (-not (Test-Path $d)) { continue }
+        Get-ChildItem $d -File | Where-Object { $_.Name -match '\.(agent|prompt)\.md$' } | ForEach-Object {
+            $t = Get-Content $_.FullName -Raw
+            $n = $t.Replace(", 'azure-devops/*'", '').Replace("'azure-devops/*', ", '').Replace("'azure-devops/*'", '')
+            if ($n -ne $t) {
+                if ($PSCmdlet.ShouldProcess($_.FullName, 'Trim azure-devops/* (GitHub work items)')) { Set-Content -Path $_.FullName -Value $n -NoNewline }
+                Write-Host ("  tools      trimmed azure-devops/* from {0}" -f $_.Name) -ForegroundColor DarkYellow
+                $script:trimmed++
+            }
+        }
+    }
+}
+
 try {
     Write-Host "`nRefreshing template-managed files" -ForegroundColor White
     foreach ($t in $customTrees) { Update-Tree $t }
@@ -232,12 +312,15 @@ try {
         Write-Host "`nRe-applying your agent models (sync.updateModels = false)" -ForegroundColor White
         Restore-Models
     }
+
+    Trim-WorkItemTools
+    Merge-ExtraTools
 }
 finally {
     if (Test-Path $temp) { Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-Write-Host "`nSummary: $added added, $updated updated, $remodeled models re-applied, $unchanged already current." -ForegroundColor White
+Write-Host "`nSummary: $added added, $updated updated, $remodeled models re-applied, $retooled tool lists extended, $trimmed trimmed, $unchanged already current." -ForegroundColor White
 if (-not $sync.updateExtensions) { Write-Host "Kept your .vscode/extensions.json (sync.updateExtensions = false)." -ForegroundColor DarkGray }
 if (-not $sync.updateInstructions) { Write-Host "Kept your .github/instructions (sync.updateInstructions = false)." -ForegroundColor DarkGray }
 $excluded = @()
