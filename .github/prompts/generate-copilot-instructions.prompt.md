@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: 'Analyze this repository and generate or refresh .github/copilot-instructions.md plus path-scoped .github/instructions/*.instructions.md files.'
 tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRepo', 'web/fetch', 'github/*']
 ---

@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: 'Onboard a new or existing AL app into the BC ALM template: capture the ALM decisions, apply them with the initializer, and scaffold repo instructions and the first spec.'
 tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'web/githubRepo', 'web/fetch', 'github/*']
 ---
