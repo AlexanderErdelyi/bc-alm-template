@@ -3,27 +3,28 @@
 Testable, per enrichment item. "Done" = the target skill/doc contains the generalized pattern,
 contains **no** Nobilis-specific content, and parses/lints clean.
 
-## E1 — Structured self-review quality gate (`bc-review-self`)
-- **AC-01** — Given a feature branch, When the skill runs, Then it defines an explicit sequence:
+## E1 — Structured self-review quality gate (`bc-review-self`) — ✅ done
+- **AC-01** ✅ — Given a feature branch, When the skill runs, Then it defines an explicit sequence:
   establish baseline → collect diff → run deterministic checks (parallel) → classify findings
   (blocking / warning / info) → apply fixes → **build-verification gate** → structured report.
-- **AC-02** — The build-verification step references `al_build` + `al_get_diagnostics` (from PR #20),
+- **AC-02** ✅ — The build-verification step references `al_build` + `al_get_diagnostics` (from PR #20),
   not raw `alc`.
-- **AC-03** — The skill includes `Tool Contracts`, `Anti-Patterns`, and `Example Triggers` sections.
-- **AC-04** — No German text, Wiki.js, or NOB-specific references remain.
+- **AC-03** ✅ — The skill includes `Tool Contracts`, `Anti-Patterns`, and `Example Triggers` sections.
+- **AC-04** ✅ — No German text, Wiki.js, or NOB-specific references remain; compares against `main`
+  (not uat); BCQuality augmentation section preserved.
 
-## E4 — Deeper technical spec (`bc-spec-author`)
-- **AC-05** — `plan.md` authoring gains steps for: object-ID reservation (via Object ID Ninja),
+## E4 — Deeper technical spec (`bc-spec-author`) — ✅ done
+- **AC-05** ✅ — `plan.md` authoring gains steps for: object-ID reservation (via Object ID Ninja),
   labels/localization plan, architecture decision records (ADRs), dependency map, and explicit
   scope boundaries.
-- **AC-06** — The existing quality-gate checklist is extended, not replaced (all current items kept).
-- **AC-07** — Object-ID guidance stays inside the assigned range and says "ask if unknown".
+- **AC-06** ✅ — The existing quality-gate checklist is extended, not replaced (all current items kept).
+- **AC-07** ✅ — Object-ID guidance stays inside the assigned range and says "ask if unknown".
 
-## E6 — Error-handling reference (`bc-build-feature`)
-- **AC-08** — A new `references/error-handling.md` covers at least: work item not found, branch
+## E6 — Error-handling reference (`bc-build-feature`) — ✅ done
+- **AC-08** ✅ — A new `references/error-handling.md` covers at least: work item not found, branch
   already exists, git operation fails, implementation uncertainty — each with a recommended action.
-- **AC-09** — `bc-build-feature/SKILL.md` links to the reference.
-- **AC-10** — Guidance is backend-neutral (works for ADO or GitHub).
+- **AC-09** ✅ — `bc-build-feature/SKILL.md` links to the reference.
+- **AC-10** ✅ — Guidance is backend-neutral (works for ADO or GitHub).
 
 ## E3 — Comprehensive PR body (`bc-ship-pull-request`)
 - **AC-11** — The PR body procedure produces a changelog **grouped by commit type**, a linked

@@ -11,7 +11,9 @@ procedure of the **`bc-dev`** agent.
 > All AL code must follow
 > [`../../instructions/al-coding-standards.instructions.md`](../../instructions/al-coding-standards.instructions.md).
 > Detailed AL patterns (extensions, enums, events, error handling, read-only queries) live in
-> [`references/al-patterns.md`](references/al-patterns.md).
+> [`references/al-patterns.md`](references/al-patterns.md). When something goes wrong (work item
+> not found, branch exists, build/symbols fail, object-ID collision, ambiguous spec), follow
+> [`references/error-handling.md`](references/error-handling.md).
 
 > **Build & diagnose with the AL toolchain — don't guess.** In VS Code Agent mode use
 > `#al_build` and `#al_getdiagnostics` to compile and read real compiler errors, and
