@@ -45,6 +45,11 @@ Example: `specs/Finance/Payments/us-123-payment-tolerance/`. Locate an existing 
 recursive glob `specs/**/*-{ID}-*/`. Full procedure — including area vs story docs, task breakdown,
 and diagrams — is in the backing skill.
 
+Every story document opens (right under its H1) with a one-line **Story nav bar** linking the
+siblings and bolding the current file, so a reader can move between `brief` ↔ `plan` ↔
+`acceptance-criteria` ↔ `change-log` without returning to `index.md`. The `specs/_TEMPLATE/` files
+already carry these bars — keep them when you copy the template.
+
 ### Spec depth — full vs lightweight
 
 Decide up front (ask if unclear) how detailed `plan.md` must be. A **full spec** (default) gives the

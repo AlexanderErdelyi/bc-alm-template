@@ -5,6 +5,8 @@
 > `../OtherArea/us-####-…/` link is expected and encouraged). This markdown *is* the epic; we do
 > not nest story folders inside an epic folder.
 
+**Area:** [Index](index.md) · **Roadmap**
+
 ## Epics / Features
 
 ### EPIC-<ID> — [Epic / Feature Title]

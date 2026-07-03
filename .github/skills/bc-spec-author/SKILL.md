@@ -44,6 +44,14 @@ nesting story folders inside an epic folder. This keeps each story next to the m
 **Finding a spec by ID:** glob recursively — `specs/**/*-{ID}-*/` matches the story folder at any
 depth regardless of type. Agents use this to locate a ticket's spec.
 
+**Cross-navigation.** Every document must be reachable from every other one — a reader who opens
+`brief.md` should be able to jump to `plan.md` without going back through `index.md`. Start each
+story document (immediately under its H1 title) with a one-line **Story nav bar** that links the
+siblings and bolds the current file:
+`**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)`
+(the story `index.md` also adds `· [↑ Area](../index.md)`). Area docs carry `**Area:** [Index](index.md) · [Roadmap](roadmap.md)`.
+The `specs/_TEMPLATE/` files already include these bars — keep them when you copy the template.
+
 **Diagrams** (mermaid): keep high-level ones (module ERD, process flow, decision tree) in the area
 `index.md`/`roadmap.md`; keep story-specific ones in that story's `plan.md`. Add them where they aid
 understanding — they are optional, not mandatory.

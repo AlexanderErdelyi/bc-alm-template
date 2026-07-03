@@ -3,6 +3,8 @@
 > Track every change to the spec after the initial v1.0 approval.
 > Any change to `brief.md`, `plan.md`, or `acceptance-criteria.md` must be logged here.
 
+**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · **Change Log**
+
 ---
 
 ## Change History

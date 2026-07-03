@@ -3,6 +3,8 @@
 > Testable criteria that define when this feature is complete.
 > The customer tests against these criteria before approving PROD deployment.
 
+**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · **Acceptance** · [Change Log](change-log.md)
+
 ---
 
 ## Feature Summary
