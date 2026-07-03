@@ -49,13 +49,15 @@ contains **no** Nobilis-specific content, and parses/lints clean.
 - **AC-16c** — Skill is wired into `SKILLS.md`, `skills/README.md`, `WHEN-TO-USE.md`, and referenced
   from the `bc-plan` agent.
 
-## E8 — Mode B integration branch — *optional, document only*
-- **AC-18** — `docs/branching-strategy.md` describes an optional integration-branch model for a
-  Feature spanning multiple user stories, clearly marked optional.
+## E8 — Mode B integration branch — ✅ done (document only)
+- **AC-18** ✅ — `docs/branching-strategy.md` describes an optional integration-branch model for a
+  Feature spanning multiple user stories, clearly marked optional, with the story-branch loop and a
+  trade-off note.
 
-## E9 — Skill-authoring convention — *optional, document only*
-- **AC-19** — `SKILLS.md` documents the recommended skill section shape (Trigger Phrases / Workflow /
-  Tool Contracts / Anti-Patterns / Example Triggers).
+## E9 — Skill-authoring convention — ✅ done (document only)
+- **AC-19** ✅ — `SKILLS.md` documents the recommended skill section shape (frontmatter + `Use when:` /
+  Workflow / Critical Rules / Anti-Patterns / Tool Contracts / Example Triggers / hand-off) plus
+  portability conventions and the registration checklist.
 
 ## Global
 - **AC-20** — All edited/added Markdown files parse; all 10 agent frontmatters still valid.

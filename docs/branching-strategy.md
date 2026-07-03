@@ -170,6 +170,48 @@ Feature branch deleted (can be archived as tag if needed)
 
 ---
 
+## Optional: Integration Branch for Multi-Story Features
+
+> **Optional pattern.** Use this only when a single Feature/Epic is broken into several child
+> stories (see the `bc-breakdown-feature` skill) that must ship together as one unit. For an
+> ordinary single-ticket change, stick with the plain `feature/ABC-{ID}-*` model above — do **not**
+> add an integration branch.
+
+When a Feature spans multiple stories, one long-lived branch integrates them before a single PR to
+`main`, so the stories are reviewed and deployed as a coherent whole:
+
+```
+main
+ └─ feature/ABC-100-payment-engine        ← integration branch (off main)
+     ├─ story/ABC-101-tolerance-field      ← branched off integration, merged --no-ff back
+     ├─ story/ABC-102-calculation          ← branched off integration (after 101 merged)
+     └─ story/ABC-103-posting-hook         ← branched off integration (after 102 merged)
+```
+
+1. **Create the integration branch** off `main`: `feature/ABC-{FeatureID}-{short-name}`; link it to
+   the parent Feature work item.
+2. **Per child story (in order):**
+   ```bash
+   git switch feature/ABC-100-payment-engine
+   git pull                                   # build on top of stories already merged
+   git switch -c story/ABC-101-tolerance-field
+   # …implement (bc-build-feature)…
+   git switch feature/ABC-100-payment-engine
+   git merge --no-ff story/ABC-101-tolerance-field -m "merge: ABC-101 into ABC-100"
+   git branch -d story/ABC-101-tolerance-field
+   ```
+   Always `git pull` the integration branch before cutting the next story branch — a later story
+   must build on all previously merged stories, not a stale copy.
+3. **When every story is merged**, treat the integration branch exactly like a normal feature
+   branch: run `bc-review-self`, open **one** PR to `main` (`bc-ship-pull-request`), then include it
+   in a release wave (`bc-ship-release`).
+
+Trade-off: an integration branch adds coordination overhead and delays feedback until the whole
+Feature is done. Prefer shipping independent stories as separate feature branches whenever they do
+**not** have to deploy together.
+
+---
+
 ## Branch Protection Rules for `main`
 
 Configure these in GitHub → Settings → Branches → Branch protection rules for `main`:
