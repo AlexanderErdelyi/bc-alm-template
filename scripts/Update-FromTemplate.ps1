@@ -32,9 +32,15 @@
         re-added, so an existing repo that opted out of, say, the docs/ library or
         the GitHub issue-ops pipeline stays that way across every sync.
 
-    After the refresh, two 'values' settings are re-applied so your customizations
-    survive the overwrite:
+    After the refresh, your 'values' choices are re-applied so a sync never reverts
+    the initialization:
 
+      * prefix / ticket prefix / repo slug / ADO org / object-ID range / work-item
+        linking - the template ships its own placeholders (ABC, AB#, 50100-50199,
+        AlexanderErdelyi/bc-alm-template, ...), so every refreshed prose/customization
+        file is re-parameterized from template.config.json 'values'. This mirrors the
+        initializer's token replacement. Scripts and the template-sync workflow are left
+        as-is (the workflow's slug guard must keep pointing at the template).
       * extraTools - project-specific tool IDs merged (additive, de-duplicated) into
         every agent + prompt 'tools:' list. 'all' applies everywhere; 'agents'/'prompts'
         add per-file extras keyed by file name (e.g. 'bc-dev', 'onboard-app'). This is
@@ -159,7 +165,7 @@ Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
 & git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp
 if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
 
-$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0; $retooled = 0; $trimmed = 0
+$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0; $retooled = 0; $trimmed = 0; $reparamed = 0
 
 function Get-Hash([string] $path) {
     if (-not (Test-Path $path)) { return $null }
@@ -302,11 +308,97 @@ function Trim-WorkItemTools {
     }
 }
 
+# Re-apply this repo's configured values (template.config.json 'values') to the freshly
+# refreshed files. The template ships its own placeholders (prefix, ticket prefix, repo slug,
+# ADO org, object-ID range, AB# linking), so a plain copy would REVERT the initialization on
+# every sync. This mirrors Initialize-Template.ps1's Update-Content, using the template clone's
+# own config as the 'from' side and this repo's config as the 'to' side. It deliberately skips
+# scripts and the template-sync workflow: that workflow's slug guard must keep pointing at the
+# template, not this repo.
+function Reparameterize {
+    if (-not ($config -and $config.values)) { return }
+    $v = $config.values
+    $tpl = $null
+    $tplCfg = Join-Path $temp 'template.config.json'
+    if (Test-Path $tplCfg) { try { $tpl = (Get-Content $tplCfg -Raw | ConvertFrom-Json).values } catch { $tpl = $null } }
+    if (-not $tpl) { return }
+
+    $fromPrefix = [string]$tpl.appPrefix
+    $fromTicket = [string]$tpl.ticketPrefix
+    $fromSlug   = [string]$tpl.repoSlug
+    $fromOrg    = [string]$tpl.adoOrg
+    $fromFrom   = [int]$tpl.objectIdFrom
+    $fromTo     = [int]$tpl.objectIdTo
+
+    $g = { param($n, $d) if ($v.PSObject.Properties[$n] -and $null -ne $v.$n -and "$($v.$n)" -ne '') { $v.$n } else { $d } }
+    $toPrefix = [string](& $g 'appPrefix'    $fromPrefix)
+    $toTicket = [string](& $g 'ticketPrefix' $fromTicket)
+    $toSlug   = [string](& $g 'repoSlug'     $fromSlug)
+    $toOrg    = [string](& $g 'adoOrg'       $fromOrg)
+    $toFrom   = [int]   (& $g 'objectIdFrom' $fromFrom)
+    $toTo     = [int]   (& $g 'objectIdTo'   $fromTo)
+    $wis      = [string](& $g 'workItemSystem' 'ADO')
+
+    $oldPrefix  = [regex]::Escape($fromPrefix)
+    $oldTicket  = [regex]::Escape($fromTicket)
+    $ticketRepl = if ($toTicket) { "$toTicket-" } else { '' }
+    $ticketEval = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $ticketRepl }
+    $prefixEval = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $toPrefix }
+    $shiftRange = ($toFrom -ne $fromFrom) -or ($toTo -ne $fromTo)
+
+    # Target only prose/customization files. Never scripts or workflows.
+    $reparamExt = @('.md', '.json', '.jsonc', '.yml', '.yaml', '.txt')
+    $targets = New-Object System.Collections.Generic.List[string]
+    foreach ($t in ($customTrees + $rootTrees)) {
+        $destDir = Join-Path $RepoRoot (Resolve-Dest $t)
+        if (Test-Path $destDir) {
+            Get-ChildItem $destDir -Recurse -File |
+                Where-Object { $reparamExt -contains $_.Extension.ToLower() } |
+                ForEach-Object { $targets.Add($_.FullName) }
+        }
+    }
+    $proseRootFiles = @(
+        '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md',
+        '.github/ISSUE_ORCHESTRATION.md', '.github/PULL_REQUEST_TEMPLATE.md', '.vscode/tasks.json'
+    )
+    foreach ($f in $proseRootFiles) {
+        $dest = Join-Path $RepoRoot (Resolve-Dest $f)
+        if (Test-Path $dest) { $targets.Add($dest) }
+    }
+
+    foreach ($path in ($targets | Select-Object -Unique)) {
+        $text = Get-Content $path -Raw
+        if ($null -eq $text) { continue }
+        $new = $text
+        if ($fromSlug) { $new = $new.Replace($fromSlug, $toSlug) }
+        if ($fromOrg)  { $new = $new.Replace($fromOrg, $toOrg) }
+        if ($fromTicket) { $new = [regex]::Replace($new, "\b$oldTicket-", $ticketEval) }
+        if ($fromPrefix) { $new = [regex]::Replace($new, "\b$oldPrefix", $prefixEval) }
+        if ($shiftRange) {
+            foreach ($dash in @('-', [char]0x2013, [char]0x2014)) {
+                $new = $new.Replace(('{0}{1}{2}' -f $fromFrom, $dash, $fromTo), ('{0}-{1}' -f $toFrom, $toTo))
+            }
+        }
+        if ($wis -eq 'GitHub') { $new = $new.Replace('AB#', '#') }
+        if ($new -ne $text) {
+            $rel = $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+            if ($PSCmdlet.ShouldProcess($path, 'Re-apply configured values (prefix/ticket/slug/org/range)')) {
+                Set-Content -Path $path -Value $new -NoNewline
+            }
+            Write-Host ("  values     re-applied to {0}" -f $rel) -ForegroundColor Blue
+            $script:reparamed++
+        }
+    }
+}
+
 try {
     Write-Host "`nRefreshing template-managed files" -ForegroundColor White
     foreach ($t in $customTrees) { Update-Tree $t }
     foreach ($t in $rootTrees) { Update-Tree $t }
     foreach ($f in $rootFiles) { Update-One $f }
+
+    Write-Host "`nRe-applying your configured values (prefix/ticket/slug/org/range)" -ForegroundColor White
+    Reparameterize
 
     if (-not $sync.updateModels) {
         Write-Host "`nRe-applying your agent models (sync.updateModels = false)" -ForegroundColor White
@@ -320,7 +412,7 @@ finally {
     if (Test-Path $temp) { Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-Write-Host "`nSummary: $added added, $updated updated, $remodeled models re-applied, $retooled tool lists extended, $trimmed trimmed, $unchanged already current." -ForegroundColor White
+Write-Host "`nSummary: $added added, $updated updated, $reparamed re-parameterized, $remodeled models re-applied, $retooled tool lists extended, $trimmed trimmed, $unchanged already current." -ForegroundColor White
 if (-not $sync.updateExtensions) { Write-Host "Kept your .vscode/extensions.json (sync.updateExtensions = false)." -ForegroundColor DarkGray }
 if (-not $sync.updateInstructions) { Write-Host "Kept your .github/instructions (sync.updateInstructions = false)." -ForegroundColor DarkGray }
 $excluded = @()
