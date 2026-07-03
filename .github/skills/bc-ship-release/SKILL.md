@@ -38,6 +38,35 @@ git tag rc/2025-06-wave-1 release/2025-06-wave-1 && git push origin rc/2025-06-w
 If feature branches were deleted after merge, cherry-pick the merge-commit SHA instead
 (`git log --oneline main | grep ABC-123`).
 
+## 4a — Assemble the release changelog (if the repo uses `changelog.d/`)
+The customer-facing changelog is built from **fragment files**, not from raw commit subjects.
+
+1. **Read all fragments:** list `changelog.d/*.md` (ignore `README.md`). Parse each one's YAML
+   front matter (`workitem`, `type`, `module`) and body (headline + optional detail bullets).
+2. **Cross-check** against a git-log fallback:
+   ```bash
+   git log --pretty=format:"%s" --no-merges <last-tag>..HEAD | grep -oE "#[0-9]+" | sort -u
+   ```
+   For any ticket id in the log with **no** matching fragment, warn the user and offer to create
+   one. If there are **no fragments at all**, fall back to the grouped git-log changelog.
+3. **Group** by `type` in Keep a Changelog order — `Added`, `Changed`, `Fixed`, `Deprecated`,
+   `Removed`, `Security` — then by `module`, then work item.
+4. **Build the version section** and insert it into `CHANGELOG.md` immediately after the
+   `## [Unreleased]` block (newest on top):
+
+   ```markdown
+   ## [{version}] - {date}
+
+   ### Added
+   - **{module}**: {headline} (#{workitem})
+     - {detail bullet}
+
+   ### Fixed
+   - **{module}**: {headline} (#{workitem})
+   ```
+5. **Delete the consumed fragments** (`git rm changelog.d/*.md`, keeping only `README.md`) — a
+   released fragment must never linger, or it would be double-counted next release.
+
 ## 5 — Deploy to TEST
 - **AL-Go for GitHub:** push of `release/*` triggers the deployment workflow if configured in
   `.github/AL-Go-Settings.json` (`environments: [{ name: TEST, branch: release/* }]`). Check

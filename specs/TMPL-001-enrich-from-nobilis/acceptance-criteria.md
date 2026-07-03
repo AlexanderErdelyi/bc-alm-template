@@ -26,18 +26,18 @@ contains **no** Nobilis-specific content, and parses/lints clean.
 - **AC-09** ✅ — `bc-build-feature/SKILL.md` links to the reference.
 - **AC-10** ✅ — Guidance is backend-neutral (works for ADO or GitHub).
 
-## E3 — Comprehensive PR body (`bc-ship-pull-request`)
-- **AC-11** — The PR body procedure produces a changelog **grouped by commit type**, a linked
+## E3 — Comprehensive PR body (`bc-ship-pull-request`) — ✅ done
+- **AC-11** ✅ — The PR body procedure produces a changelog **grouped by commit type**, a linked
   work-item summary, and a build-info section.
-- **AC-12** — Steps degrade gracefully for both `azure-devops/*` and `github/*` (no ADO-only assumptions).
+- **AC-12** ✅ — Steps degrade gracefully for both `azure-devops/*` and `github/*` (no ADO-only assumptions).
 
-## E2 — Changelog fragments
-- **AC-13** — `bc-build-feature` documents dropping a per-feature changelog **fragment**.
-- **AC-14** — `bc-ship-release` documents **assembling** a curated changelog from fragments, with a
+## E2 — Changelog fragments — ✅ done
+- **AC-13** ✅ — `bc-build-feature` documents dropping a per-feature changelog **fragment**.
+- **AC-14** ✅ — `bc-ship-release` documents **assembling** a curated changelog from fragments, with a
   git-log fallback when no fragments exist.
 
-## E7 — Spec-driven build gate (`bc-build-feature`)
-- **AC-15** — The build procedure adds: run diagnostics on the whole module/project after implementing,
+## E7 — Spec-driven build gate (`bc-build-feature`) — ✅ done
+- **AC-15** ✅ — The build procedure adds: run diagnostics on the whole module/project after implementing,
   update acceptance-criteria status in the spec, and a review gate **before** committing.
 
 ## E5 — Story + estimate-task breakdown (`bc-breakdown-feature`, new skill) — ✅ both backends
