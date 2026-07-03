@@ -48,6 +48,29 @@ depth regardless of type. Agents use this to locate a ticket's spec.
 `index.md`/`roadmap.md`; keep story-specific ones in that story's `plan.md`. Add them where they aid
 understanding — they are optional, not mandatory.
 
+**Language.** Write every spec document in **English** — the spec is the engineering contract and may
+be read by any developer. The one exception: you may keep a *verbatim* customer quote in the
+**Customer Request** section in the customer's own language (e.g. German) when that customer is
+non-English-speaking — but add an English summary alongside it. Everything else (business value,
+open questions, plan, acceptance criteria, change log) is English. Summarise any foreign-language
+source material (tickets, call notes) into English rather than copying it wholesale.
+
+**Spec depth — full vs lightweight.** Decide up front (ask the user if unclear) how detailed the
+`plan.md` needs to be:
+
+- **Full spec** (default) — the complete plan below: exact objects + reserved IDs, architecture
+  decisions, dependency map, labels/localization. Use when the design is non-trivial or the
+  developer is new to the area.
+- **Lightweight spec** — a high-level `plan.md`: the technical approach in prose, the affected
+  objects at a *coarse* level (types + rough responsibility; IDs optional), and a task breakdown —
+  but **not** the field-by-field / event-by-event design. Use for small, well-understood changes,
+  or when a senior wants a junior to make the detailed design decisions during BUILD. Flag it at the
+  top of `plan.md`:
+  `> **Spec depth:** lightweight — detailed object design is completed during BUILD and recorded back here.`
+  The `brief.md` and `acceptance-criteria.md` are **still required and still fully testable**; only
+  the technical detail in `plan.md` is deferred. During BUILD the developer fills in the exact
+  objects, IDs, and decisions and updates `plan.md`.
+
 ## Procedure
 
 ### 1 — Gather inputs & context
@@ -63,9 +86,18 @@ scaffold: the story docs from `specs/_TEMPLATE/_story/` into
 `specs/<Area>/<type>-<ID>-<slug>/`, and — if the area has no overview yet — `specs/_TEMPLATE/_area/`
 into `specs/<Area>/`. Add the new story to the area `index.md` table.
 
+**Clarify interactively — one question at a time.** Resolve ambiguities by asking the user a single
+focused question at a time, each with a short list of suggested answers they can pick or override
+(the same conversational style `bc-plan` uses) — never dump a wall of questions or invent answers.
+Unanswered points are **not** a blocker to drafting: record each under **Open Questions** in
+`brief.md`, flagged *awaiting customer* with who owns it and by when, then continue with a
+clearly-labelled assumption in `plan.md`. A spec can ship to review with open questions still open,
+as long as they are explicit and the dependent decisions are marked as assumptions.
+
 ### 2 — `brief.md` (non-technical)
-Ticket reference & URL · customer request in their words · business value · priority
-(P1/P2/P3) · requested by · target release · **open questions** (explicit) · **out of scope**.
+Ticket reference & URL · customer request in their words (with an English summary if it was in
+another language) · business value · priority (P1/P2/P3) · requested by · target release ·
+**open questions** (each flagged *answered* or *awaiting customer* with an owner) · **out of scope**.
 
 ### 3 — `plan.md` (for the developer)
 One-paragraph technical summary, then the **affected AL objects** table:
@@ -144,10 +176,14 @@ Seed with v1.0:
 
 ### 6 — `index.md` (story overview)
 A short navigation page: status (Draft / Spec review / In development / In test / Done), a link to
-the work item, one-paragraph overview, links to the four documents above, and an optional diagram.
+the work item, one-paragraph overview, links to the sibling documents, and an optional diagram.
 Also add/update the row for this story in the area `index.md` so the module overview stays current.
 
 ## Quality gate — before opening the spec PR
+
+*(For a **lightweight** spec, the object-detail items — reserved IDs, architecture decisions,
+dependency map, labels/localization — are **deferred to BUILD**; the depth marker, task breakdown,
+brief, and acceptance criteria are still required.)*
 
 - [ ] All 5 story documents present (`index`, `brief`, `plan`, `acceptance-criteria`, `change-log`).
 - [ ] Story lives under the right area folder; area `index.md` lists it.
@@ -159,7 +195,8 @@ Also add/update the row for this story in the area `index.md` so the module over
 - [ ] Dependency map present (runtime / read-only / none).
 - [ ] Scope boundaries explicit (what's out, and which sibling owns it).
 - [ ] Labels/localization plan noted; no hardcoded strings anticipated.
-- [ ] Open questions and out-of-scope explicit.
+- [ ] Open questions and out-of-scope explicit (unanswered questions flagged *awaiting customer*).
+- [ ] Every document written in English (a verbatim customer quote may stay in their language, with an English summary).
 - [ ] Minimum BC version stated in `plan.md`.
 - [ ] Permission sets noted if new objects are created.
 

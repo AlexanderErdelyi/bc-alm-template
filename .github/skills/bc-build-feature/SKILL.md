@@ -29,6 +29,12 @@ Read the spec for the ticket:
 Search for existing objects you will extend. Then summarise: what to create, what to modify,
 in what order.
 
+**If `plan.md` is flagged `Spec depth: lightweight`,** the detailed object design is *your* job:
+make the field-by-field / event-by-event design decisions now, reserve object IDs (Object ID Ninja),
+and **write them back into `plan.md`** (objects table, IDs, architecture decisions) before/while you
+build — so the spec ends up complete. If a decision changes scope or acceptance, confirm with the
+spec author first.
+
 ## 2 — Object creation order
 1. Enums → 2. Tables / Table Extensions → 3. Codeunits → 4. Pages / Page Extensions →
 5. Reports / Report Extensions → 6. Permission Sets → 7. Test Codeunits.

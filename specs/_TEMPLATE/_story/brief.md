@@ -16,6 +16,9 @@
 
 > Describe what the customer wants in plain language. Use their words where possible.
 > Avoid technical jargon — this section should be readable by the customer.
+>
+> Write the spec in **English**. If the customer is non-English-speaking, you may quote them
+> verbatim in their language, but add an English summary directly below the quote.
 
 *Example: "The finance team needs to be able to process customer payments that are slightly below the invoice amount without manually creating write-off entries. They want the system to automatically apply a tolerance of up to 1% without posting errors."*
 
@@ -54,10 +57,12 @@
 
 ## Open Questions
 
-> List everything that is unclear and must be answered before development starts.
-> Do not leave this blank — if there are no questions, write "None".
+> List everything that is unclear. Flag each as **answered** or **awaiting customer** (with an
+> owner and target date). Questions may still be open when the spec goes to review — just make them
+> explicit and mark any dependent decision in plan.md as an assumption.
+> If there are genuinely none, write "None".
 
-1. <!-- Question 1 — who will answer this and by when? -->
+1. <!-- Question 1 — status (answered / awaiting customer), owner, by when -->
 2. <!-- Question 2 -->
 
 ---
