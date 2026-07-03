@@ -41,18 +41,26 @@ specs/<Area>[/<Sub-area>…]/          # e.g. Finance, Sales/Invoicing — free-
 ```
 
 No app/ticket prefix appears in the path. `<slug>` is 3–5 words, kebab-case, from the ticket title.
-Example: `specs/Finance/Payments/us-123-payment-tolerance/`. Locate an existing spec by ID with the
+Example: `specs/Finance/us-2117-country-division-bank-data/`. Locate an existing spec by ID with the
 recursive glob `specs/**/*-{ID}-*/`. Full procedure — including area vs story docs, task breakdown,
 and diagrams — is in the backing skill.
+
+> ⚠️ **Never put the app/ticket prefix in a spec path** — the folder is `us-2117-…`, not `NOB-2117-…`
+> / `ABC-2117-…` (the prefix is only for git branches and functional-doc folders). And **if a spec
+> folder for the ID already exists, edit it in place** — keep its name, area, and existing docs; never
+> create a second folder, rename it, add a prefix, or re-scaffold it from the template.
 
 **Two story shapes.** A small story stays **flat** (the five docs above). A large or multi-part story
 is **broken into tasks**: the story keeps `index.md`, `brief.md`, `roadmap.md`, `change-log.md`, and
 the technical detail moves into numbered task sub-folders `NN-<task-slug>/`, each with its own
 `plan.md` + `acceptance-criteria.md` (+ optional `change-log.md`). Break down when the story has
 several distinct deliverables, is buildable in independent slices, or has some parts approved now and
-others deferred; the story `roadmap.md` sequences the tasks and tracks their approval state. Copy the
-task scaffold from `specs/_TEMPLATE/_task/` and the story roadmap from `specs/_TEMPLATE/_story/roadmap.md`.
-Don't over-split — a change touching a handful of objects is one flat story.
+others deferred; the story `roadmap.md` sequences the tasks and tracks their approval state.
+**Breaking down is an in-place edit of the existing story folder** — keep its bare-ID name and
+`brief.md`, just *add* `roadmap.md` and the `NN-<task-slug>/` subfolders and move the plan/acceptance
+content down into them. Copy only the task scaffold from `specs/_TEMPLATE/_task/` and the roadmap from
+`specs/_TEMPLATE/_story/roadmap.md` — do **not** re-scaffold or rename the story. Don't over-split — a
+change touching a handful of objects is one flat story.
 
 Every document opens (right under its H1) with a one-line **nav bar** linking its siblings and
 bolding the current file, so a reader can move across docs without returning to `index.md`: a

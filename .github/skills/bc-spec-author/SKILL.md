@@ -47,9 +47,14 @@ and `change-log.md`, and the technical detail moves down into numbered task sub-
 
 **Story folder name** = `<type>-<ID>-<slug>`:
 - `<type>` — work-item type token: `us` (user story), `bug`, `feat` (feature), `epic`, `task`, `spike`.
-- `<ID>` — the work-item ID, **bare number** (e.g. `2117`). No app/ticket prefix in the path.
+- `<ID>` — the work-item ID, **bare number** (e.g. `2117`).
 - `<slug>` — 3–5 words, kebab-case, from the ticket title.
-- Example: `specs/Finance/Payments/us-123-payment-tolerance/`.
+- Example: `specs/Finance/us-2117-country-division-bank-data/`.
+
+> ⚠️ **Never put the app/ticket prefix in a spec path.** The folder is `us-2117-…`, **not**
+> `NOB-2117-…` / `ABC-2117-…`. The prefix belongs **only** to git branches (`feature/NOB-2117-…`) and
+> functional-doc folders — never to `specs/`. If you find yourself typing the prefix into a spec
+> folder name, stop.
 
 **Area folder** is optional overview scaffolding. Create `index.md` (and `roadmap.md` when useful)
 the first time an area gains a story, so there is a navigable overview. `brief.md`/`change-log.md`
@@ -62,14 +67,24 @@ nesting story folders inside an epic folder. This keeps each story next to the m
 
 **Breaking a story into tasks.** Split a story into task sub-folders when it has **several distinct
 deliverables**, is **large enough to build/test in independent slices**, or when **some parts are
-approved now and others are future/parked**. To break it down:
+approved now and others are future/parked**.
 
-1. Keep `brief.md` (whole-story request/value/scope), `index.md`, `change-log.md`, and add a story
-   `roadmap.md` (copy `specs/_TEMPLATE/_story/roadmap.md`). Remove the story-level `plan.md` and
-   `acceptance-criteria.md` — that detail now lives per task.
-2. For each task, copy `specs/_TEMPLATE/_task/` to `NN-<task-slug>/` (`NN` = `01`, `02`, … fixing
-   build order). Each task folder holds `plan.md` + `acceptance-criteria.md` (+ optional
-   `change-log.md`).
+> ⚠️ **Do this IN PLACE on the existing story folder.** Breaking down is an *edit*, not a rebuild.
+> **Keep the existing `specs/<Area>/<type>-<ID>-<slug>/` folder exactly as it is** — same area, same
+> bare-ID name, same `brief.md`. **Do not** rename it, move it, add a prefix, or re-scaffold it from
+> the template. You are only *adding* subfolders and a `roadmap.md` and *relocating* the plan /
+> acceptance content down into the tasks. If a spec folder for this ID already exists, always edit it
+> in place — never create a second one.
+
+To break it down:
+
+1. **In the existing story folder**, keep `brief.md`, `index.md`, `change-log.md`, and add a story
+   `roadmap.md` (copy just that file from `specs/_TEMPLATE/_story/roadmap.md`). Move the existing
+   `plan.md` / `acceptance-criteria.md` **content** down into the task folders, then delete the two
+   story-level files (their detail now lives per task).
+2. For each task, copy `specs/_TEMPLATE/_task/` to `<existing-story-folder>/NN-<task-slug>/` (`NN` =
+   `01`, `02`, … fixing build order). Each task folder holds `plan.md` + `acceptance-criteria.md`
+   (+ optional `change-log.md`).
 3. List the tasks in the story `roadmap.md` and `index.md` tables, with order, dependencies, status,
    and **approval state** (an unapproved/future task stays in the roadmap, flagged, until signed off).
 4. Cross-task dependencies go in each task's `plan.md` Dependencies section and in the roadmap.
@@ -127,10 +142,16 @@ start from it. **Walk the hierarchy:** if the ticket is a child, read its parent
 sibling stories so scope boundaries are informed; fold in any spike/investigation findings.
 
 **Pick the area & create the folder.** Decide which module/functional area the work belongs to
-(ask the user if unclear — it should match how the codebase/business is organised). Copy the
-scaffold: the story docs from `specs/_TEMPLATE/_story/` into
-`specs/<Area>/<type>-<ID>-<slug>/`, and — if the area has no overview yet — `specs/_TEMPLATE/_area/`
-into `specs/<Area>/`. Add the new story to the area `index.md` table.
+(ask the user if unclear — it should match how the codebase/business is organised).
+
+> **First check whether a spec for this ID already exists** — glob `specs/**/*-{ID}-*/`. **If it
+> does, edit that folder in place** (keep its name, area, and existing docs); do **not** create a
+> second folder, rename it, or add a prefix. Only create a new folder for a genuinely new ticket.
+
+For a new ticket, copy the scaffold: the story docs from `specs/_TEMPLATE/_story/` into
+`specs/<Area>/<type>-<ID>-<slug>/` (bare ID, **no** app/ticket prefix), and — if the area has no
+overview yet — `specs/_TEMPLATE/_area/` into `specs/<Area>/`. Add the new story to the area
+`index.md` table.
 
 **Clarify interactively — one question at a time.** Resolve ambiguities by asking the user a single
 focused question at a time, each with a short list of suggested answers they can pick or override
