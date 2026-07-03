@@ -69,6 +69,9 @@ param(
     [string] $BranchingStrategy,
     [string] $CommitConvention,
     [string[]] $Environments,
+    # Project-specific tool IDs kept in every agent/prompt 'tools:' list across template
+    # syncs (persisted to values.extraTools.all). Additive; e.g. -ExtraTools 'bc-code-intel/*','prism/*'.
+    [string[]] $ExtraTools,
 
     [switch] $Interactive,
     [switch] $SkipModels,
@@ -218,6 +221,19 @@ if (-not $Environments)     { $Environments     = (Read-Value 'Environments, com
 # task input or CI) is split into individual names just like the interactive prompt does.
 if ($Environments) { $Environments = @($Environments | ForEach-Object { $_ -split '\s*,\s*' } | Where-Object { $_ }) }
 
+# Extra tool IDs to keep in every agent/prompt across template syncs (persisted to
+# values.extraTools.all and re-applied by Update-FromTemplate.ps1). Defaults to whatever
+# is already configured. Prefer generic namespaces (e.g. 'al/*'); machine-only servers
+# can instead be toggled per-session in VS Code's tool picker.
+if (-not $PSBoundParameters.ContainsKey('ExtraTools')) {
+    $curExtra = @()
+    if ($cur.PSObject.Properties['extraTools'] -and $cur.extraTools.PSObject.Properties['all'] -and $cur.extraTools.all) {
+        $curExtra = @($cur.extraTools.all)
+    }
+    $ans = Read-Value 'Extra tool IDs kept in every agent/prompt across syncs (comma-separated, e.g. bc-code-intel/*,prism/*; blank for none)' ($curExtra -join ',')
+    $ExtraTools = if ([string]::IsNullOrWhiteSpace($ans)) { @() } else { @($ans -split '\s*,\s*' | Where-Object { $_ }) }
+}
+$ExtraTools = @($ExtraTools | ForEach-Object { $_ -split '\s*,\s*' } | ForEach-Object { ([string]$_).Trim().Trim("'`"") } | Where-Object { $_ })
 # Offer template cleanup when interactive and not explicitly specified on the command line.
 # Never in existing-repo mode: those files (README, installer) belong to the user's project.
 if ($Interactive -and -not $existingRepo -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles')) {
@@ -449,15 +465,16 @@ if (-not $SkipModels -and $config.models) {
     }
 }
 
-# --- Trim the unused work-item MCP group from agent tools ---
+# --- Trim the unused work-item MCP group from agent + prompt tools ---
 # When the project tracks work in GitHub Issues (not Azure DevOps Boards), the
-# azure-devops/* MCP tools are dead weight in every agent's tool profile. Strip
-# them so derived repos ship a lean, relevant toolset. (github/* is always kept:
-# code + PRs live on GitHub regardless of the work-item system.)
+# azure-devops/* MCP tools are dead weight in every tool profile. Strip them so
+# derived repos ship a lean, relevant toolset. (github/* is always kept: code + PRs
+# live on GitHub regardless of the work-item system.)
 if ($WorkItemSystem -eq 'GitHub') {
-    $agentsDir = Join-Path $RepoRoot "$ghPrefix/agents"
-    if (Test-Path $agentsDir) {
-        Get-ChildItem $agentsDir -Filter *.agent.md | ForEach-Object {
+    foreach ($sub in 'agents', 'prompts') {
+        $toolDir = Join-Path $RepoRoot "$ghPrefix/$sub"
+        if (-not (Test-Path $toolDir)) { continue }
+        Get-ChildItem $toolDir -File | Where-Object { $_.Name -match '\.(agent|prompt)\.md$' } | ForEach-Object {
             $aText = Get-Content $_.FullName -Raw
             $newText = $aText.
                 Replace(", 'azure-devops/*'", '').
@@ -469,6 +486,35 @@ if ($WorkItemSystem -eq 'GitHub') {
                 }
                 Write-Host ("  tools    trimmed azure-devops/* from {0}" -f $_.Name)
             }
+        }
+    }
+}
+
+# --- Merge project-specific extra tools into agent + prompt 'tools:' lists ---
+# Additive, de-duplicated; the same set is re-applied by Update-FromTemplate.ps1 after
+# every sync so custom MCP servers survive the refresh that overwrites these files.
+if ($ExtraTools -and $ExtraTools.Count) {
+    function Add-ExtraToolsToFile([string] $filePath, [string[]] $extra) {
+        if (-not $extra -or $extra.Count -eq 0 -or -not (Test-Path $filePath)) { return }
+        $text = Get-Content $filePath -Raw
+        $m = [regex]::Match($text, '(?m)^tools:\s*\[(.*)\]\s*$')
+        if (-not $m.Success) { return }
+        $existing = @(); foreach ($t in ($m.Groups[1].Value -split ',')) { $tt = $t.Trim().Trim("'`""); if ($tt) { $existing += $tt } }
+        $addedTools = @()
+        foreach ($e in ($extra | ForEach-Object { $_ -split '\s*,\s*' })) { $en = ([string]$e).Trim().Trim("'`""); if ($en -and ($existing -notcontains $en)) { $existing += $en; $addedTools += $en } }
+        if ($addedTools.Count -eq 0) { return }
+        $newLine = 'tools: [' + (($existing | ForEach-Object { "'$_'" }) -join ', ') + ']'
+        $newText = $text.Replace($m.Value, $newLine)
+        if ($PSCmdlet.ShouldProcess($filePath, ("Add extra tools: {0}" -f ($addedTools -join ', ')))) {
+            Set-Content -Path $filePath -Value $newText -NoNewline
+        }
+        Write-Host ("  tools    {0} += {1}" -f $filePath.Substring($RepoRoot.Length).TrimStart('\', '/'), ($addedTools -join ', '))
+    }
+    foreach ($sub in 'agents', 'prompts') {
+        $toolDir = Join-Path $RepoRoot "$ghPrefix/$sub"
+        if (-not (Test-Path $toolDir)) { continue }
+        Get-ChildItem $toolDir -File | Where-Object { $_.Name -match '\.(agent|prompt)\.md$' } | ForEach-Object {
+            Add-ExtraToolsToFile $_.FullName $ExtraTools
         }
     }
 }
@@ -489,6 +535,12 @@ $config.values.defaultBranch    = $DefaultBranch
 $config.values.branchingStrategy= $BranchingStrategy
 $config.values.commitConvention = $CommitConvention
 $config.values.environments     = $Environments
+# Persist extra tools (preserving any per-agent/per-prompt maps) so syncs re-apply them.
+$etAgents  = if ($cur.PSObject.Properties['extraTools'] -and $cur.extraTools.PSObject.Properties['agents'])  { $cur.extraTools.agents }  else { [pscustomobject]@{} }
+$etPrompts = if ($cur.PSObject.Properties['extraTools'] -and $cur.extraTools.PSObject.Properties['prompts']) { $cur.extraTools.prompts } else { [pscustomobject]@{} }
+$etObj = [pscustomobject]@{ all = @($ExtraTools); agents = $etAgents; prompts = $etPrompts }
+if ($config.values.PSObject.Properties['extraTools']) { $config.values.extraTools = $etObj }
+else { $config.values | Add-Member -NotePropertyName extraTools -NotePropertyValue $etObj }
 # Record the kept content categories so later template syncs never re-add what we pruned.
 if ($doPrune) {
     if (-not $config.values.PSObject.Properties['sync']) {

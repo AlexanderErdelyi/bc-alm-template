@@ -1,7 +1,7 @@
 ---
 agent: 'agent'
 description: 'Create a phased, personalized onboarding plan for a new member of a Business Central ALM project.'
-tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'web/fetch', 'github/*']
+tools: ['search', 'read/readFile', 'web/githubRepo', 'web/fetch', 'github/*', 'azure-devops/*']
 ---
 
 # Create My Business Central Onboarding Plan
