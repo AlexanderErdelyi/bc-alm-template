@@ -33,6 +33,11 @@ never guess project-specific values — only the user knows their prefix, object
    each agent's model via the `models` map in `template.config.json`, install recommended
    extensions, and — if the user opted in — run `scripts/Add-BCQuality.ps1` to add the BCQuality
    review knowledge base) and point the user to **`bc-orchestrator`** to start their first feature.
+8. **Overlay fine-tune.** If the template was laid onto an **existing** repo via
+   `scripts/Install-IntoExistingRepo.ps1` (auto-detects an `app/.github`-style layout), also run the
+   skill's **"Fine-tuning an existing-repo overlay"** steps: confirm the detected
+   `customizationsPath`, resolve `*.template` merge files, deduplicate any skills/agents that now
+   overlap the repo's originals, and settle on one work-item backend.
 
 ## Rules
 
