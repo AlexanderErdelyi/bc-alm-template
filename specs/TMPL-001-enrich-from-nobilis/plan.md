@@ -21,10 +21,16 @@ skills, we don't add new roles.
 
 ## Proposed delivery waves
 
-### Wave 1 — P1 (high value, clearly generalizable, low risk)
-- **E1** self-review gate — biggest quality lift; aligns with the new `al_get_diagnostics` rule.
-- **E4** deeper spec-author — object-ID reservation via Object ID Ninja, ADRs, scope boundaries.
-- **E6** error-handling reference — small, self-contained, high reuse.
+### Wave 1 — P1 (high value, clearly generalizable, low risk) ✅ **done**
+- **E1** ✅ self-review gate — 8-step workflow, 18-row deterministic-check table (`al_build`/
+  `al_get_diagnostics`), findings classification 🔴/🟡/ℹ️, auto-fix rules, build-verification gate,
+  Critical Rules / Anti-Patterns / Tool Contracts / Example Triggers. BCQuality section preserved.
+- **E4** ✅ deeper spec-author — object-ID reservation (Object ID Ninja), ADR table, dependency map
+  (runtime/read-only/none), labels/localization plan, scope boundaries; quality gate extended;
+  inputs step generalized to ADO **and** GitHub + hierarchy walk.
+- **E6** ✅ error-handling reference — new `bc-build-feature/references/error-handling.md`
+  (WI-not-found, branch-exists, git-fails, build/symbols, ID collision, uncertainty, missing spec),
+  linked from the SKILL.
 
 ### Wave 2 — P2
 - **E3** comprehensive PR body — generalize for ADO **and** GitHub.
