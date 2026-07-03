@@ -1,103 +1,84 @@
 # Spec Template
 
-Specs are organised by **module / functional area**, not by ticket hierarchy. Each work item gets a
-folder named `<type>-<ID>-<slug>` under the area it belongs to. This folder holds the scaffolds you
-copy to start a new area or a new story.
+Scaffolding for every BC development spec. Specs are organised by **module / functional area**, not
+by ticket hierarchy. This folder holds three copyable scaffolds:
+
+| Scaffold | Copy to | When |
+|---|---|---|
+| `_area/` | `specs/<Area>/` | first time an area gains a story (area `index.md` + optional `roadmap.md`) |
+| `_story/` | `specs/<Area>/<type>-<ID>-<slug>/` | every work item |
+| `_task/` | `specs/<Area>/<type>-<ID>-<slug>/NN-<task-slug>/` | only when a story is broken into tasks |
+
+`<type>` = `us` \| `bug` \| `feat` \| `epic` \| `task` \| `spike`; `<ID>` = bare work-item number (no
+prefix); `<slug>` = 3–5 kebab-case words. Example: `specs/Finance/Payments/us-123-payment-tolerance/`.
+Find a spec by ID with the recursive glob `specs/**/*-{ID}-*/`.
+
+## Two story shapes
+
+**Flat** (default, small story) — five documents in the story folder:
 
 ```
-specs/
-├── _TEMPLATE/
-│   ├── _area/                     ← copy to specs/<Area>/ (first story in an area)
-│   │   ├── index.md
-│   │   └── roadmap.md
-│   └── _story/                    ← copy to specs/<Area>/<type>-<ID>-<slug>/
-│       ├── index.md
-│       ├── brief.md
-│       ├── plan.md
-│       ├── acceptance-criteria.md
-│       └── change-log.md
-│
-└── Finance/                       ← an example area
-    ├── index.md
-    ├── roadmap.md
-    └── us-123-payment-tolerance/  ← one folder per work item
-        ├── index.md
-        ├── brief.md
-        ├── plan.md
-        ├── acceptance-criteria.md
-        └── change-log.md
+<type>-<ID>-<slug>/
+├── index.md               # overview, status, nav
+├── brief.md               # business request, value, scope (non-technical)
+├── plan.md                # technical approach + AL objects + task breakdown
+├── acceptance-criteria.md # Given/When/Then, testable
+└── change-log.md          # spec version history
 ```
 
-## How to Use
-
-### 1. Create the story folder (and the area, if new)
-
-```bash
-# first story in an area only:
-cp -r specs/_TEMPLATE/_area  specs/Finance
-
-# every story:
-cp -r specs/_TEMPLATE/_story specs/Finance/us-123-payment-tolerance
-```
-
-Naming:
-- **`<Area>`** — a module / functional area, named how your codebase and business think about it
-  (`Finance`, `Sales`, `Base/Invoicing` — any depth). No app/ticket prefix.
-- **`<type>`** — work-item type: `us` (user story), `bug`, `feat`, `epic`, `task`, `spike`.
-- **`<ID>`** — the work-item ID, bare number (e.g. `123`).
-- **`<slug>`** — 3–5 words, kebab-case, from the ticket title.
-
-Then add a row for the new story in the area `index.md`.
-
-### 2. Fill in the story documents in order
-
-| Order | File | Who writes it | Who reviews it |
-|---|---|---|---|
-| 1st | `brief.md` | PM / Functional Consultant | Customer proxy |
-| 2nd | `plan.md` (incl. task breakdown) | Developer | Senior Dev / Architect |
-| 3rd | `acceptance-criteria.md` | PM / Functional Consultant | Customer |
-| Always | `index.md`, `change-log.md` | Everyone | — |
-
-### 3. Open a spec PR before starting development
-
-The spec must be reviewed and merged **before** a feature branch is created and development starts. This ensures:
-- The developer builds the right thing
-- The customer has agreed on what "done" looks like
-- The PR description and documentation can be generated from the spec
-
-### 4. Reference the spec in your feature PR
+**Broken into tasks** (large / multi-part story) — the story keeps the shared docs and the technical
+detail moves into numbered task sub-folders:
 
 ```
-📄 Spec: specs/Finance/us-123-payment-tolerance/
+<type>-<ID>-<slug>/
+├── index.md               # overview + task table (status / approved / link)
+├── brief.md               # whole-story request, value, scope
+├── roadmap.md             # task sequencing: order, dependencies, approved-now vs future
+├── change-log.md          # spec history (per-task change-logs optional)
+├── 01-<task-slug>/
+│   ├── plan.md
+│   ├── acceptance-criteria.md
+│   └── change-log.md       # optional
+└── 02-<task-slug>/
+    ├── plan.md
+    └── acceptance-criteria.md
 ```
 
-### 5. Agents read these files by convention
+Break a story down when it has several distinct deliverables, is buildable in independent slices, or
+has some parts approved now and others deferred. Don't over-split — a change touching a handful of
+objects is one flat story.
 
-Agents locate a ticket's spec with a recursive glob — `specs/**/*-{ID}-*/` — so a story is found
-regardless of which area it lives in.
+## Cross-navigation
 
-| Agent | What it reads |
+Every document opens (under its H1) with a one-line nav bar so any doc is reachable from any other:
+
+- **Story:** `[Index] · [Brief] · [Plan] · [Acceptance] · [Change Log]` (index also `↑ Area`; a
+  broken-down story swaps Plan/Acceptance for `[Roadmap]`).
+- **Task NN:** `[Plan] · [Acceptance] · [Change Log] · [↑ Story]`.
+- **Area:** `[Index] · [Roadmap]`.
+
+Keep these bars when you copy a scaffold.
+
+## Language
+
+Spec documents are written in **English** (the engineering contract). A verbatim customer quote may
+stay in the customer's language with an English summary. Customer-facing work-item content (the user
+story, the spec summary written back to Azure DevOps) stays in the customer's preferred language.
+
+## Workflow
+
+1. Spec is authored (agent `bc-spec` / skill `bc-spec-author`) and reviewed via a **spec PR**, merged
+   **before** a feature branch is created.
+2. `bc-dev` builds from `plan.md` + `acceptance-criteria.md` (per task, for a broken-down story).
+3. `change-log.md` records every change to the spec after v1.0.
+
+## Which docs each agent reads
+
+| Agent | Reads |
 |---|---|
-| BC Plan | Drafts `brief.md`, `acceptance-criteria.md` (user story) |
-| BC Spec | Creates/completes the story folder + area overview |
-| BC Developer | `plan.md` (approach + task breakdown), `acceptance-criteria.md` |
-| BC PR | `brief.md`, `plan.md` |
-| BC Doc | All story documents |
-| BC Orchestrator | Checks the story folder exists (recursive) |
-
----
-
-## File Descriptions
-
-### Story (`_story/`)
-
-- **`index.md`** — Overview & navigation: status, work-item link, links to the four documents, optional diagram.
-- **`brief.md`** — The customer request in plain language. Non-technical. What, why, who, when.
-- **`plan.md`** — The technical approach. Every AL object to create/modify, plus the **task breakdown** and optional diagrams.
-- **`acceptance-criteria.md`** — Testable Given/When/Then criteria. What "done" looks like.
-- **`change-log.md`** — Version history of the spec. Every change after v1.0 is logged here.
-
-### Area (`_area/`)
-
-- **`index.md`** — Module/area overview: the list of stories with status, links, and high-level diagrams.
-- **`roadmap.md`** — Epic/feature narrative and sequencing. Epics may span areas — cross-link child stories here.
+| bc-plan | drafts the user story; back-writes a spec summary to the work item |
+| bc-spec | creates/completes all spec documents |
+| bc-dev | `plan.md`, `acceptance-criteria.md` (per task if broken down) |
+| bc-pr | `brief.md`, `plan.md` |
+| bc-doc | all documents |
+| bc-orchestrator | checks the spec folder exists (`specs/**/*-{ID}-*/`) |

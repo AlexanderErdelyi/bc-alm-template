@@ -23,6 +23,22 @@
 - [Acceptance Criteria](acceptance-criteria.md) — testable Given/When/Then
 - [Change Log](change-log.md) — spec version history
 
+<!--
+BROKEN DOWN INTO TASKS? If this story is large or multi-part, split the technical detail into
+numbered task sub-folders. Then this story keeps brief.md + roadmap.md + change-log.md (and this
+index), plan.md / acceptance-criteria.md move DOWN into each task, and you list the tasks below
+instead of the flat Documents list above. See the _task/ template and roadmap.md.
+
+## Tasks
+
+Sequencing & narrative: [Roadmap](roadmap.md)
+
+| # | Task | Status | Approved | Spec |
+|---|---|---|---|---|
+| 01 | <!-- New country-division table --> | <!-- In development --> | <!-- yes --> | [01-new-country-division](01-new-country-division/plan.md) |
+| 02 | <!-- Automatic bank-field filling --> | <!-- Planned --> | <!-- not yet --> | [02-automatic-bank-field-filling](02-automatic-bank-field-filling/plan.md) |
+-->
+
 ## Diagram (optional)
 
 > A quick flow of the story. Delete if not useful; keep detailed diagrams in `plan.md`.
