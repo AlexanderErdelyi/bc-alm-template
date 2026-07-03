@@ -89,6 +89,34 @@ The script then:
 7. **MCP** — if using ADO, the org is already set; confirm `.vscode/mcp.json`.
 8. Hand off to **`bc-orchestrator`** to start the first feature.
 
+## Fine-tuning an existing-repo overlay
+
+When the template was laid onto an **existing** repo with
+[`scripts/Install-IntoExistingRepo.ps1`](../../../scripts/Install-IntoExistingRepo.ps1)
+(rather than "Use this template"), run the interview + initializer as above, then reconcile the
+overlay. The installer is deliberately non-destructive, so a few things need a human decision:
+
+1. **Confirm the customizations location.** The installer auto-detects an app-folder layout
+   (e.g. `app/.github`) and records it in `template.config.json` → `values.sync.customizationsPath`.
+   Verify it matches where the repo actually keeps its agents/skills (open that folder in VS Code
+   to confirm they're discovered). If wrong, re-run the installer with `-Configure -CustomizationsPath <path>`.
+2. **Resolve `*.template` files.** Merge-sensitive files (`copilot-instructions.md`, PR template,
+   `.vscode/*`, `.gitignore`) were written as `<file>.template` next to the originals. Diff each,
+   fold in what you want, then delete the `.template`.
+3. **Deduplicate overlapping skills/agents.** If the repo already had its own skills/agents under
+   different names, the `bc-*` set now coexists with them. Decide per capability whether to keep the
+   template's `bc-*` version, keep the repo's original, or merge — then delete the loser so there's
+   one procedure per lifecycle stage. Do not leave two skills that fire on the same `Use when:` triggers.
+4. **Pick the single work-item backend.** The template ships both ADO (`AB#`) and GitHub (`#`) wiring;
+   Q7 chose one and the initializer converted linking. Remove or ignore the unused backend's
+   references so commits/PRs link consistently.
+5. **Right-size the included categories.** An existing repo rarely needs `metaDocs`, `referenceDocs`,
+   `issueOps` or the `sampleApp` — the lean default leaves them off. If the repo already runs its own
+   CI (e.g. Azure DevOps pipelines), leave `issueOps` off and delete the root `.github/workflows/template-sync.yml`
+   (or add it to `.templatesyncignore`) if GitHub Actions aren't used there.
+6. **Re-verify models & MCP** as in "Finish up" — the overlaid agents carry the template's `model:`
+   lines; align them to the repo's Copilot picker and confirm `.vscode/mcp.json`.
+
 ## Guardrails
 
 - Never invent values — ask. Only the user knows their prefix, range, and org.

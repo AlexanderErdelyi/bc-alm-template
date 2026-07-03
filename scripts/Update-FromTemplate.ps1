@@ -15,10 +15,11 @@
     project's choices:
 
       * customizationsPath - '.' keeps the VS Code-discoverable customizations
-        (.github/agents, .github/skills, .github/instructions) at the repo root
-        (default). Set it to a subfolder (e.g. 'app') and those are refreshed under
-        <path>/.github instead. GitHub platform files (.github/workflows,
-        ISSUE_TEMPLATE, PULL_REQUEST_TEMPLATE) always stay at the repo root.
+        (.github/agents, .github/skills, .github/prompts, .github/instructions and
+        the agent meta-docs) at the repo root (default). Set it to a subfolder (e.g.
+        'app') and those are refreshed under <path>/.github instead. GitHub platform
+        files (.github/workflows, ISSUE_TEMPLATE, PULL_REQUEST_TEMPLATE) always stay
+        at the repo root.
       * updateModels     - false (default) re-applies your agent 'model:' choices
         from template.config.json after the refresh, so you get template prompt/
         handoff improvements but keep your own models. true accepts the template's.
@@ -157,7 +158,8 @@ function Get-Hash([string] $path) {
 # discoverable customizations under $custRoot when configured).
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)')) {
+    $relocate = @('.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $relocate -contains $r)) {
         return "$custRoot/$r"
     }
     return $r
