@@ -212,6 +212,11 @@ function Save-SyncConfig([System.Collections.Specialized.OrderedDictionary] $inc
     $sync.customizationsPath = $custPath
     if ($sync.PSObject.Properties['syncWorkflow']) { $sync.syncWorkflow = $syncWorkflow }
     else { $sync | Add-Member -NotePropertyName syncWorkflow -NotePropertyValue $syncWorkflow }
+    # Mark this as an existing-repo install so Initialize-Template.ps1 runs in its non-destructive
+    # mode: it localizes only the template-owned files it added and never renumbers object IDs,
+    # rewrites the real app.json, renames the user's files, or prunes their app/test/docs folders.
+    if ($sync.PSObject.Properties['existingRepo']) { $sync.existingRepo = $true }
+    else { $sync | Add-Member -NotePropertyName existingRepo -NotePropertyValue $true }
     $incObj = [pscustomobject]@{
         metaDocs = $inc.metaDocs; referenceDocs = $inc.referenceDocs; issueOps = $inc.issueOps
         specs    = $inc.specs; prTemplate = $inc.prTemplate; sampleApp = $inc.sampleApp
