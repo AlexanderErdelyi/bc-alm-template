@@ -25,6 +25,14 @@ Combines spec-driven development, GitHub Copilot custom agents for every workflo
 
 ## The Full BC Development Workflow
 
+The same eight-stage lifecycle runs whether you track work in **Azure DevOps Boards** or in
+**GitHub Issues + Projects** — only the work-item mechanics differ (the initializer wires exactly
+one backend at Q7). Unsure which stage you're in? Give **`bc-orchestrator`** the ticket/issue
+number and it routes you to the right agent. Full decision map:
+[`.github/WHEN-TO-USE.md`](.github/WHEN-TO-USE.md).
+
+### Backend: Azure DevOps Boards
+
 ```
 ADO Ticket
     │
@@ -70,6 +78,108 @@ Documentation PR Reviewed & Merged
     ▼
 ADO Ticket Closed ✅
 ```
+
+### Backend: GitHub Issues & Projects
+
+The flow below shows a single request travelling from a customer call to a closed issue — who
+does what, which agent drives it, and how the **Issue** and its **Project board status** change at
+each step. (Project statuses are illustrative — name your board columns however your team likes.)
+
+```mermaid
+flowchart TD
+    CALL["📞 Request arrives<br/>(call, email, Teams)"] --> PM
+
+    PM["🧭 bc-pm · TRIAGE<br/>create + triage the Issue"]
+    PM -->|"Issue created, labeled,<br/>added to Project → <i>Triage → Backlog</i>"| PLAN
+
+    PLAN["📝 bc-plan · PLAN<br/>write user story + acceptance criteria<br/>(Epic/Feature ➜ create sub-issues)"]
+    PLAN -->|"Issue body updated → <i>Ready</i>"| SPEC
+
+    SPEC["📐 bc-spec · SPEC<br/>author specs/ABC-{ID}-*/ (4 docs)"]
+    SPEC -->|"spec PR merged → <i>In Spec</i>"| DEV
+
+    DEV["🔨 bc-dev · BUILD<br/>feature/ABC-{ID}-* · AL objects + tests · app.json bump"]
+    DEV -->|"branch pushed → <i>In Progress</i>"| PR
+
+    PR["🚀 bc-pr · SHIP<br/>open PR (Closes #ID), run AL checklist, link Issue"]
+    PR -->|"PR opened → <i>In Review</i>"| REVIEW{"Review"}
+
+    REVIEW -->|"changes requested"| DEV
+    REVIEW -->|"approved + merged to main<br/>(Closes #ID auto-links)"| DEPLOY
+
+    DEPLOY["📦 bc-deploy · SHIP<br/>compose release/YYYY-MM-wave-N → deploy TEST"]
+    DEPLOY -->|"→ <i>Testing / UAT</i>"| TEST{"Customer test"}
+
+    TEST -->|"bug found"| DEV
+    TEST -->|"approved"| DOC
+
+    DOC["📖 bc-doc · DOCS<br/>functional docs + changelog (PROD gate)"]
+    DOC -->|"docs PR merged"| PROD
+
+    PROD["📦 bc-deploy · SHIP<br/>deploy PROD (BC Admin Center)"]
+    PROD -->|"Issue auto-closes on merge"| DONE["✅ Issue Done / Closed"]
+```
+
+**Which agent, step by step**
+
+| # | You want to… | Switch to | What happens in GitHub | Issue / board status |
+|---|---|---|---|---|
+| 1 | Capture an incoming request | **bc-pm** | New **Issue** opened from the template, labeled, added to the Project | `Triage` |
+| 2 | Triage, dedupe, prioritize, groom | **bc-pm** | Labels/priority set, duplicates linked, intake accepted | `Backlog` |
+| 3 | Shape the user story + testable criteria | **bc-plan** | Issue **body** rewritten (story + AC). For an Epic/Feature, child **sub-issues** are created per story | `Ready` |
+| 4 | Write the developer-ready spec | **bc-spec** | `specs/ABC-{ID}-*/` committed on a spec branch; spec **PR** opened & merged | `In Spec` |
+| 5 | Implement the AL objects + tests | **bc-dev** | `feature/ABC-{ID}-*` branch; objects, tests, `app.json` version bump | `In Progress` |
+| 6 | Open the pull request | **bc-pr** | **PR** with `Closes #ID`, AL quality checklist, work-item link | `In Review` |
+| 7 | Handle review feedback | **bc-pr** / **bc-dev** | Changes-requested loops back to build; on merge the Issue auto-closes via `Closes #ID` | merged to `main` |
+| 8 | Ship a release to TEST | **bc-deploy** | `release/YYYY-MM-wave-N` composed from selected merges; deployed to TEST | `Testing / UAT` |
+| 9 | Write customer-facing docs (PROD gate) | **bc-doc** | `docs/functional/ABC-{ID}-*.md` + changelog; docs **PR** merged | — |
+| 10 | Deploy to PROD | **bc-deploy** | PROD deploy via BC Admin Center | `Done` ✅ |
+
+> **Tip — status automation:** if you use `Closes #ID` (or `Fixes #ID`) in the PR body, merging it
+> **auto-closes** the linked Issue. Pair that with a GitHub **Projects** workflow ("Item closed → set
+> status to Done", "PR opened → In Review") so board columns update themselves as the agents work.
+> Sub-issues let an Epic/Feature (step 3) roll its children up automatically.
+
+### Request types & routing (either backend)
+
+Not every request is a fresh user story. **`bc-pm` classifies each incoming request first** and
+sends it down the right path — the standard flow above is the backbone; the other cases branch off
+it or short-circuit it. This routing is the same whether you track work in ADO or GitHub.
+
+```mermaid
+flowchart TD
+    IN["📥 Incoming request"] --> C{"🧭 bc-pm<br/>classifies"}
+
+    C -->|"duplicate / not actionable"| X1["Link or close · no branch"]
+    C -->|"question / how-to"| X2["Answer or route · no code change"]
+    C -->|"single user story"| STD["Standard path<br/>plan → spec → build → PR → release → docs"]
+    C -->|"Epic / Feature"| EPIC["bc-plan splits into sub-issues<br/>each child runs the Standard path"]
+    C -->|"bug (in backlog)"| BUG["bugfix/ABC-{ID}-*<br/>lightweight spec (repro = AC) → build → PR"]
+    C -->|"PROD is down"| HOT["hotfix/ABC-{ID}-*<br/>expedited fix → reviewed PR → PROD<br/>spec + docs backfilled"]
+    C -->|"docs only"| DOC2["bc-doc → docs PR"]
+    C -->|"CI/CD · pipeline · setup"| UTIL["Utility agents<br/>bc-workflow · bc-init"]
+
+    EPIC --> STD
+```
+
+**Case cheat-sheet**
+
+| Request type | bc-pm routes to | Path / branch | Spec? | Notes |
+|---|---|---|---|---|
+| **Single user story** | bc-plan | `feature/ABC-{ID}-*` · full lifecycle | ✅ full | The backbone diagram above. |
+| **Epic / Feature** (multi-story) | bc-plan (breakdown) | parent issue + **sub-issues**; optional **integration branch** | ✅ per child | Each child runs the standard path; the parent closes when its children do. See [branching-strategy](docs/branching-strategy.md#optional-integration-branch-for-multi-story-features). |
+| **Bug** (in backlog) | bc-plan → bc-spec | `bugfix/ABC-{ID}-*` | ✅ lightweight — repro steps become the acceptance criteria | Fix + a regression test; ships in the next wave. |
+| **Hotfix** (PROD broken) | bc-dev (expedited) | `hotfix/ABC-{ID}-*` off the deployed release/tag → PROD, then forward-merge to `main` | ⏳ backfilled | The **only** path that may ship before the spec is written — but the PR + review gate is **never** skipped. |
+| **Documentation only** | bc-doc | docs branch | — | `docs/functional/*` + changelog; no AL change. |
+| **Duplicate / won't-do / question** | bc-pm | — | — | Label, link, close, or answer — no branch. |
+| **CI/CD or pipeline change** | bc-workflow | utility (outside the lifecycle) | — | GitHub Actions / AL-Go pipelines. |
+| **Template / repo setup** | bc-init | utility (one-time) | — | Adapt the template to your project. |
+
+> **Spec-first, with one exception:** the template's rule is that AL work follows a reviewed spec —
+> even a bug gets a *lightweight* spec (repro steps as acceptance criteria). A genuine **PROD-down
+> hotfix** is the only case that may ship before the spec is written, and it still goes through a
+> reviewed PR (see [branching-strategy.md](docs/branching-strategy.md)). The spec and functional docs
+> are backfilled right after the fire is out.
 
 ---
 
