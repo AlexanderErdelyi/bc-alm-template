@@ -3,40 +3,119 @@ name: bc-review-self
 description: "Runs a pre-PR self-review of a Business Central feature branch against the AL quality gate before a pull request is opened. Use when: self review before PR, check AL quality, review my changes, pre-PR check, did I miss anything, validate before pull request, lint my AL feature."
 ---
 
-# BC · Self-Review (pre-PR gate)
+# BC · Self-Review (pre-PR quality gate)
 
-Catch problems on your own feature branch *before* asking anyone to review. This is the
-**REVIEW** phase, shared by the `bc-dev` and `bc-pr` agents.
+The **last quality gate before a PR**. Analyse the diff of the current feature branch, run
+deterministic checks, fix only the safe issues (as separate commits), and report the rest for the
+developer. This is the **REVIEW** phase, shared by the `bc-dev` and `bc-pr` agents.
 
 ## Scope
 
-Review only what changed on the feature branch since it diverged from `main`. Read the spec
-(`specs/ABC-{ID}-*/`) so you can check the code against what was agreed.
+Review **only what changed on this feature branch** since it diverged from `main`. Read the spec
+(`specs/ABC-{ID}-*/`) so you can check the code against what was agreed. Never refactor unrelated
+files "while we're at it" — that is a separate feature.
 
-## Checklist — report ✅ / ❌ with a one-line note each
+---
 
-**Correctness vs spec**
-- [ ] Every AL object in `plan.md` is implemented.
-- [ ] No object exists in code that is missing from the spec (or the spec was updated).
-- [ ] Behaviour matches each acceptance criterion.
+## Workflow
 
-**AL standards** (see `../bc-build-feature/references/al-patterns.md`)
-- [ ] No hardcoded user-visible text — all Labels, with `Comment` for placeholders.
-- [ ] No hardcoded IDs / magic values — enums or setup tables.
-- [ ] No base-table modifications — table extensions only.
-- [ ] `DataClassification` on every new field.
-- [ ] Event subscribers used instead of base edits where applicable.
-- [ ] Naming: objects PascalCase + prefix, locals lowerCamelCase.
+### 1 — Establish baseline
+```pwsh
+$branch = git branch --show-current
+git fetch origin main
+$base = git merge-base origin/main HEAD
+```
+- If the branch is `main` (or another protected/release branch) → **abort**: this skill reviews
+  *feature* branches only.
+- If the working tree has **uncommitted changes** → STOP and ask the user to commit or stash.
+  Do not silently stash — that hides intent.
 
-**Hygiene**
-- [ ] `app.json` version bumped correctly for the change type.
-- [ ] Test codeunit present and covering the acceptance criteria.
-- [ ] Permission set updated for all new/changed objects.
-- [ ] No leftover `// TODO`, debug `Message()`, or commented-out blocks.
-- [ ] Commits follow `bc-util-commit-message`.
+### 2 — Collect the diff
+```pwsh
+git diff origin/main...HEAD --name-status
+git diff origin/main...HEAD --stat
+git log origin/main..HEAD --oneline
+```
+Build lists of **added** (`A`), **modified** (`M`), and **deleted/renamed** (`D`/`R`) files. Flag
+any deletion of a `.al` file whose objects are still referenced elsewhere. If the diff is empty →
+STOP (nothing to review). If it is very large (> ~5 000 lines) → warn and offer to chunk it.
 
-> Items needing a compile (e.g. "code compiles", "analyzer clean") can't be confirmed by
-> reading files — mark them **"requires build verification"** and tell the user to run the build.
+### 3 — Run deterministic checks (in parallel where possible)
+
+| # | Check | How | Severity |
+|---|---|---|---|
+| 1 | **Compiles clean** | `al_build` (or `#al_build`); read errors with `al_get_diagnostics` | 🔴 Blocker |
+| 2 | **Analyzer warnings** | Diagnostics from the build (CodeCop/UICop/PerTenantExtensionCop) | 🟡 Major |
+| 3 | **Correctness vs spec** | Every object in `plan.md` implemented; no code object missing from the spec; behaviour matches each acceptance criterion | 🔴 Blocker |
+| 4 | **Hardcoded user-visible text** | grep `(Error\|Message\|Confirm\|StrSubstNo)\s*\(\s*'` in changed `.al` files — must be Labels | 🔴 Blocker |
+| 5 | **Missing ToolTips on new page fields** | For each new page `field()`, check for a `ToolTip`. **Skip if the backing table field defines one** (BC inherits it). Only flag when both lack a ToolTip, or there is no backing field. | 🟡 Major |
+| 6 | **Object IDs in range** | New objects/fields inside the app's **assigned** object ID range (ask if unknown) | 🔴 Blocker |
+| 7 | **Base-table edits** | No modifications to base tables — table extensions only | 🔴 Blocker |
+| 8 | **DataClassification** | Every new field has `DataClassification` | 🟡 Major |
+| 9 | **Legacy C/AL casing** | grep uppercase `^\s*(SETRANGE\|FINDSET\|MODIFY\|INSERT)\b` → should be PascalCase | 🟡 Major |
+| 10 | **Enums vs Option / magic values** | New choices use enums (`Extensible = true` unless closed); no literal IDs/country codes | 🟡 Major |
+| 11 | **`app.json` version bump** | Bumped correctly for the change type (fix/feature/breaking) | 🟡 Major |
+| 12 | **Tests present** | Test codeunit in `test/` covering the acceptance criteria | 🟡 Major |
+| 13 | **Permission set** | Updated for every new/changed object | 🟡 Major |
+| 14 | **Translation drift** | If `.al` changed but no `.xlf` in `Translations/` changed → *report* (do not auto-fix) | 🟡 Major |
+| 15 | **Conventional commits** | `git log origin/main..HEAD` commits match `bc-util-commit-message` | 🟡 Major |
+| 16 | **Leftovers** | grep `\b(TODO\|FIXME\|XXX\|HACK)\b`, debug `Message()`, commented-out blocks | ℹ️ Info |
+| 17 | **Secrets** | grep for hardcoded passwords/API keys/suspicious GUIDs | 🔴 Blocker |
+| 18 | **Removed event subscribers** | A deleted `[EventSubscriber(...)]` → flag for explicit confirmation | 🟡 Major |
+
+Record each finding with **file, line, snippet, severity, suggested fix**.
+
+### 4 — Classify findings
+- **🔴 Blocker** — must be fixed before PR. Auto-fix if safe; otherwise escalate to the user.
+- **🟡 Major** — should be fixed. Suggest, then ask before applying.
+- **ℹ️ Info** — reported only.
+
+**Auto-fixable** (apply, then commit):
+- ToolTip stub on a new field *only* when the text is the BC default `'Specifies the value.'`
+  **and** the backing table field also lacks a ToolTip.
+- Removing any `Auto-generated by …` footer.
+- Well-known keyword casing (`SETRANGE` → `SetRange`) — only inside `.al` files in the diff.
+
+**Never auto-fix** (always ask): hardcoded strings (Label name/text needs human judgment),
+object-ID changes, removed event subscribers, deleted files, `.xlf` translations.
+
+### 5 — Apply corrections (if any)
+One commit **per category** so the trail stays reviewable:
+```
+chore: #{ID} - self-review: add tooltips to new fields
+chore: #{ID} - self-review: remove auto-generated footers
+style: #{ID} - self-review: modernize AL casing
+```
+Push **once** at the end, not after each commit.
+
+### 6 — Build verification (after fixes)
+Re-run `al_build`. If it is still red → STOP, do **not** push, report to the user. A "fix" that
+breaks the build is worse than the original issue.
+
+### 7 — Report
+```
+## Self-Review — ABC-{ID}
+
+✅ Passed: <n>   ❌ Issues: <m>   ⏳ Requires build: <k>
+
+✅ Build:                green
+✅ Conventional commits: 7/7 valid
+✅ Object ID range:      OK (50100–50105)
+🟡 ToolTips:             3 fields fixed (auto-commit)
+🔴 Hardcoded strings:    2 — user action required:
+   - app/src/Sales/SalesPost.al:142  Error('Cannot post sales order')
+🟡 Translation drift:    .al changed, .xlf untouched — run the XLF refresh task
+ℹ️ TODOs left:           1 in app/src/Export/DataExport.al:55
+
+### Suggested next steps
+1. …
+```
+Only mark the branch **ready** when there are **zero 🔴 blockers**.
+
+### 8 — Optional: comment on the work item
+If the user opts in (or invoked from the orchestrator), post a short summary comment on the linked
+work item via `azure-devops/*` or `github/*`. Match the field format rules in
+[`copilot-instructions.md`](../../copilot-instructions.md) (ADO description = HTML, comments = Markdown).
 
 ## BCQuality augmentation (optional)
 
@@ -50,22 +129,47 @@ Microsoft- and community-curated BC rules:
    `technologies: [al]`, `bc-version:` (from `app/app.json` `application`), `enabled-layers:
    [microsoft, community, custom]`.
 3. Run each action skill in the returned **dispatch record** (typically `al-code-review` and its
-   leaf reviewers), then fold their JSON findings into the issues list below — keep each
-   finding's reference to the knowledge file that justified it.
+   leaf reviewers), then fold their JSON findings into the report above — keep each finding's
+   reference to the knowledge file that justified it.
 
-This is **additive**: it strengthens the review, it never replaces the checklist. If no BCQuality
-checkout is present, skip this section silently and review against the standards above.
+This is **additive**: it strengthens the review, it never replaces the checks. If no BCQuality
+checkout is present, skip this section silently.
 
-## Output
+## Critical rules
 
-```
-## Self-Review — ABC-{ID}
+1. **Never auto-fix hardcoded strings** — Label naming and canonical text need human judgment.
+2. **One commit per fix category** — never bundle categories; reviewability matters.
+3. **Compare against `main`** (the base this branch diverged from), not the local branch tip.
+4. **Always re-run the build after auto-fixes** — never push a red build.
+5. **Do not modify files outside the diff** — self-review is scoped to this branch's changes.
+6. **Refuse to run on protected branches** (`main`, release branches).
+7. **If the working tree is dirty, stop** — don't stash silently.
+8. **Push only once**, at the end.
+9. **Never auto-commit `.xlf` translations** — an incorrect refresh can corrupt them; only report.
 
-✅ Passed: <n>   ❌ Issues: <m>   ⏳ Requires build: <k>
+## Anti-patterns
 
-### Issues to fix before PR
-1. ❌ <file:line> — <problem> → <suggested fix>
-```
+- ❌ Auto-fixing hardcoded strings by guessing Label names.
+- ❌ Reformatting unrelated files.
+- ❌ Squash-fixing multiple categories into one commit.
+- ❌ Auto-committing `.xlf` files.
+- ❌ Ignoring a build failure and pushing anyway.
+- ❌ Running on `main` / a release branch.
+- ❌ Marking the branch "ready" while 🔴 blockers exist.
+- ❌ Silently fixing things without reporting them.
 
-If there are ❌ items, return to **`bc-build-feature`** (agent: `bc-dev`). When clean, proceed
-to **`bc-ship-pull-request`** (agent: `bc-pr`).
+## Tool contracts
+
+**Required:** `al_build` + `al_get_diagnostics` (compile & diagnostics), `search/textSearch` (regex
+over `.al`), `read/readFile` (snippet extraction), `edit/editFiles` (auto-fixes), `execute/runInTerminal`
+(git). **Optional:** `azure-devops/*` or `github/*` (Step 8 work-item comment only).
+**Not used:** web fetches, PR creation (that is `bc-ship-pull-request`).
+
+## Example triggers
+
+- "Self-review my branch." · "Run pre-PR checks for ABC-1234." · "Did I miss anything before I open the PR?"
+
+## Downstream hand-off
+
+With **0 🔴 blockers** → proceed to **`bc-ship-pull-request`** (agent: `bc-pr`). If blockers
+remain → return to **`bc-build-feature`** (agent: `bc-dev`), fix, and re-run this skill.
