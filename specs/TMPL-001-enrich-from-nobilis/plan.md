@@ -32,10 +32,13 @@ skills, we don't add new roles.
   (WI-not-found, branch-exists, git-fails, build/symbols, ID collision, uncertainty, missing spec),
   linked from the SKILL.
 
-### Wave 2 — P2
-- **E3** comprehensive PR body — generalize for ADO **and** GitHub.
-- **E2** changelog fragments — nice ALM hygiene; touches two skills.
-- **E7** build gate additions to `bc-build-feature`.
+### Wave 2 — P2 ✅ **done**
+- **E3** ✅ comprehensive PR body — changelog grouped by conventional-commit type, work-item table,
+  build-info/statistics, changelog-fragment cross-check; generalized for ADO **and** GitHub.
+- **E2** ✅ changelog fragments — `bc-build-feature` drops/updates `changelog.d/{id}-{slug}.md`;
+  `bc-ship-release` assembles Keep-a-Changelog sections + git-log fallback + fragment cleanup.
+- **E7** ✅ build gate additions to `bc-build-feature` — module-wide `al_build`/`al_get_diagnostics`,
+  acceptance-criteria status update in the spec, review gate before committing.
 
 ### Wave 3 — P3 (document, don't over-engineer)
 - **E5** ✅ **done** — delivered early as a new dual-backend skill `bc-breakdown-feature`
