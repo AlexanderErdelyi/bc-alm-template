@@ -55,7 +55,7 @@ Audience: customer / end-user / functional consultant. Tone: clear, non-technica
 
 ## Related
 - ADO Ticket: ABC-{ID}
-- Spec: `specs/ABC-{ID}-short-description/`
+- Spec: `specs/<Area>/<type>-<ID>-<slug>/`
 ```
 
 ## 5 — Update `docs/changelog.md`

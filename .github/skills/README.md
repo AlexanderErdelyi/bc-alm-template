@@ -37,7 +37,7 @@ See [`../WHEN-TO-USE.md`](../WHEN-TO-USE.md) for a decision map and
 
 ## Conventions used by every skill
 
-- **Ticket / spec naming:** `specs/ABC-{ID}-short-description/` (kebab-case, 3–5 words).
+- **Spec naming:** `specs/<Area>/<type>-<ID>-<slug>/` (for example, `specs/Finance/us-123-payment-tolerance/`; slug is kebab-case, 3–5 words).
 - **Object prefix & range:** replace the sample `ABC` prefix and `50100–50199` range with
   your own assigned values (see [`app/app.json`](../../app/app.json)).
 - **Coding standards:** all AL work follows

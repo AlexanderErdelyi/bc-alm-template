@@ -25,7 +25,7 @@ flowchart LR
 | Intake, triage, prioritize or groom the backlog | TRIAGE | **bc-pm** | [`bc-triage-backlog`](skills/bc-triage-backlog/SKILL.md) |
 | Turn a triaged ticket into a user story + criteria | PLAN | **bc-plan** | [`bc-plan-user-story`](skills/bc-plan-user-story/SKILL.md) |
 | Break a Feature/Epic into child stories + estimates | PLAN | **bc-plan** | [`bc-breakdown-feature`](skills/bc-breakdown-feature/SKILL.md) |
-| Write the full `specs/ABC-{ID}-*/` folder | SPEC | **bc-spec** | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) |
+| Write the full `specs/<Area>/<type>-<ID>-<slug>/` story folder | SPEC | **bc-spec** | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) |
 | Implement AL objects, bump `app.json`, add tests | BUILD | **bc-dev** | [`bc-build-feature`](skills/bc-build-feature/SKILL.md) |
 | Self-check the branch before a PR | REVIEW | **bc-dev** / **bc-pr** | [`bc-review-self`](skills/bc-review-self/SKILL.md) |
 | Compose the PR description + checklist | SHIP | **bc-pr** | [`bc-ship-pull-request`](skills/bc-ship-pull-request/SKILL.md) |

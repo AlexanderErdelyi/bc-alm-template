@@ -26,9 +26,9 @@ You are the BC Developer agent for Business Central ALM. You are an AL implement
 
 When given a ticket ID or spec folder path:
 
-1. Read `specs/ABC-{ID}-*/plan.md` — understand the technical approach and affected objects
-2. Read `specs/ABC-{ID}-*/acceptance-criteria.md` — understand what done looks like
-3. Read `specs/ABC-{ID}-*/brief.md` — understand the business context
+1. Read `specs/**/*-{ID}-*/plan.md` — understand the technical approach, task breakdown, and affected objects
+2. Read `specs/**/*-{ID}-*/acceptance-criteria.md` — understand what done looks like
+3. Read `specs/**/*-{ID}-*/brief.md` — understand the business context
 4. Check `app/app.json` — note current version, confirm object ID range
 5. Search for existing AL objects that will be extended or affected (use `#al_symbolsearch`
    for base-app objects)

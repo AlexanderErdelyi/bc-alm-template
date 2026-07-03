@@ -5,7 +5,7 @@ tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'web/githubRep
 handoffs:
   - label: "SPEC · Hand the story to the spec author"
     agent: "bc-spec"
-    prompt: "The user story and acceptance criteria are agreed. Take over: produce the developer-ready spec folder specs/ABC-{ID}-*/ following the bc-spec-author skill."
+    prompt: "The user story and acceptance criteria are agreed. Take over: produce the developer-ready story folder specs/<Area>/<type>-<ID>-<slug>/ following the bc-spec-author skill."
   - label: "TRIAGE · Send back for triage"
     agent: "bc-pm"
     prompt: "This request is not ready to plan — it needs triage (priority, labels, duplicate check, backlog placement). Take over following the bc-triage-backlog skill, then return to bc-plan."

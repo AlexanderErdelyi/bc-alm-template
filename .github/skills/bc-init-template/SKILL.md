@@ -26,7 +26,7 @@ into one prompt.
 | # | Question | Token | Default | Notes |
 |---|---|---|---|---|
 | 1 | App / object **prefix** (2-4 chars) | `appPrefix` | `ABC` | Your registered BC partner/AppSource prefix. Used in every object name and file name. |
-| 2 | **Ticket / spec prefix** | `ticketPrefix` | `ABC` | The key in `PREFIX-123` and `specs/PREFIX-{ID}-*`. Often your ADO project key or Jira key; may equal the app prefix. |
+| 2 | **Ticket / branch prefix** | `ticketPrefix` | `ABC` | The key in `PREFIX-123` references and `feature/PREFIX-{ID}-*` branch names. Often your ADO project key or Jira key; may equal the app prefix; type `none` for bare IDs. (Spec folders no longer carry it — they are grouped by module/area.) |
 | 3 | App **display name** | `appName` | `ABC Payment Tolerance` | The extension's name in `app.json`. |
 | 4 | **Publisher** | `publisher` | `ABC` | Your company name (`app.json` publisher). |
 | 5 | Object ID **range** (from / to) | `objectIdFrom` / `objectIdTo` | `50100` / `50199` | Your assigned range. Sample object IDs are shifted to match. |

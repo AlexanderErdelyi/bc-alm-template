@@ -27,38 +27,58 @@ When specs are in the repository:
 
 ## Spec Folder Structure
 
-Every ADO work item gets its own folder under `specs/`:
+Specs are organised by **module / functional area** (mirroring how the code and the business think
+about the app), **not** by ticket hierarchy. Each work item gets a folder named `<type>-<ID>-<slug>`
+under the area it belongs to:
 
 ```
 specs/
-├── _TEMPLATE/                          ← Copy this to start a new spec
-│   ├── README.md
-│   ├── brief.md
-│   ├── plan.md
-│   ├── acceptance-criteria.md
-│   └── change-log.md
+├── _TEMPLATE/                          ← copy _area/ and _story/ to start
+│   ├── _area/  { index.md, roadmap.md }
+│   └── _story/ { index.md, brief.md, plan.md, acceptance-criteria.md, change-log.md }
 │
-├── ABC-123-payment-tolerance/          ← One folder per ticket
-│   ├── brief.md
-│   ├── plan.md
-│   ├── acceptance-criteria.md
-│   └── change-log.md
+├── Finance/                            ← a module / functional area
+│   ├── index.md                        ← area overview: story list + status + links + diagrams
+│   ├── roadmap.md                      ← epic/feature narrative (may span areas)
+│   └── us-123-payment-tolerance/       ← one folder per work item
+│       ├── index.md
+│       ├── brief.md
+│       ├── plan.md
+│       ├── acceptance-criteria.md
+│       └── change-log.md
 │
-└── ABC-124-vat-report-fix/
-    ├── brief.md
-    ├── plan.md
-    ├── acceptance-criteria.md
-    └── change-log.md
+└── Sales/
+    └── us-124-vat-report-fix/
+        └── … (same story documents)
 ```
 
-**Naming convention:** `specs/ABC-{ID}-short-description/`
-- Use the ADO ticket ID prefix
-- Short description in kebab-case (3-5 words)
-- No version numbers in folder name — the `change-log.md` tracks versions
+**Naming convention:** `specs/<Area>[/<Sub-area>…]/<type>-<ID>-<slug>/`
+- **`<Area>`** — a module / functional area, free-form and any depth (`Finance`, `Sales`, `Base/Invoicing`). No app/ticket prefix.
+- **`<type>`** — work-item type: `us` (user story), `bug`, `feat`, `epic`, `task`, `spike`.
+- **`<ID>`** — the work-item ID, bare number (e.g. `123`).
+- **`<slug>`** — short description in kebab-case (3–5 words). No version numbers — the `change-log.md` tracks versions.
+
+**Finding a spec by ID:** agents glob recursively with `specs/**/*-{ID}-*/`, so the story is found
+regardless of which area it lives in.
+
+**Epics / features that span areas** are tracked in an area (or top-level) `roadmap.md`/`index.md`
+that cross-links the child stories wherever they live — not by nesting story folders inside an epic
+folder. This keeps every story next to the module it touches.
 
 ---
 
-## The 4 Spec Documents
+## The Story Documents
+
+Each story folder holds five documents. An `index.md` and (once per area) an area `index.md` +
+`roadmap.md` provide navigation on top.
+
+### 0. `index.md` — Story Overview & Navigation
+
+A short page holding the story status (Draft → Spec review → In development → In test → Done), a link
+to the work item, a one-paragraph overview, links to the four documents below, and an optional
+diagram. The area `index.md` lists every story in the module with its status.
+
+---
 
 ### 1. `brief.md` — Customer Request
 
@@ -85,6 +105,7 @@ Written after `brief.md` is approved. Technical detail. Answers:
 - What are the risks and dependencies?
 - Which BC version must it be compatible with?
 - Are there performance considerations?
+- What is the ordered **task breakdown** BUILD will execute?
 
 **Audience:** Developer, Senior Developer, Architect  
 **Written by:** Developer or PM agent (with developer review)  
@@ -132,7 +153,7 @@ Every spec starts at `v1.0`. Changes requested during testing increment the vers
 ## Spec Lifecycle
 
 ```
-1. BC Spec agent creates spec files in specs/ABC-{ID}/ (after BC Plan shapes the user story)
+1. BC Spec agent creates the story folder under its area, e.g. specs/Finance/us-{ID}-…/ (after BC Plan shapes the user story)
          │
          ▼
 2. Spec PR opened (separate from code PR)
@@ -159,7 +180,7 @@ Every spec starts at `v1.0`. Changes requested during testing increment the vers
 9. If changes requested → change-log.md updated, spec re-versioned
          │
          ▼
-10. BC Doc agent reads all 4 files to generate functional documentation
+10. BC Doc agent reads all story documents to generate functional documentation
          │
          ▼
 11. Feature deployed to PROD → spec folder archived in main
@@ -175,14 +196,14 @@ Each agent knows where to find spec documents by convention:
 |---|---|---|
 | **BC PM** | ADO ticket / backlog | Triages, prioritizes, and grooms work items |
 | **BC Plan** | Triaged ticket | Shapes the user story + acceptance criteria |
-| **BC Spec** | User story + ticket | Authors all 4 spec documents |
+| **BC Spec** | User story + ticket | Authors the story folder + area overview |
 | **BC Developer** | `plan.md` + `acceptance-criteria.md` | Understands what to build and what done looks like |
 | **BC PR** | `brief.md` + `plan.md` | Generates PR description and checks implementation against spec |
 | **BC Deploy** | `change-log.md` + `plan.md` | Verifies spec is approved before including in release |
-| **BC Doc** | All 4 documents + git diff | Generates customer documentation and changelog |
-| **BC Orchestrator** | Checks if `specs/ABC-{ID}/` exists | Determines current workflow stage |
+| **BC Doc** | All story documents + git diff | Generates customer documentation and changelog |
+| **BC Orchestrator** | Checks if the story folder exists (`specs/**/*-{ID}-*/`) | Determines current workflow stage |
 
-Agents reference the spec folder by ticket ID. When you tell `bc-dev` to "work on ABC-123", it automatically looks for `specs/ABC-123-*/` using glob matching.
+Agents reference the spec folder by ticket ID. When you tell `bc-dev` to "work on 123", it automatically looks for `specs/**/*-123-*/` using recursive glob matching.
 
 ---
 
@@ -204,7 +225,7 @@ Skipping approval gates is allowed only for P1 hotfixes, and only the code PR ga
 
 1. Copy the template:
    ```bash
-   cp -r specs/_TEMPLATE specs/ABC-123-your-feature-name
+   cp -r specs/_TEMPLATE/_story specs/Finance/us-123-your-feature-name
    ```
 
 2. Fill in `brief.md` first — even before involving a developer
@@ -212,7 +233,7 @@ Skipping approval gates is allowed only for P1 hotfixes, and only the code PR ga
 3. Open a spec PR before starting development
 
 4. Use the **BC Spec agent** to help fill in the spec from an ADO ticket:
-   > "Create a spec for ABC-123" — the agent will draft all 4 documents
+   > "Create a spec for 123" — the agent will draft the story folder
 
 5. Reference the spec folder in your feature PR:
-   > "This PR implements `specs/ABC-123-payment-tolerance/`"
+   > "This PR implements `specs/Finance/us-123-payment-tolerance/`"

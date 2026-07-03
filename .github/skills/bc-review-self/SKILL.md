@@ -12,7 +12,7 @@ developer. This is the **REVIEW** phase, shared by the `bc-dev` and `bc-pr` agen
 ## Scope
 
 Review **only what changed on this feature branch** since it diverged from `main`. Read the spec
-(`specs/ABC-{ID}-*/`) so you can check the code against what was agreed. Never refactor unrelated
+(`specs/**/*-{ID}-*/`) so you can check the code against what was agreed. Never refactor unrelated
 files "while we're at it" — that is a separate feature.
 
 ---

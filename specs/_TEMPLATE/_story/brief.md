@@ -6,7 +6,7 @@
 
 ## Ticket Reference
 
-- **ADO Ticket ID:** ABC-<!-- ID -->
+- **Work Item:** <!-- e.g. User Story 2117 --> (ID <!-- 2117 -->)
 - **ADO URL:** https://dev.azure.com/<!-- org -->/<!-- project -->/_workitems/edit/<!-- ID -->
 - **Priority:** P1 Critical / P2 Standard / P3 Backlog *(delete as appropriate)*
 

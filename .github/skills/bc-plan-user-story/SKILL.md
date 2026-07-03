@@ -102,4 +102,4 @@ Example Description HTML:
 ## Next step
 
 When the story and criteria are agreed, move to **`bc-spec-author`** (agent: `bc-spec`) to
-create the full `specs/ABC-{ID}-*/` folder.
+create the full `specs/<Area>/<type>-<ID>-<slug>/` story folder.

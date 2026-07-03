@@ -8,7 +8,7 @@ description: "Composes a high-quality Business Central pull request — descript
 Turn a finished feature branch into a review-ready PR. Core procedure of the **`bc-pr`** agent.
 
 ## 1 — Read the spec
-`specs/ABC-{ID}-*/brief.md`, `plan.md`, `acceptance-criteria.md`. If there is no spec folder,
+`specs/**/*-{ID}-*/brief.md`, `plan.md`, `acceptance-criteria.md`. If there is no spec folder,
 warn the user and send them to **`bc-spec-author`** (agent: `bc-spec`) first.
 
 ## 2 — Build the changelog from commits
@@ -56,7 +56,7 @@ Use [`../../PULL_REQUEST_TEMPLATE.md`](../../PULL_REQUEST_TEMPLATE.md).
 
 - **Build info:** build status (from `al_build`), and `git diff --shortstat` (files changed,
   +insertions / −deletions).
-- **Spec link:** `📄 specs/ABC-{ID}-short-description/`
+- **Spec link:** `📄 specs/<Area>/<type>-<ID>-<slug>/`
 - **Testing:** reference `acceptance-criteria.md` and the test codeunit.
 - **Deployment notes:** any manual setup, config, or data migration.
 

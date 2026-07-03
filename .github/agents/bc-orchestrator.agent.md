@@ -12,7 +12,7 @@ handoffs:
     prompt: "The orchestrator detected the PLAN phase. Take over: turn the ticket into a crisp user story with testable acceptance criteria following the bc-plan-user-story skill, then hand off to bc-spec."
   - label: "SPEC · Draft or complete the spec"
     agent: "bc-spec"
-    prompt: "The orchestrator detected the SPEC phase for this ticket. Take over: create or complete specs/ABC-{ID}-*/ (brief, plan, acceptance-criteria, change-log) following the bc-spec-author skill, then have the user open a spec PR."
+    prompt: "The orchestrator detected the SPEC phase for this ticket. Take over: create or complete the story folder under its area (specs/<Area>/<type>-{ID}-*/ with index, brief, plan, acceptance-criteria, change-log) following the bc-spec-author skill, then have the user open a spec PR."
   - label: "BUILD · Implement the feature"
     agent: "bc-dev"
     prompt: "The orchestrator detected the BUILD phase. Take over: read the spec, create/confirm the feature branch, implement the AL objects following the bc-build-feature skill and the al-coding-standards instructions, bump app.json, and add tests."
@@ -44,13 +44,16 @@ never carry out the phase's work yourself (see Important Rules).
 ## Stage Detection Logic
 
 ### Step 1 — Check for spec folder
-Look for a folder matching `specs/ABC-{ID}-*/` in the repository.
+Look for the ticket's story folder anywhere under `specs/` — glob recursively with
+`specs/**/*-{ID}-*/` (specs are organised by module/area, so the folder can be at any depth, e.g.
+`specs/Finance/us-{ID}-…/`).
 
 - **Not found** → Stage: **SPEC DRAFTING**
-  - Action: "No spec folder found for ABC-{ID}. If the ticket is still raw, switch to the **bc-pm agent** to triage it and **bc-plan** to shape the user story first. Otherwise switch to the **bc-spec agent** to create the specification documents."
+  - Action: "No spec folder found for {ID}. If the ticket is still raw, switch to the **bc-pm agent** to triage it and **bc-plan** to shape the user story first. Otherwise switch to the **bc-spec agent** to create the specification documents."
 
 ### Step 2 — Check spec completeness
-If spec folder exists, check that all 4 files are present:
+If the story folder exists, check that its documents are present:
+- `index.md`
 - `brief.md`
 - `plan.md`
 - `acceptance-criteria.md`
