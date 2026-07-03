@@ -88,11 +88,19 @@ into `specs/<Area>/`. Add the new story to the area `index.md` table.
 
 **Clarify interactively — one question at a time.** Resolve ambiguities by asking the user a single
 focused question at a time, each with a short list of suggested answers they can pick or override
-(the same conversational style `bc-plan` uses) — never dump a wall of questions or invent answers.
+(the ask-questions tool where available — VS Code's `askQuestions` — otherwise ask inline; the same
+conversational style `bc-plan` uses) — never dump a wall of questions or invent answers.
 Unanswered points are **not** a blocker to drafting: record each under **Open Questions** in
 `brief.md`, flagged *awaiting customer* with who owns it and by when, then continue with a
 clearly-labelled assumption in `plan.md`. A spec can ship to review with open questions still open,
 as long as they are explicit and the dependent decisions are marked as assumptions.
+
+**Align before you write.** Before committing an approach to `plan.md`, confirm the technical
+direction with the user: surface the constraints and alternative approaches you found, state your
+key assumptions, and validate the ones that carry real design risk. If the answers materially change
+scope, loop back to gathering — and if the *requirement* itself changes (not just the design), hand
+back to `bc-plan`. Keep it proportionate (a one-line check for a small change; confirm the key ADRs
+for a non-trivial design).
 
 ### 2 — `brief.md` (non-technical)
 Ticket reference & URL · customer request in their words (with an English summary if it was in
@@ -144,6 +152,14 @@ Seed with v1.0:
 A short navigation page: status (Draft / Spec review / In development / In test / Done), a link to
 the work item, one-paragraph overview, links to the sibling documents, and an optional diagram.
 Also add/update the row for this story in the area `index.md` so the module overview stays current.
+
+### 7 — Present & refine
+Show the user a short summary (approach, key decisions, acceptance criteria, open questions) and
+handle their response: **changes** → revise the affected docs and keep the whole spec in sync
+(`plan`, `acceptance-criteria`, `index` status, a `change-log` row); **questions** → clarify
+one-at-a-time; **alternative** → loop back to align (or to `bc-plan` if the requirement changed);
+**approval** → run the quality gate and open the spec PR. Don't open the PR until the user approves
+or explicitly asks you to commit the draft as-is.
 
 ## Quality gate — before opening the spec PR
 
