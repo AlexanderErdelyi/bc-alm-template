@@ -92,6 +92,22 @@ Example Description HTML:
 <p>…</p>
 ```
 
+## Spec summary back-write (after bc-spec)
+
+When `bc-spec` hands a finished spec back to you, add a concise **Spec Summary** to the work item so
+a junior developer or PM can grasp the plan without opening the whole spec. Read the spec's
+`brief.md` and `plan.md`, then write a short block into the work-item **Description** (below the
+story), containing:
+
+- **Approach** — one or two sentences on the chosen technical approach.
+- **Key decisions** — the notable architecture choices (from the spec's decision table).
+- **Open questions** — any still flagged *awaiting customer*.
+- **Spec link** — the path to the spec folder (`specs/<Area>/<type>-<ID>-<slug>/`).
+
+Keep it to a few lines and refresh it if the spec changes. This is a *summary*, not a copy — the
+spec folder remains the source of truth. Write it as **HTML** (Description field); if you'd rather
+keep it out of the story body, post it as a **Markdown** discussion comment instead.
+
 ## Quality gate (mirror of the repo issue form)
 
 - [ ] Story is a single deliverable (split if not).
