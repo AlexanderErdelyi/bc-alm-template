@@ -12,6 +12,12 @@
          ('values.sync'). Use -Interactive to be prompted for each choice. No
          content is copied in this step.
 
+    Layout auto-detection: when -CustomizationsPath is not given and the target has
+    no saved 'sync' config yet, the script inspects the repo. If it already keeps its
+    Copilot customizations under a subfolder (e.g. 'app/.github/agents', as in an
+    AL-Go / app-centric layout), that subfolder is detected and reused automatically;
+    otherwise it defaults to the repo root. A saved config always wins over detection.
+
       2. EXECUTE (run again without -Configure): read that config and copy the
          core files plus only the enabled categories to their configured places.
 
@@ -23,6 +29,7 @@
       * Core (always)  - agents, skills, instructions, copilot-instructions.md,
                          template.config.json, the sync workflow + scripts.
       * metaDocs       - .github/AGENT-ARCHITECTURE.md, WHEN-TO-USE.md, SKILLS.md
+                         (relocated alongside the customizations when -CustomizationsPath is set)
       * referenceDocs  - the docs/ library (bcquality, branching, workflow, ...)
       * issueOps       - .github/workflows/issue-*.yml + ISSUE_TEMPLATE + ISSUE_ORCHESTRATION.md
       * specs          - specs/_TEMPLATE scaffold
@@ -64,10 +71,13 @@ param(
     # Overwrite existing files instead of skipping (Add) or writing .template (Merge).
     [switch] $Force,
 
-    # Where the VS Code-discoverable customizations (.github/agents, skills,
-    # instructions, copilot-instructions.md) go. '.' (default) = repo root .github.
-    # A subfolder (e.g. 'app') places them under <path>/.github. Platform files
-    # (workflows, ISSUE_TEMPLATE, PR template) always stay at the repo root.
+    # Where the VS Code-discoverable customizations (.github/agents, skills, prompts,
+    # instructions, copilot-instructions.md and the agent meta-docs) go. '.' (default)
+    # = repo root .github. A subfolder (e.g. 'app') places them under <path>/.github.
+    # Platform files (workflows, ISSUE_TEMPLATE, PR template) always stay at the repo
+    # root. If you DON'T pass this and the target has no saved config, the script
+    # auto-detects an existing layout: a repo that already keeps its customizations
+    # under 'app/.github' (or any single subfolder) is recognized and reused.
     [string] $CustomizationsPath = '.',
 
     # Opt IN to categories that are off by default for an existing repo.
@@ -121,6 +131,22 @@ function Apply-IncludeFlags([System.Collections.Specialized.OrderedDictionary] $
     if ($NoSpecs) { $inc.specs = $false }
     if ($NoPrTemplate) { $inc.prTemplate = $false }
     return $inc
+}
+
+# Auto-detect where a repo already keeps its Copilot customizations, so an app-folder
+# layout (e.g. app/.github) is recognized without passing -CustomizationsPath. Returns
+# '.' (repo root), a single subfolder name, or $null when nothing is found.
+function Detect-CustomizationsPath {
+    $markers = @('agents', 'skills', 'copilot-instructions.md')
+    foreach ($m in $markers) {
+        if (Test-Path (Join-Path $TargetRepo ".github/$m")) { return '.' }
+    }
+    foreach ($d in (Get-ChildItem $TargetRepo -Directory -Force | Where-Object { $_.Name -notmatch '^\.' })) {
+        foreach ($m in $markers) {
+            if (Test-Path (Join-Path $d.FullName ".github/$m")) { return $d.Name }
+        }
+    }
+    return $null
 }
 
 function Read-YesNo([string] $label, [bool] $default) {
@@ -186,7 +212,19 @@ if ($existing -and -not $Configure) {
 }
 else {
     $include = Apply-IncludeFlags (Get-LeanInclude)
-    $custPath = $CustomizationsPath
+    if ($PSBoundParameters.ContainsKey('CustomizationsPath')) {
+        $custPath = $CustomizationsPath
+    }
+    else {
+        $detected = Detect-CustomizationsPath
+        if ($detected -and $detected -ne '.') {
+            $custPath = $detected
+            Write-Host "  detected existing customizations under '$detected/.github' -> using -CustomizationsPath '$detected'" -ForegroundColor Cyan
+        }
+        else {
+            $custPath = $CustomizationsPath
+        }
+    }
     if ($Configure -and $Interactive) {
         $picked = Prompt-Profile $include $custPath
         $include = $picked.include; $custPath = $picked.customizationsPath
@@ -217,7 +255,8 @@ $script:added = 0; $script:skipped = 0; $script:merged = 0
 
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $r -eq '.github/copilot-instructions.md')) {
+    $relocate = @('.github/copilot-instructions.md', '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $relocate -contains $r)) {
         return "$custRoot/$r"
     }
     return $r

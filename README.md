@@ -263,12 +263,14 @@ It **never clobbers your existing files**: new paths are added (anything you alr
 suffix so you can diff and merge by hand.
 
 **Keep the customizations in your app folder instead of the repo root?** Pass
-`-CustomizationsPath app` (or any subfolder). The agents, skills, instructions, and
-`copilot-instructions.md` are placed under `app/.github/` — handy when you open a subfolder directly
-in VS Code — while the GitHub platform files (workflows, issue/PR templates, meta-docs) always stay
-at the repo root, because GitHub Actions and Copilot on github.com only read the root `.github/`.
-The choice is recorded in `template.config.json` (`sync.customizationsPath`) so later syncs keep
-writing to the same place.
+`-CustomizationsPath app` (or any subfolder) — or just let the installer **auto-detect** it: if your
+repo already keeps its Copilot files under a subfolder (e.g. `app/.github/agents`), that layout is
+recognized and reused without a flag. The agents, skills, instructions, `copilot-instructions.md`,
+and the agent meta-docs (`AGENT-ARCHITECTURE.md` / `WHEN-TO-USE.md` / `SKILLS.md`) are placed under
+`app/.github/` — handy when you open a subfolder directly in VS Code — while the GitHub platform
+files (workflows, issue/PR templates) always stay at the repo root, because GitHub Actions and
+Copilot on github.com only read the root `.github/`. The choice is recorded in `template.config.json`
+(`sync.customizationsPath`) so later syncs keep writing to the same place.
 
 Then continue with step 2 (run the initializer) inside your repo. The overlay also drops in
 [`.templatesyncignore`](.templatesyncignore) and `scripts/Update-FromTemplate.ps1` so you can
