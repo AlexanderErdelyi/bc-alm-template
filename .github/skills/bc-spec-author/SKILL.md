@@ -26,6 +26,25 @@ specs/
         └── change-log.md          # version history of the spec itself
 ```
 
+**Two story shapes.** Small, single-deliverable stories stay **flat** (the five docs above). A large
+or multi-part story is **broken into tasks**: the story keeps `index.md`, `brief.md`, `roadmap.md`
+and `change-log.md`, and the technical detail moves down into numbered task sub-folders:
+
+```
+    └── <type>-<ID>-<slug>/         # e.g. us-2117-country-division-bank-data
+        ├── index.md               # story overview + task table (status / approved / link)
+        ├── brief.md               # business request, value, scope (whole story)
+        ├── roadmap.md             # task sequencing: order, dependencies, approved-now vs future
+        ├── change-log.md          # spec history (whole story; per-task logs optional)
+        ├── 01-<task-slug>/         # one folder per task, ordinal-prefixed to fix build order
+        │   ├── plan.md
+        │   ├── acceptance-criteria.md
+        │   └── change-log.md       # optional — omit and use the story change-log
+        └── 02-<task-slug>/
+            ├── plan.md
+            └── acceptance-criteria.md
+```
+
 **Story folder name** = `<type>-<ID>-<slug>`:
 - `<type>` — work-item type token: `us` (user story), `bug`, `feat` (feature), `epic`, `task`, `spike`.
 - `<ID>` — the work-item ID, **bare number** (e.g. `2117`). No app/ticket prefix in the path.
@@ -41,15 +60,34 @@ change-logs plus the roadmap cover history.
 `roadmap.md`/`index.md` that cross-links the child story folders wherever they live — **not** by
 nesting story folders inside an epic folder. This keeps each story next to the module it touches.
 
+**Breaking a story into tasks.** Split a story into task sub-folders when it has **several distinct
+deliverables**, is **large enough to build/test in independent slices**, or when **some parts are
+approved now and others are future/parked**. To break it down:
+
+1. Keep `brief.md` (whole-story request/value/scope), `index.md`, `change-log.md`, and add a story
+   `roadmap.md` (copy `specs/_TEMPLATE/_story/roadmap.md`). Remove the story-level `plan.md` and
+   `acceptance-criteria.md` — that detail now lives per task.
+2. For each task, copy `specs/_TEMPLATE/_task/` to `NN-<task-slug>/` (`NN` = `01`, `02`, … fixing
+   build order). Each task folder holds `plan.md` + `acceptance-criteria.md` (+ optional
+   `change-log.md`).
+3. List the tasks in the story `roadmap.md` and `index.md` tables, with order, dependencies, status,
+   and **approval state** (an unapproved/future task stays in the roadmap, flagged, until signed off).
+4. Cross-task dependencies go in each task's `plan.md` Dependencies section and in the roadmap.
+
+Don't over-split: a change that touches a handful of objects is one flat story, not three tasks.
+Tasks are a spec-side breakdown; they may or may not mirror ADO child Tasks under the User Story.
+
 **Finding a spec by ID:** glob recursively — `specs/**/*-{ID}-*/` matches the story folder at any
 depth regardless of type. Agents use this to locate a ticket's spec.
 
 **Cross-navigation.** Every document must be reachable from every other one — a reader who opens
 `brief.md` should be able to jump to `plan.md` without going back through `index.md`. Start each
-story document (immediately under its H1 title) with a one-line **Story nav bar** that links the
-siblings and bolds the current file:
-`**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)`
-(the story `index.md` also adds `· [↑ Area](../index.md)`). Area docs carry `**Area:** [Index](index.md) · [Roadmap](roadmap.md)`.
+document (immediately under its H1 title) with a one-line nav bar that links its siblings and bolds
+the current file:
+- **Story docs:** `**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)` (the story `index.md` also adds `· [↑ Area](../index.md)`; a broken-down story swaps Plan/Acceptance for `[Roadmap](roadmap.md)`).
+- **Task docs:** `**Task NN:** [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md) · [↑ Story](../index.md)`.
+- **Area docs:** `**Area:** [Index](index.md) · [Roadmap](roadmap.md)`.
+
 The `specs/_TEMPLATE/` files already include these bars — keep them when you copy the template.
 
 **Diagrams** (mermaid): keep high-level ones (module ERD, process flow, decision tree) in the area
@@ -132,8 +170,7 @@ State explicitly what this spec **does** and **does not** cover, referencing sib
 responsibility lands elsewhere (e.g. "reporting is handled by us-1235, not here").
 
 #### 3f — Task breakdown
-End `plan.md` with an ordered, checkable task list (this is the breakdown BUILD executes — no
-separate `tasks.md` unless the story grows large enough to warrant one):
+End `plan.md` with an ordered, checkable task list — the breakdown BUILD executes:
 
 ```markdown
 ## Task Breakdown
@@ -142,6 +179,11 @@ separate `tasks.md` unless the story grows large enough to warrant one):
 - [ ] Add page extension 50101 to surface the field
 - [ ] Write tests for AC-01…AC-03
 ```
+
+For a **large or multi-part story**, promote this checklist into **task sub-folders** instead (see
+*Breaking a story into tasks* above): each `NN-<task-slug>/` gets its own `plan.md` (with its own
+Task Breakdown) + `acceptance-criteria.md`, the story keeps `brief`/`roadmap`/`index`/`change-log`,
+and the roadmap sequences the tasks. Keep the flat single-`plan.md` form for everything else.
 
 ### 4 — `acceptance-criteria.md`
 Given/When/Then, numbered `AC-01…`. Add edge cases, error scenarios (expected messages),
@@ -175,9 +217,10 @@ or explicitly asks you to commit the draft as-is.
 dependency map, labels/localization — are **deferred to BUILD**; the depth marker, task breakdown,
 brief, and acceptance criteria are still required.)*
 
-- [ ] All 5 story documents present (`index`, `brief`, `plan`, `acceptance-criteria`, `change-log`).
+- [ ] Story documents present — **flat story:** `index`, `brief`, `plan`, `acceptance-criteria`, `change-log`; **broken-down story:** `index`, `brief`, `roadmap`, `change-log` + each `NN-<slug>/` with `plan` + `acceptance-criteria`.
 - [ ] Story lives under the right area folder; area `index.md` lists it.
-- [ ] `plan.md` ends with a task breakdown.
+- [ ] `plan.md` ends with a task breakdown (per task, for a broken-down story); broken-down tasks are sequenced in `roadmap.md` with status + approval state.
+- [ ] Every document opens with its nav bar (story / task / area).
 - [ ] Object IDs reserved from the assigned range (Object ID Ninja, or marked "verify").
 - [ ] No base-table modifications planned (use table extensions).
 - [ ] ≥ 3 acceptance criteria.

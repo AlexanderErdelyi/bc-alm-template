@@ -29,6 +29,11 @@ Read the spec for the ticket:
 Search for existing objects you will extend. Then summarise: what to create, what to modify,
 in what order.
 
+**If the story is broken into tasks** (task sub-folders `NN-<task-slug>/` and a story `roadmap.md`
+instead of a story-level `plan.md`), read the `roadmap.md` for order/dependencies and build the
+**approved** tasks in ordinal order — each task's `plan.md` + `acceptance-criteria.md` is its own
+definition of done. Skip tasks the roadmap flags as not-yet-approved/future.
+
 **If `plan.md` is flagged `Spec depth: lightweight`,** the detailed object design is *your* job:
 make the field-by-field / event-by-event design decisions now, reserve object IDs (Object ID Ninja),
 and **write them back into `plan.md`** (objects table, IDs, architecture decisions) before/while you

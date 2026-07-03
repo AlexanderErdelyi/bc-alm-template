@@ -45,10 +45,20 @@ Example: `specs/Finance/Payments/us-123-payment-tolerance/`. Locate an existing 
 recursive glob `specs/**/*-{ID}-*/`. Full procedure — including area vs story docs, task breakdown,
 and diagrams — is in the backing skill.
 
-Every story document opens (right under its H1) with a one-line **Story nav bar** linking the
-siblings and bolding the current file, so a reader can move between `brief` ↔ `plan` ↔
-`acceptance-criteria` ↔ `change-log` without returning to `index.md`. The `specs/_TEMPLATE/` files
-already carry these bars — keep them when you copy the template.
+**Two story shapes.** A small story stays **flat** (the five docs above). A large or multi-part story
+is **broken into tasks**: the story keeps `index.md`, `brief.md`, `roadmap.md`, `change-log.md`, and
+the technical detail moves into numbered task sub-folders `NN-<task-slug>/`, each with its own
+`plan.md` + `acceptance-criteria.md` (+ optional `change-log.md`). Break down when the story has
+several distinct deliverables, is buildable in independent slices, or has some parts approved now and
+others deferred; the story `roadmap.md` sequences the tasks and tracks their approval state. Copy the
+task scaffold from `specs/_TEMPLATE/_task/` and the story roadmap from `specs/_TEMPLATE/_story/roadmap.md`.
+Don't over-split — a change touching a handful of objects is one flat story.
+
+Every document opens (right under its H1) with a one-line **nav bar** linking its siblings and
+bolding the current file, so a reader can move across docs without returning to `index.md`: a
+**Story** bar on story docs (the index also links `↑ Area`), a **Task NN** bar on task docs (linking
+`↑ Story`), and an **Area** bar on area docs. The `specs/_TEMPLATE/` files already carry these bars —
+keep them when you copy the template.
 
 ### Spec depth — full vs lightweight
 
