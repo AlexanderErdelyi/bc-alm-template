@@ -76,18 +76,11 @@ approved now and others are future/parked**.
 > acceptance content down into the tasks. If a spec folder for this ID already exists, always edit it
 > in place — never create a second one.
 
-To break it down:
-
-1. **In the existing story folder**, keep `brief.md`, `index.md`, `change-log.md`, and add a story
-   `roadmap.md` (copy just that file from `specs/_TEMPLATE/_story/roadmap.md`). Move the existing
-   `plan.md` / `acceptance-criteria.md` **content** down into the task folders, then delete the two
-   story-level files (their detail now lives per task).
-2. For each task, copy `specs/_TEMPLATE/_task/` to `<existing-story-folder>/NN-<task-slug>/` (`NN` =
-   `01`, `02`, … fixing build order). Each task folder holds `plan.md` + `acceptance-criteria.md`
-   (+ optional `change-log.md`).
-3. List the tasks in the story `roadmap.md` and `index.md` tables, with order, dependencies, status,
-   and **approval state** (an unapproved/future task stays in the roadmap, flagged, until signed off).
-4. Cross-task dependencies go in each task's `plan.md` Dependencies section and in the roadmap.
+When the user asks to break a story down, follow the full step-by-step (locate the existing folder,
+keep `brief`/`index`/`change-log`, add `roadmap.md`, relocate the plan/acceptance content into
+`NN-<task-slug>/` folders, wire dependencies, fix nav bars) in
+**[references/task-breakdown.md](references/task-breakdown.md)** — it includes a worked `us-2117`
+before/after. In short: keep the existing folder, add subfolders + roadmap, relocate the detail down.
 
 Don't over-split: a change that touches a handful of objects is one flat story, not three tasks.
 Tasks are a spec-side breakdown; they may or may not mirror ADO child Tasks under the User Story.
@@ -202,9 +195,10 @@ End `plan.md` with an ordered, checkable task list — the breakdown BUILD execu
 ```
 
 For a **large or multi-part story**, promote this checklist into **task sub-folders** instead (see
-*Breaking a story into tasks* above): each `NN-<task-slug>/` gets its own `plan.md` (with its own
-Task Breakdown) + `acceptance-criteria.md`, the story keeps `brief`/`roadmap`/`index`/`change-log`,
-and the roadmap sequences the tasks. Keep the flat single-`plan.md` form for everything else.
+**[references/task-breakdown.md](references/task-breakdown.md)**): each `NN-<task-slug>/` gets its own
+`plan.md` (with its own Task Breakdown) + `acceptance-criteria.md`, the story keeps
+`brief`/`roadmap`/`index`/`change-log`, and the roadmap sequences the tasks. Keep the flat
+single-`plan.md` form for everything else.
 
 ### 4 — `acceptance-criteria.md`
 Given/When/Then, numbered `AC-01…`. Add edge cases, error scenarios (expected messages),
