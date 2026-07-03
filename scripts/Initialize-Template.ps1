@@ -197,7 +197,9 @@ function Read-Int([string] $prompt, $default) {
 
 # --- Resolve effective values (param > interactive prompt > detected/app.json > current default) ---
 if (-not $AppPrefix)        { $AppPrefix        = Read-Value 'App / object prefix (e.g. NOB)'       (Def 'appPrefix' $cur.appPrefix) }
-if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / spec prefix (work-item key for PREFIX-123 and specs/PREFIX-*; often same as app prefix)' $cur.ticketPrefix }
+if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / spec prefix for PREFIX-123 and specs/PREFIX-* (often same as app prefix; type "none" for bare feature/123)' $cur.ticketPrefix }
+# Allow an explicit "no prefix" scheme: 'none'/'-'/'(none)' => bare feature/123, specs/123-*, [123]
+if ($TicketPrefix -match '^(none|-|\(none\))$') { $TicketPrefix = '' }
 if (-not $AppName)          { $AppName          = Read-Value 'App display name'                    (Def 'appName' $cur.appName) }
 if (-not $Publisher)        { $Publisher        = Read-Value 'Publisher (company name)'            (Def 'publisher' $cur.publisher) }
 if (-not $ObjectIdFrom)     { $ObjectIdFrom     = Read-Int   'Object ID range - from'              (Def 'objectIdFrom' $cur.objectIdFrom) }
@@ -261,7 +263,7 @@ if ($existingRepo) { $offset = 0 }
 Write-Host "`nApplying template configuration:" -ForegroundColor Cyan
 if ($existingRepo) { Write-Host "  mode             existing repo (non-destructive: localizes template files only, no renumber/rename/prune)" -ForegroundColor Yellow }
 Write-Host ("  prefix           {0} -> {1}" -f $cur.appPrefix, $AppPrefix)
-Write-Host ("  ticket prefix    {0} -> {1}" -f $cur.ticketPrefix, $TicketPrefix)
+Write-Host ("  ticket prefix    {0} -> {1}" -f $cur.ticketPrefix, $(if ($TicketPrefix) { $TicketPrefix } else { '(none / bare IDs)' }))
 Write-Host ("  object ID range  {0}-{1} -> {2}-{3}{4}" -f $oldFrom, $oldTo, $ObjectIdFrom, $ObjectIdTo, $(if ($existingRepo) { '  (docs only; objects not renumbered)' } else { "  (offset $offset)" }))
 Write-Host ("  publisher        {0} -> {1}" -f $cur.publisher, $Publisher)
 Write-Host ("  app name         {0} -> {1}" -f $cur.appName, $AppName)
@@ -314,8 +316,10 @@ function Update-Content([string] $text) {
     # 1. Repo slug + ADO org (literal)
     $text = $text.Replace($cur.repoSlug, $RepoSlug)
     $text = $text.Replace($cur.adoOrg, $AdoOrg)
-    # 2. Ticket prefix first ('PREFIX-123', 'PREFIX-{ID}') so it doesn't collide with bare prefix
-    $text = [regex]::Replace($text, "\b$oldTicket-", "$TicketPrefix-")
+    # 2. Ticket prefix first ('PREFIX-123', 'PREFIX-{ID}') so it doesn't collide with bare prefix.
+    #    Empty $TicketPrefix => strip the prefix and its dash entirely (bare 'feature/123', 'specs/123-*').
+    $ticketRepl = if ($TicketPrefix) { "$TicketPrefix-" } else { '' }
+    $text = [regex]::Replace($text, "\b$oldTicket-", $ticketRepl)
     # 3. Bare app/object prefix (object names, identifiers, doc examples)
     $text = [regex]::Replace($text, "\b$oldPrefix", $AppPrefix)
     # 4. Object IDs. In a fresh template repo, shift the sample app's IDs into the new range.
@@ -518,7 +522,7 @@ $projectMd = @"
 | Setting | Value |
 |---|---|
 | App / object prefix | ``$AppPrefix`` |
-| Ticket / spec prefix | ``$TicketPrefix`` |
+| Ticket / spec prefix | ``$(if ($TicketPrefix) { $TicketPrefix } else { '(none — bare IDs)' })`` |
 | App name | $AppName |
 | Publisher | $Publisher |
 | Object ID range | ``$ObjectIdFrom``-``$ObjectIdTo`` |
@@ -588,7 +592,8 @@ if ($CleanupTemplateFiles) {
             $gettingSteps.Add("1. Add your AL project(s) and open the repo (or a ``*.code-workspace``) in VS Code; install the recommended AL extensions when prompted.")
         }
         if ($keep.specs) {
-            $gettingSteps.Add("2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$TicketPrefix-123-short-name/``, fill in")
+            $ticketEg = if ($TicketPrefix) { "$TicketPrefix-123" } else { '123' }
+            $gettingSteps.Add("2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$ticketEg-short-name/``, fill in")
             $gettingSteps.Add("   ``brief.md``, open a spec PR, then implement.")
         }
         $gettingSteps.Add("$($gettingSteps.Count + 1). Open GitHub Copilot Chat and choose a ``bc-*`` agent — start with **BC Orchestrator** and give")
