@@ -46,8 +46,8 @@ Present a numbered list and let the user select. Do not assume all features go i
 ### Step 3 — Verify readiness
 
 For each selected feature, verify:
-- [ ] Spec folder exists: `specs/ABC-{ID}-*/`
-- [ ] All 4 spec documents present
+- [ ] Spec folder exists: `specs/**/*-{ID}-*/`
+- [ ] All 5 story documents present
 - [ ] Feature PR is merged (not just open)
 - [ ] No open issues or blockers on the PR
 - [ ] `app.json` version in the merged code is correct

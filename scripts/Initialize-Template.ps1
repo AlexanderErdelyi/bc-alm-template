@@ -200,8 +200,8 @@ function Read-Int([string] $prompt, $default) {
 
 # --- Resolve effective values (param > interactive prompt > detected/app.json > current default) ---
 if (-not $AppPrefix)        { $AppPrefix        = Read-Value 'App / object prefix (e.g. NOB)'       (Def 'appPrefix' $cur.appPrefix) }
-if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / spec prefix for PREFIX-123 and specs/PREFIX-* (often same as app prefix; type "none" for bare feature/123)' $cur.ticketPrefix }
-# Allow an explicit "no prefix" scheme: 'none'/'-'/'(none)' => bare feature/123, specs/123-*, [123]
+if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / branch prefix for PREFIX-123 refs and feature/PREFIX-{ID}-* branches (often same as app prefix; type "none" for bare feature/123)' $cur.ticketPrefix }
+# Allow an explicit "no prefix" scheme: 'none'/'-'/'(none)' => bare feature/123, [123]
 if ($TicketPrefix -match '^(none|-|\(none\))$') { $TicketPrefix = '' }
 if (-not $AppName)          { $AppName          = Read-Value 'App display name'                    (Def 'appName' $cur.appName) }
 if (-not $Publisher)        { $Publisher        = Read-Value 'Publisher (company name)'            (Def 'publisher' $cur.publisher) }
@@ -574,7 +574,7 @@ $projectMd = @"
 | Setting | Value |
 |---|---|
 | App / object prefix | ``$AppPrefix`` |
-| Ticket / spec prefix | ``$(if ($TicketPrefix) { $TicketPrefix } else { '(none — bare IDs)' })`` |
+| Ticket / branch prefix | ``$(if ($TicketPrefix) { $TicketPrefix } else { '(none — bare IDs)' })`` |
 | App name | $AppName |
 | Publisher | $Publisher |
 | Object ID range | ``$ObjectIdFrom``-``$ObjectIdTo`` |
@@ -644,9 +644,8 @@ if ($CleanupTemplateFiles) {
             $gettingSteps.Add("1. Add your AL project(s) and open the repo (or a ``*.code-workspace``) in VS Code; install the recommended AL extensions when prompted.")
         }
         if ($keep.specs) {
-            $ticketEg = if ($TicketPrefix) { "$TicketPrefix-123" } else { '123' }
-            $gettingSteps.Add("2. Pick up a ticket: copy ``specs/_TEMPLATE`` to ``specs/$ticketEg-short-name/``, fill in")
-            $gettingSteps.Add("   ``brief.md``, open a spec PR, then implement.")
+            $gettingSteps.Add("2. Pick up a ticket: copy ``specs/_TEMPLATE/_story`` to ``specs/<Area>/us-123-short-name/`` (and")
+            $gettingSteps.Add("   ``_area`` to ``specs/<Area>/`` if new), fill in ``brief.md``, open a spec PR, then implement.")
         }
         $gettingSteps.Add("$($gettingSteps.Count + 1). Open GitHub Copilot Chat and choose a ``bc-*`` agent — start with **BC Orchestrator** and give")
         $gettingSteps.Add("   it a ticket ID.")

@@ -36,9 +36,10 @@ Use this agent when:
 ### Step 1 — Read the spec
 
 Find and read all spec documents for this ticket:
-- `specs/ABC-{ID}-*/brief.md`
-- `specs/ABC-{ID}-*/plan.md`
-- `specs/ABC-{ID}-*/acceptance-criteria.md`
+- `specs/**/*-{ID}-*/index.md`
+- `specs/**/*-{ID}-*/brief.md`
+- `specs/**/*-{ID}-*/plan.md`
+- `specs/**/*-{ID}-*/acceptance-criteria.md`
 
 If no spec folder exists, warn the user: "No spec found for this ticket. A spec should exist before a PR is opened. Switch to the **bc-spec agent** to create one."
 
@@ -79,12 +80,12 @@ AB#123
 
 **Spec link:** Always include:
 ```
-📄 Spec: specs/ABC-123-payment-tolerance/
+📄 Spec: specs/Finance/us-123-payment-tolerance/
 ```
 
 **Testing:** Reference the acceptance criteria:
 ```
-Tests against: specs/ABC-123-payment-tolerance/acceptance-criteria.md
+Tests against: specs/Finance/us-123-payment-tolerance/acceptance-criteria.md
 Test codeunit: Codeunit 50150 "Payment Tolerance Test"
 ```
 
@@ -158,11 +159,11 @@ Closes AB#123
 
 ## Spec
 
-📄 `specs/ABC-123-short-description/`
+📄 `specs/<Area>/us-123-short-description/`
 
 ## Testing
 
-Tested against: `specs/ABC-123-short-description/acceptance-criteria.md`
+Tested against: `specs/<Area>/us-123-short-description/acceptance-criteria.md`
 
 Test codeunit: `Codeunit 50150 "Your Feature Test"`
 

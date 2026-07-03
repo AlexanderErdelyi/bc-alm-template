@@ -43,19 +43,20 @@ If the ADO MCP server is configured in `.vscode/mcp.json`, the **BC PM agent** c
 
 **Owner:** Developer / Functional Consultant with BC Plan + BC Spec Agents  
 **Input:** Triaged ADO ticket ID  
-**Output:** `specs/ABC-{ID}/` folder with 4 documents  
+**Output:** `specs/<Area>/<type>-<ID>-<slug>/` story folder with 5 documents
 **Agent:** [BC Plan](.github/agents/bc-plan.agent.md) (user story + acceptance criteria), then [BC Spec](.github/agents/bc-spec.agent.md) (technical spec)
 
 Start with the **BC Plan agent** to shape the user story and acceptance criteria, then switch to the **BC Spec agent** with the ticket ID (e.g. `ABC-123`). Together they will:
 
 1. Read the ADO ticket (via MCP) or ask you to paste the ticket content
-2. Create `specs/ABC-{ID}-short-description/` folder
-3. Draft `brief.md` — plain language customer requirement
-4. Draft `plan.md` — technical approach with affected AL objects
-5. Draft `acceptance-criteria.md` — testable Given/When/Then criteria
-6. Create `change-log.md` — v1.0 initial entry
-7. Flag any missing information (object IDs, BC version, permissions scope)
-8. Open a spec PR
+2. Create `specs/<Area>/<type>-<ID>-<slug>/` folder (for example, `specs/Finance/us-123-payment-tolerance/`)
+3. Draft `index.md` — story overview and navigation
+4. Draft `brief.md` — plain language customer requirement
+5. Draft `plan.md` — technical approach with affected AL objects and task breakdown
+6. Draft `acceptance-criteria.md` — testable Given/When/Then criteria
+7. Create `change-log.md` — v1.0 initial entry
+8. Flag any missing information (object IDs, BC version, permissions scope)
+9. Open a spec PR
 
 **Do not start AL development until the spec PR is merged.**
 
@@ -102,7 +103,7 @@ See [branching-strategy.md](branching-strategy.md) for full naming conventions.
 **Output:** AL objects committed to feature branch, tests written  
 **Agent:** [BC Developer](.github/agents/bc-dev.agent.md)
 
-Use the **BC Developer agent** and tell it the spec folder (e.g. `work on specs/ABC-123-payment-tolerance/`). The agent will:
+Use the **BC Developer agent** and tell it the spec folder (e.g. `work on specs/Finance/us-123-payment-tolerance/`). The agent will:
 
 1. Read `plan.md` to understand which AL objects to create or modify
 2. Read `acceptance-criteria.md` to understand what the implementation must satisfy
@@ -209,7 +210,7 @@ Deployment to TEST is typically handled by AL-Go for GitHub pipelines or the BC 
 **Output:** Customer sign-off or feedback  
 **Agent:** None (human process)
 
-The acceptance criteria from `specs/ABC-{ID}/acceptance-criteria.md` are the test script. The customer (or functional consultant on their behalf) verifies each Given/When/Then criterion.
+The acceptance criteria from `specs/**/*-{ID}-*/acceptance-criteria.md` are the test script. The customer (or functional consultant on their behalf) verifies each Given/When/Then criterion.
 
 Outcomes:
 - **Approved:** Move to Stage 11 (documentation)
@@ -220,15 +221,16 @@ Outcomes:
 ## Stage 11 — Documentation
 
 **Owner:** Developer / Technical Writer with BC Doc Agent  
-**Input:** All 4 spec files + final AL diff  
+**Input:** All 5 story documents + final AL diff
 **Output:** `docs/functional/ABC-{ID}-title.md` + updated `docs/changelog.md`  
 **Agent:** [BC Doc](.github/agents/bc-doc.agent.md)
 
 The **BC Doc agent** is the gate before PROD. It reads:
-- `specs/ABC-{ID}/brief.md` — what was requested
-- `specs/ABC-{ID}/plan.md` — what was planned
-- `specs/ABC-{ID}/acceptance-criteria.md` — what was accepted
-- `specs/ABC-{ID}/change-log.md` — what changed during development
+- `specs/**/*-{ID}-*/index.md` — story overview and navigation
+- `specs/**/*-{ID}-*/brief.md` — what was requested
+- `specs/**/*-{ID}-*/plan.md` — what was planned, including the task breakdown
+- `specs/**/*-{ID}-*/acceptance-criteria.md` — what was accepted
+- `specs/**/*-{ID}-*/change-log.md` — what changed during development
 - Git diff of the feature branch — what was actually implemented
 
 It then generates:

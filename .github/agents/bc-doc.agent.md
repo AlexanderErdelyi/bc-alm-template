@@ -27,10 +27,11 @@ PROD deployment cannot proceed until your output is merged. This ensures:
 ### Step 1 — Read all spec documents
 
 For the given ticket ID, read:
-1. `specs/ABC-{ID}-*/brief.md` — original customer request and business value
-2. `specs/ABC-{ID}-*/plan.md` — what was planned technically
-3. `specs/ABC-{ID}-*/acceptance-criteria.md` — what was agreed as "done"
-4. `specs/ABC-{ID}-*/change-log.md` — how the spec evolved
+1. `specs/**/*-{ID}-*/index.md` — story overview and navigation
+2. `specs/**/*-{ID}-*/brief.md` — original customer request and business value
+3. `specs/**/*-{ID}-*/plan.md` — what was planned technically, including the task breakdown
+4. `specs/**/*-{ID}-*/acceptance-criteria.md` — what was agreed as "done"
+5. `specs/**/*-{ID}-*/change-log.md` — how the spec evolved
 
 ### Step 2 — Review the implementation
 
@@ -105,7 +106,7 @@ Template:
 ## Related
 
 - ADO Ticket: ABC-{ID}
-- Spec: `specs/ABC-{ID}-short-description/`
+- Spec: `specs/<Area>/<type>-<ID>-<slug>/`
 ```
 
 ### Step 5 — Update changelog
@@ -157,7 +158,7 @@ If any spec document is missing or incomplete:
 ⚠️ Cannot generate documentation. Missing spec documents:
 - acceptance-criteria.md not found
 
-Documentation requires all 4 spec documents to ensure accuracy.
+Documentation requires all 5 story documents to ensure accuracy.
 Switch to the **bc-spec agent** to complete the spec before generating docs.
 ```
 

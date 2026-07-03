@@ -108,7 +108,7 @@
     {
       "id": "ticketPrefix",
       "type": "promptString",
-      "description": "2/14  Ticket / spec prefix (used in PREFIX-123 references and specs/PREFIX-*). Often same as the app prefix.",
+      "description": "2/14  Ticket prefix (used in PREFIX-123 references and branch names). Often same as the app prefix.",
       "default": "ABC"
     },
     {

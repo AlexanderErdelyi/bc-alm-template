@@ -63,7 +63,7 @@
   },
   "tokens": {
     "appPrefix": "BC partner/app object-name prefix. Appears in AL object names ('ABC Payment ...'), identifiers, file names, app.json publisher-style prefix, instructions and docs.",
-    "ticketPrefix": "Work-item / spec key used in 'PREFIX-123' references and 'specs/PREFIX-{ID}-*' folders. Often equal to appPrefix but can differ (e.g. ADO project key).",
+    "ticketPrefix": "Work-item key used in 'PREFIX-123' references and 'feature/PREFIX-{ID}-*' / 'bugfix/' / 'hotfix/' branch names. Often equal to appPrefix but can differ (e.g. ADO project key); set to '' for bare IDs. Note: spec folders no longer carry this prefix — they are organised by module/area as 'specs/<Area>/<type>-<ID>-<slug>/'.",
     "appName": "Display name of the sample AL extension (app.json 'name').",
     "publisher": "app.json 'publisher' — your company / partner name.",
     "objectIdFrom": "Lower bound of your assigned AL object ID range. The initializer shifts every sample object ID by (new from - old from).",

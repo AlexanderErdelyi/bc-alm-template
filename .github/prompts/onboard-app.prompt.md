@@ -38,7 +38,7 @@ Custom instructions are how Copilot learns this app's rules. Ensure they exist a
 - Verify `.github/instructions/al-coding-standards.instructions.md` reflects the confirmed prefix and ID range.
 
 ## 5. First ticket
-- Copy `specs/_TEMPLATE` to `specs/<PREFIX>-<id>-<slug>/` for the first piece of work, or hand off to **bc-pm** / **bc-spec**.
+- Copy `specs/_TEMPLATE/_area` to `specs/<Area>/` for a new area, then copy `specs/_TEMPLATE/_story` to `specs/<Area>/<type>-<id>-<slug>/` for the first piece of work, or hand off to **bc-pm** / **bc-spec**.
 - Point me at `bc-orchestrator` as the entry point for day-to-day work.
 
 Finish with a short checklist of what changed and what I still need to do manually (e.g. `az login`, enable the `al` MCP server, request a symbols/sandbox).

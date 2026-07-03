@@ -28,7 +28,7 @@ Closes AB#<!-- ticket ID -->
 
 <!-- Link to the spec folder for this ticket. -->
 
-📄 Spec: `specs/<!-- ABC-{ID}-short-description -->/`
+📄 Spec: `specs/<!-- <Area>/<type>-<ID>-<slug> -->/`
 
 ## Testing
 

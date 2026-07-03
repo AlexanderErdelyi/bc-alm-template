@@ -20,7 +20,7 @@ Please check:
 ```
 
 **Action:** do not fabricate requirements. Ask for the correct ID, or offer to proceed from a spec
-folder (`specs/ABC-{ID}-*/`) if one already exists.
+folder (`specs/**/*-{ID}-*/`) if one already exists.
 
 ---
 
@@ -107,7 +107,7 @@ anything that materially changes the design.
 
 ## 7 — Spec missing or stale
 
-**Detection:** no `specs/ABC-{ID}-*/` folder, or the code diverges from `plan.md`.
+**Detection:** no `specs/**/*-{ID}-*/` folder, or the code diverges from `plan.md`.
 
 **Action:** do not implement without a reviewed spec. Hand back to **`bc-spec-author`** (agent:
 `bc-spec`) to author or update it first.

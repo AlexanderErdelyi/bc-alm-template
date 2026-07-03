@@ -24,7 +24,7 @@ procedure of the **`bc-dev`** agent.
 
 ## 1 — Orient
 Read the spec for the ticket:
-`specs/ABC-{ID}-*/plan.md` (approach + objects), `acceptance-criteria.md` (definition of done),
+`specs/**/*-{ID}-*/plan.md` (approach + objects + task breakdown), `acceptance-criteria.md` (definition of done),
 `brief.md` (context). Check `app/app.json` for the current version and confirm the object ID range.
 Search for existing objects you will extend. Then summarise: what to create, what to modify,
 in what order.
@@ -65,7 +65,7 @@ See `references/al-patterns.md` for copy-ready snippets.
 After the objects are in, validate the **whole module**, not just the last file you touched:
 - Run `al_build` and `al_get_diagnostics` across the app project; resolve every error and every
   in-scope warning before proceeding.
-- Update the spec's acceptance criteria: in `specs/ABC-{ID}-*/acceptance-criteria.md`, mark each
+- Update the spec's acceptance criteria: in `specs/**/*-{ID}-*/acceptance-criteria.md`, mark each
   criterion you have verified (e.g. `Open → Pass`). Commit this together with the code.
 - **Review gate — ask before committing.** Summarise what changed, the build/diagnostics result,
   and the AC status, then confirm with the user before you commit. Never auto-commit a red build.

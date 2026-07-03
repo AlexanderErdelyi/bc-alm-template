@@ -76,8 +76,19 @@ jobs:
             const slug = '${{ steps.branch.outputs.slug }}';
             const issue = context.payload.issue;
             const today = new Date().toISOString().split('T')[0];
-            const specFolder = `specs/${issueNum}-${slug}`;
+            const specFolder = `specs/General/us-${issueNum}-${slug}`;
             const issueBody = (issue.body || '').trim().slice(0, 600);
+
+            const indexLines = [
+              `# #${issueNum} ${issue.title}`,
+              '',
+              '## Story Documents',
+              '',
+              '- [Brief](brief.md)',
+              '- [Plan](plan.md)',
+              '- [Acceptance Criteria](acceptance-criteria.md)',
+              '- [Change Log](change-log.md)',
+            ];
 
             const briefLines = [
               `# Brief — #${issueNum} ${issue.title}`,
@@ -113,6 +124,12 @@ jobs:
               '| Object Type | Object ID | Object Name | Action |',
               '|---|---|---|---|',
               '| | | | |',
+              '',
+              '## Task Breakdown',
+              '',
+              '- [ ] Confirm scope and dependencies',
+              '- [ ] Implement AL changes',
+              '- [ ] Add or update tests',
               '',
               '## Test Codeunit',
               '',
@@ -157,6 +174,7 @@ jobs:
             ];
 
             const files = [
+              { path: `${specFolder}/index.md`,               content: indexLines.join('\n')     },
               { path: `${specFolder}/brief.md`,               content: briefLines.join('\n')     },
               { path: `${specFolder}/plan.md`,                content: planLines.join('\n')      },
               { path: `${specFolder}/acceptance-criteria.md`, content: acLines.join('\n')        },
@@ -186,7 +204,7 @@ jobs:
             const issueNum = Number('${{ steps.branch.outputs.issue_number }}');
             const slug = '${{ steps.branch.outputs.slug }}';
             const issue = context.payload.issue;
-            const specFolder = `specs/${issueNum}-${slug}`;
+            const specFolder = `specs/General/us-${issueNum}-${slug}`;
 
             const prBodyLines = [
               '## Summary',
@@ -201,8 +219,9 @@ jobs:
               '',
               '## What Is Included',
               '',
+              `- \`${specFolder}/index.md\` — Story overview and navigation`,
               `- \`${specFolder}/brief.md\` — Background and problem statement`,
-              `- \`${specFolder}/plan.md\` — Implementation plan stub`,
+              `- \`${specFolder}/plan.md\` — Implementation plan and task breakdown stub`,
               `- \`${specFolder}/acceptance-criteria.md\` — Acceptance criteria stub`,
               `- \`${specFolder}/change-log.md\` — Change log`,
               '',

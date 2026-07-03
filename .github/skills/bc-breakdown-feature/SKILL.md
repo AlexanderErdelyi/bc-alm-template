@@ -207,4 +207,4 @@ order, and the parent issue URL.
 ## Next step
 
 Hand each story to **`bc-spec-author`** (agent: `bc-spec`) to produce its
-`specs/ABC-{ID}-*/` folder, then to **`bc-build-feature`** (agent: `bc-dev`).
+`specs/<Area>/<type>-<ID>-<slug>/` folder, then to **`bc-build-feature`** (agent: `bc-dev`).

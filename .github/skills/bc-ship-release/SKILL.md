@@ -17,7 +17,7 @@ date, and whether `docs/functional/ABC-{ID}-*.md` exists.
 Ask the user which merged features to include (numbered list). Do not assume "all".
 
 ## 3 — Verify readiness (per feature)
-- [ ] Spec folder exists with all 4 documents.
+- [ ] Spec folder exists with all 5 story documents.
 - [ ] Feature PR merged (not just open).
 - [ ] No open blockers on the PR.
 - [ ] `app.json` version correct.

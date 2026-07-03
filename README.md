@@ -41,7 +41,7 @@ ADO Ticket
     │
     ▼
 [BC Plan + BC Spec] ─► Spec Created (brief + plan + acceptance-criteria)
-    │                  specs/ABC-{ID}/
+    │                  specs/<Area>/<type>-<ID>-<slug>/
     ▼
 Spec PR Reviewed & Merged
     │
@@ -95,7 +95,7 @@ flowchart TD
     PLAN["📝 bc-plan · PLAN<br/>write user story + acceptance criteria<br/>(Epic/Feature ➜ create sub-issues)"]
     PLAN -->|"Issue body updated → <i>Ready</i>"| SPEC
 
-    SPEC["📐 bc-spec · SPEC<br/>author specs/ABC-{ID}-*/ (4 docs)"]
+    SPEC["📐 bc-spec · SPEC<br/>author specs/<Area>/<type>-<ID>-<slug>/ (5 docs)"]
     SPEC -->|"spec PR merged → <i>In Spec</i>"| DEV
 
     DEV["🔨 bc-dev · BUILD<br/>feature/ABC-{ID}-* · AL objects + tests · app.json bump"]
@@ -127,7 +127,7 @@ flowchart TD
 | 1 | Capture an incoming request | **bc-pm** | New **Issue** opened from the template, labeled, added to the Project | `Triage` |
 | 2 | Triage, dedupe, prioritize, groom | **bc-pm** | Labels/priority set, duplicates linked, intake accepted | `Backlog` |
 | 3 | Shape the user story + testable criteria | **bc-plan** | Issue **body** rewritten (story + AC). For an Epic/Feature, child **sub-issues** are created per story | `Ready` |
-| 4 | Write the developer-ready spec | **bc-spec** | `specs/ABC-{ID}-*/` committed on a spec branch; spec **PR** opened & merged | `In Spec` |
+| 4 | Write the developer-ready spec | **bc-spec** | `specs/<Area>/<type>-<ID>-<slug>/` committed on a spec branch; spec **PR** opened & merged | `In Spec` |
 | 5 | Implement the AL objects + tests | **bc-dev** | `feature/ABC-{ID}-*` branch; objects, tests, `app.json` version bump | `In Progress` |
 | 6 | Open the pull request | **bc-pr** | **PR** with `Closes #ID`, AL quality checklist, work-item link | `In Review` |
 | 7 | Handle review feedback | **bc-pr** / **bc-dev** | Changes-requested loops back to build; on merge the Issue auto-closes via `Closes #ID` | merged to `main` |
@@ -437,7 +437,8 @@ first feature.
 ### 3. Copy the spec template for your first ticket
 
 ```bash
-cp -r specs/_TEMPLATE specs/ABC-123-your-feature-name
+cp -r specs/_TEMPLATE/_area specs/Finance
+cp -r specs/_TEMPLATE/_story specs/Finance/us-123-your-feature-name
 ```
 
 Fill in `brief.md` first, then open a spec PR before writing any AL code.
@@ -460,7 +461,7 @@ Open GitHub Copilot Chat in VS Code or GitHub.com and select an agent from the d
 - **Not sure where to start?** → `BC Orchestrator` — give it a ticket ID
 - **New ticket to triage?** → `BC PM` — intake, triage, and groom the backlog
 - **Need a spec?** → `BC Plan` (user story) then `BC Spec` — give it an ADO ticket ID or paste the description
-- **Implementing?** → `BC Developer` — tell it to work on `specs/ABC-123/`
+- **Implementing?** → `BC Developer` — tell it to work on `specs/Finance/us-123-payment-tolerance/`
 - **Ready to ship?** → `BC PR` → `BC Deploy` → `BC Doc` → `BC Deploy`
 
 > **Agents not showing in the Copilot dropdown?** VS Code discovers `.github/agents`,

@@ -106,4 +106,29 @@
 
 ---
 
+## Task Breakdown
+
+> The ordered, checkable list BUILD executes. Keep it here in `plan.md` unless the story grows large
+> enough to justify a separate `tasks.md`. Each task should touch only a few files and map back to an
+> object above and/or an acceptance criterion.
+
+- [ ] <!-- e.g. Create table 50100 "ABC Setup" with fields … -->
+- [ ] <!-- e.g. Add event subscriber in codeunit 50103 … -->
+- [ ] <!-- e.g. Add page extension 50101 to surface the field -->
+- [ ] <!-- e.g. Write tests for AC-01…AC-03 -->
+
+---
+
+## Diagram (optional)
+
+> Embed a mermaid diagram where it aids understanding — an ERD of new/extended tables, or the process
+> flow. Delete this section if not needed. Keep module-wide diagrams in the area `index.md`/`roadmap.md`.
+
+```mermaid
+erDiagram
+    CUSTOMER ||--o{ PAYMENT_TOLERANCE_SETUP : configures
+```
+
+---
+
 *Spec version: 1.0 — see [change-log.md](change-log.md) for history*
