@@ -5,7 +5,7 @@ tools: ['search/codebase', 'search/textSearch', 'search/usages', 'edit/editFiles
 handoffs:
   - label: "BUILD · Hand the spec to the developer"
     agent: "bc-dev"
-    prompt: "The spec for this ticket is complete and merged. Take over: locate the spec with specs/**/*-{ID}-*/, create/confirm the feature branch, and implement the AL objects following the bc-build-feature skill."
+    prompt: "The spec for this ticket is complete and merged. Take over: locate the spec with specs/**/*-{ID}-*/, confirm the working branch (reuse the branch you're already on if its name contains the ticket ID — only create one from main if there is none), and implement the AL objects following the bc-build-feature skill."
   - label: "SUMMARY · Update the user story with a spec summary"
     agent: "bc-plan"
     prompt: "The spec for this ticket is complete (find it with specs/**/*-{ID}-*/). Take over and add a brief Spec Summary to the user story: read brief.md and plan.md, then update the work item with a concise summary — chosen approach, key decisions, still-open questions, and a link to the spec folder. Write the summary in the customer's preferred language (same as the user story), since the work item is customer-facing — translate from the English spec. Keep it short; do not duplicate the full spec. Follow the bc-plan-user-story skill's 'Spec summary back-write' step."

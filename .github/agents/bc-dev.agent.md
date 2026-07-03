@@ -32,7 +32,12 @@ When given a ticket ID or spec folder path:
 4. Check `app/app.json` — note current version, confirm object ID range
 5. Search for existing AL objects that will be extended or affected (use `#al_symbolsearch`
    for base-app objects)
-6. Summarise: what needs to be created, what needs to be modified, and in what order
+6. **Confirm the working branch — reuse before you create.** Run `git branch --show-current`. If you
+   are already on a branch for this ticket (its name contains the ticket ID, e.g. `feature/2117-…` —
+   prefix or exact wording don't matter), **stay on it**; never create a second branch or rename it.
+   Only create a branch (from an up-to-date `main`, per `docs/branching-strategy.md`) when there is
+   none for this ticket. If unsure, ask rather than branch.
+7. Summarise: what needs to be created, what needs to be modified, and in what order
 
 ---
 
