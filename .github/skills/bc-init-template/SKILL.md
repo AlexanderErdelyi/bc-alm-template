@@ -1,6 +1,6 @@
 ---
 name: bc-init-template
-description: "Guides an adopter through initializing this BC ALM template for their own project — interviews them for prefix, object ID range, publisher, repo, work-item system, branching and commit conventions, then runs scripts/Initialize-Template.ps1 to apply everything. Use when: initialize the template, set up this repo for my project, customize the template, run guided setup, configure prefix and object range, onboard a new BC repo, replace ABC placeholders, first-time setup."
+description: "Guides an adopter through initializing this BC ALM template for their own project — interviews them for prefix, object ID range, publisher, repo, work-item system, branching and commit conventions, runs scripts/Initialize-Template.ps1 to apply everything, then regenerates project-specific copilot-instructions grounded in the real app. Use when: initialize the template, set up this repo for my project, customize the template, run guided setup, configure prefix and object range, onboard a new BC repo, replace ABC placeholders, first-time setup, generate project-specific copilot-instructions, my copilot-instructions still describe the template."
 ---
 
 # BC · Initialize the Template
@@ -64,6 +64,25 @@ The script then:
 - converts `AB#` -> `#` when the work-item system is GitHub;
 - writes each agent's `model:` line from the `models` map in `template.config.json`;
 - writes the choices back to `template.config.json` and generates `PROJECT.md`.
+
+## Ground the instructions in the real project
+
+The script only replaces **tokens** — it does not rewrite prose. The template ships a
+`.github/copilot-instructions.md` (and path-scoped `.github/instructions/*.instructions.md`) that
+**describe this ALM template itself**. After a real project is initialized, those must be
+regenerated so Copilot's always-on context describes the **adopter's actual app**, not the template.
+
+1. Read the real project: `app.json` (name, publisher, `idRanges`, target versions), representative
+   AL source, `.vscode/*`, `docs/`, and the ALM decisions just confirmed.
+2. Regenerate `.github/copilot-instructions.md` following the procedure in
+   [`.github/prompts/generate-copilot-instructions.prompt.md`](../../prompts/generate-copilot-instructions.prompt.md)
+   — repo-wide guidance + focused path-scoped instruction files, all grounded in the code. (Equivalently,
+   hand off to **bc-doc**.)
+3. The file lives at `<customizationsPath>/.github/copilot-instructions.md` (repo root, or under
+   `app/` for an app-folder layout). It is listed in `.templatesyncignore` and skipped by
+   `Update-FromTemplate.ps1`, so the project-specific version is **safe from future template syncs** —
+   regenerate with confidence.
+4. Show the user a diff before writing and flag any rule you inferred so they can confirm it.
 
 ## Finish up (guide the user through these)
 

@@ -45,7 +45,9 @@ you want to understand *why* it is structured the way it is before adapting it.
 
 > `bc-workflow` (CI/CD & AL-Go pipeline authoring) and `bc-init` (one-time setup) are **utility**
 > agents outside the TRIAGE → DOCS lifecycle. `bc-init` runs once, when a repo is first created
-> from this template, to replace the prefix/range/org placeholders and sync agent models (see
+> from this template, to replace the prefix/range/org placeholders, sync agent models, and
+> **regenerate `copilot-instructions.md` so it describes the adopter's real app** (not the template
+> itself — see
 > [`scripts/Initialize-Template.ps1`](../scripts/Initialize-Template.ps1) and
 > [`template.config.json`](../template.config.json)). Neither is in `bc-orchestrator`'s handoff chain.
 
