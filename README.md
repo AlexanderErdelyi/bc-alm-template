@@ -386,8 +386,9 @@ issue-ops pipeline (it's off by default) and keep work-item links on `AB#` by in
 repo already keeps its Copilot files under a subfolder (e.g. `app/.github/agents`), that layout is
 recognized and reused without a flag. The agents, skills, instructions, `copilot-instructions.md`,
 and the agent meta-docs (`AGENT-ARCHITECTURE.md` / `WHEN-TO-USE.md` / `SKILLS.md`) are placed under
-`app/.github/` — handy when you open a subfolder directly in VS Code — while the GitHub platform
-files (workflows, issue/PR templates) always stay at the repo root, because GitHub Actions and
+`app/.github/`, and the spec scaffold under `app/specs/` — handy when you open a subfolder directly in
+VS Code — while the GitHub platform files (workflows, issue/PR templates) always stay at the repo root,
+because GitHub Actions and
 Copilot on github.com only read the root `.github/`. The choice is recorded in `template.config.json`
 (`sync.customizationsPath`) so later syncs keep writing to the same place.
 

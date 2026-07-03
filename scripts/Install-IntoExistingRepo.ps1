@@ -35,6 +35,7 @@
       * referenceDocs  - the docs/ library (bcquality, branching, workflow, ...)
       * issueOps       - .github/workflows/issue-*.yml + ISSUE_TEMPLATE + ISSUE_ORCHESTRATION.md
       * specs          - specs/_TEMPLATE scaffold
+                         (relocated under <CustomizationsPath>/specs when set)
       * prTemplate     - .github/PULL_REQUEST_TEMPLATE.md
       * sampleApp      - the demo app/ + test/ projects (install-time only)
 
@@ -283,7 +284,7 @@ $script:added = 0; $script:skipped = 0; $script:merged = 0
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
     $relocate = @('.github/copilot-instructions.md', '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $relocate -contains $r)) {
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $r -match '^specs(/|$)' -or $relocate -contains $r)) {
         return "$custRoot/$r"
     }
     return $r
@@ -396,8 +397,9 @@ Write-Host "  3. pwsh ./scripts/Initialize-Template.ps1 -Interactive   # replace
 Write-Host "     (or, in VS Code: Terminal -> Run Task... -> 'BC: Initialize project (guided)' for a form-style wizard)"
 Write-Host "  4. Review 'git status' / 'git diff', then commit."
 if ($custRoot) {
-    Write-Host "  5. Customizations were placed under '$custRoot/.github'. Opening '$custRoot' as a folder in"
-    Write-Host "     VS Code discovers the agents/skills/instructions natively - no extra setting needed."
+    Write-Host "  5. Customizations were placed under '$custRoot/.github' (and, if selected, the spec scaffold under"
+    Write-Host "     '$custRoot/specs'). Opening '$custRoot' as a folder in VS Code discovers the"
+    Write-Host "     agents/skills/instructions natively - no extra setting needed."
     Write-Host "     (Copilot on github.com reads the repo-root .github, so it won't see the relocated agents.)" -ForegroundColor DarkGray
 }
 else {

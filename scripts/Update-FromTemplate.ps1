@@ -161,7 +161,7 @@ function Get-Hash([string] $path) {
 function Resolve-Dest([string] $rel) {
     $r = $rel.Replace('\', '/')
     $relocate = @('.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
-    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $relocate -contains $r)) {
+    if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $r -match '^specs(/|$)' -or $relocate -contains $r)) {
         return "$custRoot/$r"
     }
     return $r
