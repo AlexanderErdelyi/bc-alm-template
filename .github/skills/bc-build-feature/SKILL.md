@@ -61,7 +61,38 @@ See `references/al-patterns.md` for copy-ready snippets.
 - Update a **permission set** to cover every new/changed object (use a Permission Set
   Extension when extending an existing one).
 
-## Pre-PR checklist
+## 6 — Final validation & spec status
+After the objects are in, validate the **whole module**, not just the last file you touched:
+- Run `al_build` and `al_get_diagnostics` across the app project; resolve every error and every
+  in-scope warning before proceeding.
+- Update the spec's acceptance criteria: in `specs/ABC-{ID}-*/acceptance-criteria.md`, mark each
+  criterion you have verified (e.g. `Open → Pass`). Commit this together with the code.
+- **Review gate — ask before committing.** Summarise what changed, the build/diagnostics result,
+  and the AC status, then confirm with the user before you commit. Never auto-commit a red build.
+
+## 7 — Changelog fragment (optional, if the repo uses `changelog.d/`)
+For a customer- or consultant-facing change (new/changed behaviour, bug fix — **not** pure
+internals), drop a **changelog fragment** so it can be assembled at release time by
+**`bc-ship-release`**. One fragment per ticket, covering the whole feature scope:
+
+1. Check `changelog.d/` for an existing `{ticketId}-*.md`; if present, **update** it (merge bullets)
+   rather than adding a second file for the same ticket.
+2. Write `changelog.d/{ticketId}-{slug}.md` (slug = kebab-case feature name):
+
+   ```markdown
+   ---
+   workitem: {ticketId}
+   type: Added        # Added | Changed | Fixed | Deprecated | Removed | Security
+   module: {module}
+   ---
+   {Headline sentence — the customer benefit.}
+   - {capability 1}
+   - {capability 2}
+   ```
+   Map commit type → fragment `type`: `feat:` → `Added` (or `Changed` for behaviour changes),
+   `fix:` → `Fixed`; `perf:`/`refactor:` usually get no fragment unless user-visible.
+3. Commit the fragment **with the code** so it travels into `main`. Do not assemble or delete
+   fragments here — that is `bc-ship-release`'s job.
 
 - [ ] Every object in `plan.md` implemented.
 - [ ] No hardcoded text (Labels) and no hardcoded IDs (enums/setup).
@@ -70,6 +101,8 @@ See `references/al-patterns.md` for copy-ready snippets.
 - [ ] `app/app.json` version bumped per the table.
 - [ ] Test codeunit in the `test/` project covers the acceptance criteria.
 - [ ] Permission set updated; `DataClassification` on all new fields.
+- [ ] Module-wide `al_build` clean; verified acceptance criteria marked in the spec.
+- [ ] Changelog fragment added/updated (if the repo uses `changelog.d/` and the change is user-facing).
 
 ## Next step
 
