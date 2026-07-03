@@ -29,3 +29,33 @@ A [GitHub Copilot Agent Skill](https://docs.github.com/en/copilot/concepts/agent
 is a Markdown file (`SKILL.md`) with YAML frontmatter (`name`, `description`) and a body of
 instructions. Copilot loads it automatically when the request matches the description, giving
 the model a focused, repeatable procedure without bloating every prompt.
+
+## Skill-authoring convention
+
+Keep new `bc-*` skills consistent with the existing ones. The recommended shape (adapt as needed —
+short skills can fold sections together):
+
+1. **Frontmatter** — `name` matching the folder, and a `description` that ends with a
+   `Use when:` list of natural-language trigger phrases (this is what fires the skill).
+2. **One-line purpose** — what the skill does and which agent owns it.
+3. **Workflow** — numbered, ordered steps. Put the deterministic procedure here; prefer tool
+   IDs the template already standardizes (`al_build`, `al_get_diagnostics`, `ninjaNextId`,
+   `azure-devops/*`, `github/*`).
+4. **Critical rules** — the non-negotiables (confirmation-first, no red-build push, etc.).
+5. **Anti-patterns** — the "❌ never do this" list.
+6. **Tool contracts** — which tools are required / optional / not used.
+7. **Example triggers** — a few sample prompts.
+8. **Downstream hand-off** — the next skill/agent in the lifecycle.
+
+Conventions that keep skills portable:
+- **Backend-neutral** — any work-item step must degrade gracefully between Azure DevOps and
+  GitHub (the initializer wires exactly one).
+- **Use placeholders**, never hardcoded project values — `ABC` prefix, the assigned object-ID
+  range, "ask if unknown".
+- **Long procedures go in a `references/` subfolder** so the top-level `SKILL.md` stays scannable
+  (see `bc-build-feature/references/`).
+- **Register every new skill** in this file, [`skills/README.md`](skills/README.md), and
+  [`WHEN-TO-USE.md`](WHEN-TO-USE.md); if a specific agent should surface it, note it in that
+  agent's `.agent.md`.
+
+`bc-breakdown-feature` and `bc-review-self` are good reference examples of this shape.
