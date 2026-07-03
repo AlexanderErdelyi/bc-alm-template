@@ -366,19 +366,29 @@ installed. Everything else is an opt-in/opt-out **content category**, and your c
 | Spec scaffold (`specs/_TEMPLATE`) | `-NoSpecs` to drop | on |
 | PR template (`PULL_REQUEST_TEMPLATE.md`) | `-NoPrTemplate` to drop | on |
 | Sample AL app (`app/` + `test/` + workspace) | `-IncludeSampleApp` | off |
+| GitHub Actions template-sync (`template-sync.yml` + `.templatesyncignore`) | `-NoSyncWorkflow` to drop | on (auto-off for ADO) |
 
 It **never clobbers your existing files**: new paths are added (anything you already have is skipped
 — `-Force` overwrites); merge-sensitive files (`.github/copilot-instructions.md`,
 `PULL_REQUEST_TEMPLATE.md`, `.vscode/*`, `.gitignore`) are written next to yours with a `.template`
 suffix so you can diff and merge by hand.
 
+**Azure DevOps-only repo?** The GitHub Actions template-sync workflow (`.github/workflows/template-sync.yml`
++ `.templatesyncignore`) never runs there, so the installer **auto-skips it** when it sees ADO markers
+(`.devops`/`.azuredevops`/`azure-pipelines.yml`) and no existing `.github/workflows` — no dead root
+`.github/` is created. Pass `-NoSyncWorkflow` to force it off anywhere. Ongoing template updates then
+run via `pwsh ./scripts/Update-FromTemplate.ps1` (or an ADO pipeline) instead. Also turn off the
+issue-ops pipeline (it's off by default) and keep work-item links on `AB#` by initializing with
+`workItemSystem=ADO`.
+
 **Keep the customizations in your app folder instead of the repo root?** Pass
 `-CustomizationsPath app` (or any subfolder) — or just let the installer **auto-detect** it: if your
 repo already keeps its Copilot files under a subfolder (e.g. `app/.github/agents`), that layout is
 recognized and reused without a flag. The agents, skills, instructions, `copilot-instructions.md`,
 and the agent meta-docs (`AGENT-ARCHITECTURE.md` / `WHEN-TO-USE.md` / `SKILLS.md`) are placed under
-`app/.github/` — handy when you open a subfolder directly in VS Code — while the GitHub platform
-files (workflows, issue/PR templates) always stay at the repo root, because GitHub Actions and
+`app/.github/`, and the spec scaffold under `app/specs/` — handy when you open a subfolder directly in
+VS Code — while the GitHub platform files (workflows, issue/PR templates) always stay at the repo root,
+because GitHub Actions and
 Copilot on github.com only read the root `.github/`. The choice is recorded in `template.config.json`
 (`sync.customizationsPath`) so later syncs keep writing to the same place.
 
@@ -515,6 +525,7 @@ your local customizations even as you pull template improvements:
 ```jsonc
 "sync": {
   "customizationsPath": ".",   // where your agents/skills/instructions live ("." = root, or e.g. "app")
+  "syncWorkflow": true,         // false = skip the GitHub Actions template-sync (auto-off for ADO repos)
   "updateModels": false,        // false = re-apply your agent model choices after refreshing the file
   "updateExtensions": false,    // false = keep your .vscode/extensions.json (your toolset)
   "updateInstructions": true,   // false = keep your .github/instructions untouched
@@ -532,6 +543,7 @@ your local customizations even as you pull template improvements:
 | Key | Default | What it does |
 | --- | --- | --- |
 | `customizationsPath` | `.` | Folder holding `.github/agents`, `.github/skills`, `.github/instructions`, and `copilot-instructions.md`. Set to `app` (or any subfolder) to relocate them; platform files stay at the repo root either way. |
+| `syncWorkflow` | `true` | When `true`, the GitHub Actions template-sync workflow (`.github/workflows/template-sync.yml` + `.templatesyncignore`) is installed and kept refreshed. Set `false` (auto-defaulted for Azure DevOps-only repos) to skip it and sync manually via `scripts/Update-FromTemplate.ps1`. |
 | `updateModels` | `false` | When `false`, sync refreshes each agent's prompt/handoffs **but re-applies your `model:`** from `template.config.json` afterward, so a template change never resets your model picks. Set `true` to also adopt the template's models. |
 | `updateExtensions` | `false` | When `false`, your [`.vscode/extensions.json`](.vscode/extensions.json) is left alone — change your toolchain freely without sync reverting it. Set `true` to track the template's recommended extensions. |
 | `updateInstructions` | `true` | When `false`, `.github/instructions` (your AL coding standards) is not refreshed. |
