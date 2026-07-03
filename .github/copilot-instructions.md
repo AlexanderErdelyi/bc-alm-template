@@ -62,6 +62,14 @@ When the AL agent tools are available (the AL Language extension or the `al` MCP
 - **Azure DevOps field formats matter**: the work-item **Description** (and other large HTML fields)
   must be written as **HTML**, while **comments/discussion** use **Markdown**. Sending Markdown into
   an HTML field renders raw tags. Match the field's expected format when creating or updating items.
+- **Images/attachments can't be uploaded via the MCP tools.** The Azure DevOps work-item tools can
+  only *download* an existing attachment (`wit_get_work_item_attachment`) — there is no upload/create
+  attachment tool. So a screenshot pasted into chat cannot be pushed into a work item programmatically.
+  When the user asks to attach an image, **say so** and either (a) ask them to drag-drop/paste the
+  image directly into the work item's Description or a comment in the browser, or (b) if a PAT is
+  configured, upload it yourself via the REST attachments API (`POST _apis/wit/attachments`) with
+  `curl`, then reference the returned URL in the Description HTML (`<img src="…">`) or as an
+  `AttachedFile` relation. Never silently skip an attachment request.
 
 ## When responding
 

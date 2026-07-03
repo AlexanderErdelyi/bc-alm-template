@@ -76,6 +76,11 @@ When you update the ADO work item, mind the field formats (see the repo Copilot 
   the background, acceptance criteria, and options sections.
 - **Discussion/comments** use **Markdown**, not HTML — only the Description (and similar large
   fields) are HTML.
+- **Screenshots/attachments can't be uploaded via the MCP tools** — they only *download* existing
+  attachments. If the user pastes a screenshot and asks to attach it, **say so** and ask them to
+  drag-drop it into the work item's Description/comment in the browser (or, if a PAT is configured,
+  upload it via the REST `POST _apis/wit/attachments` endpoint with `curl` and reference the URL in
+  the Description HTML). Don't silently ignore the request.
 
 Example Description HTML:
 
