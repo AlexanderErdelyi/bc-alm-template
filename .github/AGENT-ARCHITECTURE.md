@@ -82,6 +82,10 @@ you want to understand *why* it is structured the way it is before adapting it.
   your own tools.
 - **Handoffs are human-in-the-loop.** A `handoffs:` entry is a labelled, one-click step to the
   next agent — the human stays in control of phase transitions.
+- **The orchestrator is read-only.** `bc-orchestrator` reads work-item/branch/PR state only to
+  detect the stage, then hands off — it never edits work items, specs, code, PRs, or releases
+  itself. Running a phase agent as a subagent is opt-in (only when the user asks it to progress
+  automatically), and even then the phase agent does the work under its own tools and skill.
 
 ## Adapting this for your project
 
