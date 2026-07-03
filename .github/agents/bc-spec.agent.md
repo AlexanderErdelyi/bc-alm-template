@@ -82,6 +82,24 @@ flagged **awaiting customer** (with who owns it and by when), and continue with 
 assumption in `plan.md`. A spec can go to review with questions still open, as long as they are
 explicit and the decisions that depend on them are marked as assumptions.
 
+> **Interactive questions:** where the surface supports it, use the ask-questions tool (VS Code's
+> `askQuestions`, the same popup `bc-plan` uses) so the user can pick from suggested answers; on
+> plain chat, just ask the single question inline. Either way — one focused question at a time.
+
+### Step 1c — Align on approach (before writing the docs)
+
+Once you understand the request, **validate the technical direction with the user before you commit
+it to `plan.md`** — don't silently pick an approach:
+
+- Surface any **technical constraints** you discovered (base-object limits, upgrade/extensibility
+  concerns, dependencies, performance) and the **alternative approaches** you considered.
+- State the assumptions you're making and confirm the ones that carry real design risk.
+- If the answers **significantly change scope**, loop back to Step 1 — and if the *requirement*
+  itself shifts (not just the design), hand back to **bc-plan** to reshape the story first.
+
+Keep this lightweight: a short "here's the approach and the main decision, does that match your
+intent?" is enough for a small change; a non-trivial design warrants confirming the key ADRs.
+
 ### Step 2 — Create `brief.md`
 
 Write this for a non-technical audience. Translate technical jargon into plain business language.
@@ -149,6 +167,24 @@ Start with a single v1.0 entry:
 Write the story `index.md` (status, work-item link, links to the sibling documents, optional diagram),
 then add/update the story's row in the area `index.md` so the module overview stays current. End
 `plan.md` with a task breakdown (checkable list BUILD executes).
+
+### Step 7 — Present & refine
+
+Show the user a short summary of the drafted spec (approach, key objects/decisions, acceptance
+criteria, any open questions) and let them react. On their input:
+
+- **Changes requested** → revise the affected document(s) and re-present. Keep every spec file in
+  sync — if the approach changes, update `plan.md`, `acceptance-criteria.md`, the `index.md` status,
+  and add a `change-log.md` row.
+- **Questions asked** → clarify, using the ask-questions tool for anything that needs a decision
+  (one at a time).
+- **Alternative wanted** → loop back to **Step 1c (Align)** — or to **bc-plan** if the requirement
+  itself is changing.
+- **Approval given** → acknowledge, run the quality gate, then open the spec PR and offer the
+  handoffs (BUILD, or SUMMARY back to `bc-plan`).
+
+Don't proceed to the PR until the user has approved, or has explicitly asked you to commit the draft
+as-is (e.g. so a junior can pick it up).
 
 ---
 
