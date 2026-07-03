@@ -100,46 +100,16 @@ another language) · business value · priority (P1/P2/P3) · requested by · ta
 **open questions** (each flagged *answered* or *awaiting customer* with an owner) · **out of scope**.
 
 ### 3 — `plan.md` (for the developer)
-One-paragraph technical summary, then the **affected AL objects** table:
+One-paragraph technical summary, then the **affected AL objects** table (Object Type · ID · Name ·
+Action · Notes), followed by: new objects (with reserved IDs) · existing objects to modify (with
+reason) · technical approach · dependencies · risks · minimum BC version · performance notes.
 
-| Object Type | Object ID | Object Name | Action | Notes |
-|---|---|---|---|---|
-| Table Extension | 50100 | Customer ABC Ext. | Modify | Add tolerance % field |
-| Codeunit | 50103 | ABC Payment Tolerance Mgt. | Create | Core logic |
+For a **full** spec, follow **[references/plan-authoring.md](references/plan-authoring.md)** for the
+object table, ID reservation (Object ID Ninja), architecture decisions (ADRs), the dependency map,
+labels/localization, and diagrams. For a **lightweight** spec, keep this section high-level (approach
++ coarse object list) and let BUILD fill in that detail.
 
-Plus: new objects (with IDs from your assigned range) · existing objects to modify (with
-reason) · technical approach (extension table / event subscriber / interface …) ·
-dependencies · risks · minimum BC version · performance considerations.
-
-> Object types to consider: Table, Table Extension, Page, Page Extension, Codeunit, Report,
-> Report Extension, Query, Enum, Enum Extension, Interface, XMLport, PermissionSet.
-
-#### 3a — Reserve object IDs
-Assign IDs with **Object ID Ninja** (`ninjaNextId`) so you never collide with an existing object.
-If Ninja is unavailable, propose the next free ID **inside the app's assigned range**, note it as
-*"verify before commit"*, and confirm the range with the user if it is unknown. Never hand-pick an
-ID that might clash.
-
-#### 3b — Architecture decisions (ADRs)
-For any choice with a real alternative, record it so BUILD doesn't relitigate it:
-
-| Decision | Chosen | Alternatives considered | Rationale |
-|---|---|---|---|
-| How to add the field | Table Extension on Customer | New related table | Simpler; avoids join; standard BC pattern |
-| Trigger point | Event subscriber on OnAfterValidate | Modify base validation | Non-intrusive; upgrade-safe |
-
-#### 3c — Dependency map
-Classify each dependency so the developer knows the blast radius:
-
-| Dependency | Relationship | Notes |
-|---|---|---|
-| Base "Customer" table | **read-only** | Extended, not modified |
-| ABC Setup singleton | **runtime** | Must exist before logic runs |
-| Sales posting | **none** | Explicitly out of interaction |
-
-#### 3d — Labels & localization
-List user-visible text as Labels (`...Msg/...Err/...Qst/...Lbl`, each with a `Comment`) and note
-whether a translation (`.xlf`) is expected. No hardcoded strings reach BUILD.
+Always include, inline, regardless of depth:
 
 #### 3e — Scope boundaries
 State explicitly what this spec **does** and **does not** cover, referencing sibling stories where
@@ -156,10 +126,6 @@ separate `tasks.md` unless the story grows large enough to warrant one):
 - [ ] Add page extension 50101 to surface the field
 - [ ] Write tests for AC-01…AC-03
 ```
-
-#### 3g — Diagrams (optional)
-Where it aids understanding, embed a mermaid diagram in `plan.md` (e.g. an ERD of the new/extended
-tables, or a flow of the process). Keep module-wide diagrams in the area `index.md`/`roadmap.md`.
 
 ### 4 — `acceptance-criteria.md`
 Given/When/Then, numbered `AC-01…`. Add edge cases, error scenarios (expected messages),
