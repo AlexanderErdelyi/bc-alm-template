@@ -35,6 +35,25 @@ flowchart LR
 | Format a commit message | any | _(any)_ | [`bc-util-commit-message`](skills/bc-util-commit-message/SKILL.md) |
 | **Set up this template for a new project** | setup | **bc-init** | [`bc-init-template`](skills/bc-init-template/SKILL.md) |
 
+## Request types (not every request is a new story)
+
+**`bc-pm` classifies each incoming request first**, then routes it:
+
+| Request type | Routes to | Path | Spec? |
+|---|---|---|---|
+| Single user story | bc-plan | `feature/*` · full lifecycle | ✅ full |
+| Epic / Feature (multi-story) | bc-plan (breakdown) | parent + **sub-issues**; each child runs the full path | ✅ per child |
+| Bug (backlog) | bc-plan → bc-spec | `bugfix/*` | ✅ lightweight (repro = criteria) |
+| Hotfix (PROD down) | bc-dev (expedited) | `hotfix/*` → reviewed PR → PROD, backfill spec/docs | ⏳ backfilled |
+| Documentation only | bc-doc | docs branch | — |
+| Duplicate / won't-do / question | bc-pm | close, link, or answer — no branch | — |
+| CI/CD or pipeline | bc-workflow | utility (outside lifecycle) | — |
+| Template / repo setup | bc-init | utility (one-time) | — |
+
+Spec-first is the rule; a genuine PROD-down **hotfix** is the only path that ships before the spec
+is written (and it still goes through a reviewed PR). The README has the full routing diagram under
+[**Backend: GitHub Issues & Projects → Request types & routing**](../README.md#request-types--routing-either-backend).
+
 ## Agents vs skills — which do I invoke?
 
 - **Skills** trigger automatically when your request matches their `Use when:` phrases, in any

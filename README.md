@@ -140,6 +140,47 @@ flowchart TD
 > status to Done", "PR opened → In Review") so board columns update themselves as the agents work.
 > Sub-issues let an Epic/Feature (step 3) roll its children up automatically.
 
+### Request types & routing (either backend)
+
+Not every request is a fresh user story. **`bc-pm` classifies each incoming request first** and
+sends it down the right path — the standard flow above is the backbone; the other cases branch off
+it or short-circuit it. This routing is the same whether you track work in ADO or GitHub.
+
+```mermaid
+flowchart TD
+    IN["📥 Incoming request"] --> C{"🧭 bc-pm<br/>classifies"}
+
+    C -->|"duplicate / not actionable"| X1["Link or close · no branch"]
+    C -->|"question / how-to"| X2["Answer or route · no code change"]
+    C -->|"single user story"| STD["Standard path<br/>plan → spec → build → PR → release → docs"]
+    C -->|"Epic / Feature"| EPIC["bc-plan splits into sub-issues<br/>each child runs the Standard path"]
+    C -->|"bug (in backlog)"| BUG["bugfix/ABC-{ID}-*<br/>lightweight spec (repro = AC) → build → PR"]
+    C -->|"PROD is down"| HOT["hotfix/ABC-{ID}-*<br/>expedited fix → reviewed PR → PROD<br/>spec + docs backfilled"]
+    C -->|"docs only"| DOC2["bc-doc → docs PR"]
+    C -->|"CI/CD · pipeline · setup"| UTIL["Utility agents<br/>bc-workflow · bc-init"]
+
+    EPIC --> STD
+```
+
+**Case cheat-sheet**
+
+| Request type | bc-pm routes to | Path / branch | Spec? | Notes |
+|---|---|---|---|---|
+| **Single user story** | bc-plan | `feature/ABC-{ID}-*` · full lifecycle | ✅ full | The backbone diagram above. |
+| **Epic / Feature** (multi-story) | bc-plan (breakdown) | parent issue + **sub-issues**; optional **integration branch** | ✅ per child | Each child runs the standard path; the parent closes when its children do. See [branching-strategy](docs/branching-strategy.md#optional-integration-branch-for-multi-story-features). |
+| **Bug** (in backlog) | bc-plan → bc-spec | `bugfix/ABC-{ID}-*` | ✅ lightweight — repro steps become the acceptance criteria | Fix + a regression test; ships in the next wave. |
+| **Hotfix** (PROD broken) | bc-dev (expedited) | `hotfix/ABC-{ID}-*` off the deployed release/tag → PROD, then forward-merge to `main` | ⏳ backfilled | The **only** path that may ship before the spec is written — but the PR + review gate is **never** skipped. |
+| **Documentation only** | bc-doc | docs branch | — | `docs/functional/*` + changelog; no AL change. |
+| **Duplicate / won't-do / question** | bc-pm | — | — | Label, link, close, or answer — no branch. |
+| **CI/CD or pipeline change** | bc-workflow | utility (outside the lifecycle) | — | GitHub Actions / AL-Go pipelines. |
+| **Template / repo setup** | bc-init | utility (one-time) | — | Adapt the template to your project. |
+
+> **Spec-first, with one exception:** the template's rule is that AL work follows a reviewed spec —
+> even a bug gets a *lightweight* spec (repro steps as acceptance criteria). A genuine **PROD-down
+> hotfix** is the only case that may ship before the spec is written, and it still goes through a
+> reviewed PR (see [branching-strategy.md](docs/branching-strategy.md)). The spec and functional docs
+> are backfilled right after the fire is out.
+
 ---
 
 ## The 10 Copilot Agents
