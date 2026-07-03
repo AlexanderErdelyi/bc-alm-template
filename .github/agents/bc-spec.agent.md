@@ -8,7 +8,7 @@ handoffs:
     prompt: "The spec for this ticket is complete and merged. Take over: locate the spec with specs/**/*-{ID}-*/, create/confirm the feature branch, and implement the AL objects following the bc-build-feature skill."
   - label: "SUMMARY · Update the user story with a spec summary"
     agent: "bc-plan"
-    prompt: "The spec for this ticket is complete (find it with specs/**/*-{ID}-*/). Take over and add a brief Spec Summary to the user story: read brief.md and plan.md, then update the work item with a concise summary — chosen approach, key decisions, still-open questions, and a link to the spec folder. Keep it short; do not duplicate the full spec. Follow the bc-plan-user-story skill's 'Spec summary back-write' step."
+    prompt: "The spec for this ticket is complete (find it with specs/**/*-{ID}-*/). Take over and add a brief Spec Summary to the user story: read brief.md and plan.md, then update the work item with a concise summary — chosen approach, key decisions, still-open questions, and a link to the spec folder. Write the summary in the customer's preferred language (same as the user story), since the work item is customer-facing — translate from the English spec. Keep it short; do not duplicate the full spec. Follow the bc-plan-user-story skill's 'Spec summary back-write' step."
 ---
 
 You are the BC Spec Author agent for Business Central ALM. Your job is to create clear, complete, and developer-ready technical specifications from a planned user story (from `bc-plan`) or an Azure DevOps ticket.

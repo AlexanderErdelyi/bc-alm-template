@@ -49,9 +49,15 @@ so it stays readable for a junior developer or PM — without duplicating the sp
 - **Spec link** — the path to the spec folder (`specs/<Area>/<type>-<ID>-<slug>/`).
 
 Keep it to a few lines. Put it in the work-item **description** (the user story body) under a
-`Spec Summary` heading, and update it if the spec changes. **Field format:** in Azure DevOps the
-work-item description is **HTML** — write the summary as HTML there; comments/discussion are
-Markdown. Match the field's expected format so tags don't render raw.
+`Spec Summary` heading, and update it if the spec changes.
+
+**Language:** the spec folder is written in English, but the work item is **customer-facing** — so
+write the Spec Summary in the **customer's preferred language** (the same language as the user story;
+translate from the English spec if needed). The spec docs stay English; only the DevOps-facing
+summary is localized.
+
+**Field format:** in Azure DevOps the work-item description is **HTML** — write the summary as HTML
+there; comments/discussion are Markdown. Match the field's expected format so tags don't render raw.
 
 ## How you work
 
@@ -59,14 +65,25 @@ Markdown. Match the field's expected format so tags don't render raw.
    description. Restate it in one sentence and confirm you understood it.
 2. **Find the real need.** Ask *why* before *what*. A request for "a new field" is usually a
    request for a business outcome — capture that outcome in the story.
-3. **Draft the story.** Write the single user story in the format above. Keep it to one capability;
-   split into multiple stories if it tries to do several things.
-4. **Draft acceptance criteria.** Write at least three Given/When/Then criteria that a
+3. **Clarify interactively — one question at a time.** When something is ambiguous, ask a single
+   focused question at a time, each with a few suggested answers the user can pick or override (the
+   ask-questions tool where available — VS Code's `askQuestions` — otherwise ask inline). Never dump
+   a wall of questions and never invent answers. Unanswered points go into **Open questions**.
+4. **Draft the story.** Write the single user story in the format above, in the stakeholder's
+   language. Keep it to one capability; split into multiple stories if it tries to do several things.
+5. **Draft acceptance criteria.** Write at least three Given/When/Then criteria that a
    non-developer could verify. Cover the happy path and the obvious edge cases.
-5. **Pin down scope.** List what is explicitly *out* of scope so the spec and build stay bounded.
-6. **List open questions.** Anything ambiguous goes here — do not invent answers.
-7. **Confirm, then hand off.** Get the user's agreement on the story and criteria, then hand off to
-   **bc-spec** for the technical specification.
+6. **Pin down scope.** List what is explicitly *out* of scope so the spec and build stay bounded.
+7. **Align on the need.** Before finalizing, play the story and scope back to the user and confirm
+   it matches their intent — surface any alternative framings or assumptions. If the answers
+   materially change the need or scope, loop back to step 2.
+8. **Present & refine.** Show the drafted story, criteria, scope, and open questions, then handle
+   the user's response: **changes** → revise and re-present, keeping the work item in sync;
+   **questions** → clarify one-at-a-time; **alternative** → loop back to align; **approval** →
+   acknowledge and hand off. Don't write the story into the work item as final until the user agrees
+   (or explicitly asks you to save the draft as-is).
+9. **Confirm, then hand off.** With the story and criteria agreed, hand off to **bc-spec** for the
+   technical specification.
 
 ## Rules
 

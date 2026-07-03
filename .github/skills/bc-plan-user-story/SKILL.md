@@ -37,8 +37,15 @@ keeps everyone honest about scope.
    - testable by a non-developer,
    - tied to something in the story,
    - free of vague words like "should work correctly".
-5. **List open questions** explicitly — anything that blocks a confident spec.
+5. **List open questions** explicitly — anything that blocks a confident spec. Resolve ambiguities
+   by asking **one focused question at a time** (the ask-questions tool where available — VS Code's
+   `askQuestions` — otherwise inline), each with a few suggested answers; never invent answers.
 6. **State what is out of scope.**
+7. **Align & refine.** Play the story, criteria, and scope back to the user before finalizing. On
+   their response: **changes** → revise and re-present, keeping the work item in sync; **questions**
+   → clarify one-at-a-time; **alternative framing** → loop back to restating the need; **approval**
+   → move to hand-off. If the answers materially change the need or scope, loop back to step 1.
+   Don't write the story to the work item as final until the user agrees (or asks to save the draft).
 
 ## Output
 
@@ -105,8 +112,14 @@ story), containing:
 - **Spec link** — the path to the spec folder (`specs/<Area>/<type>-<ID>-<slug>/`).
 
 Keep it to a few lines and refresh it if the spec changes. This is a *summary*, not a copy — the
-spec folder remains the source of truth. Write it as **HTML** (Description field); if you'd rather
-keep it out of the story body, post it as a **Markdown** discussion comment instead.
+spec folder remains the source of truth.
+
+**Language:** the spec folder is English, but the work item is **customer-facing** — write the Spec
+Summary in the **customer's preferred language** (the same language as the user story; translate from
+the English spec if needed). Only the DevOps-facing summary is localized; the spec docs stay English.
+
+Write it as **HTML** (Description field); if you'd rather keep it out of the story body, post it as a
+**Markdown** discussion comment instead.
 
 ## Quality gate (mirror of the repo issue form)
 
