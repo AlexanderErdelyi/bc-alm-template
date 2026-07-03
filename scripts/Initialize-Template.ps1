@@ -14,6 +14,16 @@
     Use -Interactive to be prompted for each value, or pass parameters directly
     (ideal for CI / non-interactive use). Use -WhatIf to preview without writing.
 
+    EXISTING-REPO MODE: when the target was set up with scripts/Install-IntoExistingRepo.ps1
+    (it records values.sync.existingRepo / a relocated customizationsPath), the script runs in
+    a non-destructive mode. It localizes ONLY the template-owned files it installed (agents,
+    skills, prompts, instructions, spec scaffold, the .vscode/docs it wrote) - setting the prefix,
+    ticket key, repo slug and ADO org and documenting your object-ID range - and sets agent models
+    and trims tools. It NEVER renumbers object IDs, rewrites your app.json (name/publisher/BC
+    version), renames your files, overwrites your README, or prunes your app/test/docs folders.
+    Defaults for prefix/name/publisher/ID range are auto-read from your app.json (+ AppSourceCop.json
+    mandatory affix). Force with -ExistingRepo, or force the whole-tree behavior with -NewFromTemplate.
+
     A repo created via GitHub "Use this template" receives the WHOLE tree. When
     -CleanupTemplateFiles is on (the "created FROM the template" path), this script
     also PRUNES the content categories a working project doesn't need, and records
@@ -78,6 +88,13 @@ param(
     [switch] $NoSpecs,
     [switch] $NoPrTemplate,
     [switch] $NoSampleApp,
+    # Force existing-repo (non-destructive) mode on/off. Auto-detected from template.config.json
+    # (values.sync.existingRepo / a relocated customizationsPath) when not specified. In this mode
+    # the initializer localizes ONLY the template-owned files it manages and never renumbers object
+    # IDs, rewrites the real app.json, renames your files, overwrites your README, or prunes folders.
+    [switch] $ExistingRepo,
+    # Force the whole-tree "created FROM the template" behavior even if existing-repo markers exist.
+    [switch] $NewFromTemplate,
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
@@ -99,6 +116,57 @@ if ($cur.PSObject.Properties['sync'] -and $cur.sync.PSObject.Properties['customi
 $ghPrefix = if ($custRoot) { "$custRoot/.github" } else { '.github' }
 $specsPrefix = if ($custRoot) { "$custRoot/specs" } else { 'specs' }
 
+# --- Existing-repo (non-destructive) mode ---------------------------------------------------
+# A repo created FROM the template (via "Use this template") owns the whole tree, so the
+# initializer renumbers the sample app, renames prefixed files, and rewrites the README.
+# A repo the template was INSTALLED INTO already contains the user's real AL source, so all
+# of that would be destructive. Install-IntoExistingRepo.ps1 records values.sync.existingRepo;
+# fall back to "a relocated customizationsPath implies an existing repo". -ExistingRepo /
+# -NewFromTemplate force it either way.
+$existingRepo =
+    if ($NewFromTemplate) { $false }
+    elseif ($ExistingRepo) { $true }
+    elseif ($cur.PSObject.Properties['sync'] -and $cur.sync.PSObject.Properties['existingRepo']) { [bool]$cur.sync.existingRepo }
+    else { [bool]$custRoot }
+
+# --- Auto-detect sensible defaults from the target app's app.json (so Enter just works) -----
+$appDefaults = @{}
+$ajCandidates = @()
+if ($custRoot) { $ajCandidates += (Join-Path $RepoRoot (Join-Path $custRoot 'app.json')) }
+$ajCandidates += (Join-Path $RepoRoot 'app/app.json'), (Join-Path $RepoRoot 'app.json')
+$ajPath = $ajCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($ajPath) {
+    try {
+        $aj = Get-Content $ajPath -Raw | ConvertFrom-Json
+        if ($aj.PSObject.Properties['name'] -and $aj.name)           { $appDefaults.appName   = [string]$aj.name }
+        if ($aj.PSObject.Properties['publisher'] -and $aj.publisher) { $appDefaults.publisher = [string]$aj.publisher }
+        if ($aj.PSObject.Properties['idRanges'] -and $aj.idRanges.Count -gt 0) {
+            $appDefaults.objectIdFrom = [int](($aj.idRanges | ForEach-Object { [int]$_.from } | Measure-Object -Minimum).Minimum)
+            $appDefaults.objectIdTo   = [int](($aj.idRanges | ForEach-Object { [int]$_.to }   | Measure-Object -Maximum).Maximum)
+        }
+        elseif ($aj.PSObject.Properties['idRange'] -and $aj.idRange) {
+            $appDefaults.objectIdFrom = [int]$aj.idRange.from
+            $appDefaults.objectIdTo   = [int]$aj.idRange.to
+        }
+        # Object-name prefix comes from the AppSourceCop mandatory affix when configured.
+        $ascPath = Join-Path (Split-Path $ajPath) 'AppSourceCop.json'
+        if (Test-Path $ascPath) {
+            $asc = Get-Content $ascPath -Raw | ConvertFrom-Json
+            if ($asc.PSObject.Properties['mandatoryAffixes']) {
+                $aff = @($asc.mandatoryAffixes) | Where-Object { $_ } | Select-Object -First 1
+                if ($aff) { $appDefaults.appPrefix = ([string]$aff).Trim() }
+            }
+        }
+        Write-Host ("Detected from {0}:" -f (Resolve-Path $ajPath).Path) -ForegroundColor DarkCyan
+        foreach ($k in 'appPrefix', 'appName', 'publisher', 'objectIdFrom', 'objectIdTo') {
+            if ($appDefaults.ContainsKey($k)) { Write-Host ("  {0,-13} {1}" -f $k, $appDefaults[$k]) -ForegroundColor DarkCyan }
+        }
+    }
+    catch { Write-Host "  (could not parse $ajPath - $_)" -ForegroundColor DarkYellow }
+}
+# Prefer an app.json-detected value over the template default when prompting.
+function Def($key, $fallback) { if ($appDefaults.ContainsKey($key) -and $appDefaults[$key]) { return $appDefaults[$key] } return $fallback }
+
 function Read-Value([string] $prompt, $default) {
     if (-not $Interactive) { return $default }
     $shown = if ($default -is [array]) { $default -join ',' } else { $default }
@@ -118,28 +186,39 @@ function Read-YesNo([string] $prompt, [bool] $default) {
     }
 }
 
-# --- Resolve effective values (param > interactive prompt > current default) ---
-if (-not $AppPrefix)        { $AppPrefix        = Read-Value 'App / object prefix'                 $cur.appPrefix }
-if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / spec prefix'               $cur.ticketPrefix }
-if (-not $AppName)          { $AppName          = Read-Value 'App display name'                    $cur.appName }
-if (-not $Publisher)        { $Publisher        = Read-Value 'Publisher (company name)'            $cur.publisher }
-if (-not $ObjectIdFrom)     { $ObjectIdFrom     = [int](Read-Value 'Object ID range - from'        $cur.objectIdFrom) }
-if (-not $ObjectIdTo)       { $ObjectIdTo       = [int](Read-Value 'Object ID range - to'          $cur.objectIdTo) }
-if (-not $RepoSlug)         { $RepoSlug         = Read-Value 'GitHub repo slug (owner/repo)'       $cur.repoSlug }
-if (-not $AdoOrg)           { $AdoOrg           = Read-Value 'Azure DevOps organization'           $cur.adoOrg }
-if (-not $AdoProject)       { $AdoProject       = Read-Value 'Azure DevOps project (optional)'     $cur.adoProject }
+# Tolerant integer read: accepts pasted noise like "50000 - 99699," and takes the first number.
+function Read-Int([string] $prompt, $default) {
+    $v = Read-Value $prompt $default
+    if ($v -is [int]) { return $v }
+    $m = [regex]::Match([string]$v, '\d+')
+    if ($m.Success) { return [int]$m.Value }
+    return [int]$default
+}
+
+# --- Resolve effective values (param > interactive prompt > detected/app.json > current default) ---
+if (-not $AppPrefix)        { $AppPrefix        = Read-Value 'App / object prefix (e.g. NOB)'       (Def 'appPrefix' $cur.appPrefix) }
+if (-not $TicketPrefix)     { $TicketPrefix     = Read-Value 'Ticket / spec prefix (work-item key for PREFIX-123 and specs/PREFIX-*; often same as app prefix)' $cur.ticketPrefix }
+if (-not $AppName)          { $AppName          = Read-Value 'App display name'                    (Def 'appName' $cur.appName) }
+if (-not $Publisher)        { $Publisher        = Read-Value 'Publisher (company name)'            (Def 'publisher' $cur.publisher) }
+if (-not $ObjectIdFrom)     { $ObjectIdFrom     = Read-Int   'Object ID range - from'              (Def 'objectIdFrom' $cur.objectIdFrom) }
+if (-not $ObjectIdTo)       { $ObjectIdTo       = Read-Int   'Object ID range - to'                (Def 'objectIdTo' $cur.objectIdTo) }
 if (-not $WorkItemSystem)   { $WorkItemSystem   = Read-Value 'Work-item system (ADO/GitHub)'       $cur.workItemSystem }
+if (-not $RepoSlug -and $WorkItemSystem -ne 'ADO') { $RepoSlug = Read-Value 'GitHub repo slug (owner/repo)' $cur.repoSlug }
+if (-not $RepoSlug)         { $RepoSlug         = $cur.repoSlug }
+if (-not $AdoOrg)           { $AdoOrg           = Read-Value 'Azure DevOps organization (the {org} in dev.azure.com/{org})' $cur.adoOrg }
+if (-not $AdoProject)       { $AdoProject       = Read-Value 'Azure DevOps project (optional)'     $cur.adoProject }
 if (-not $DefaultBranch)    { $DefaultBranch    = Read-Value 'Default (production) branch'         $cur.defaultBranch }
-if (-not $BranchingStrategy){ $BranchingStrategy= Read-Value 'Branching strategy id'              $cur.branchingStrategy }
-if (-not $CommitConvention) { $CommitConvention = Read-Value 'Commit convention'                   $cur.commitConvention }
-if (-not $Environments)     { $Environments     = (Read-Value 'Environments (comma separated)'     ($cur.environments -join ',')) -split '\s*,\s*' }
+if (-not $BranchingStrategy){ $BranchingStrategy= Read-Value 'Branching strategy id (feature-release-selective | gitflow | github-flow | trunk)' $cur.branchingStrategy }
+if (-not $CommitConvention) { $CommitConvention = Read-Value 'Commit convention (conventional | none)' $cur.commitConvention }
+if (-not $Environments)     { $Environments     = (Read-Value 'Environments, comma separated (BC environment/deploy targets; use e.g. DEV,TEST,PROD or a single onprem name)' ($cur.environments -join ',')) -split '\s*,\s*' }
 
 # Normalize Environments so a single comma-joined value (e.g. "TEST,PROD" passed by a VS Code
 # task input or CI) is split into individual names just like the interactive prompt does.
 if ($Environments) { $Environments = @($Environments | ForEach-Object { $_ -split '\s*,\s*' } | Where-Object { $_ }) }
 
 # Offer template cleanup when interactive and not explicitly specified on the command line.
-if ($Interactive -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles')) {
+# Never in existing-repo mode: those files (README, installer) belong to the user's project.
+if ($Interactive -and -not $existingRepo -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles')) {
     $ans = Read-Host 'Remove template-only files (CONTRIBUTING, installer, bootstrap) and write a project README? [Y/n]'
     $CleanupTemplateFiles = [string]::IsNullOrWhiteSpace($ans) -or ($ans -match '^(y|yes)$')
 }
@@ -149,6 +228,10 @@ if ($Interactive -and -not $PSBoundParameters.ContainsKey('CleanupTemplateFiles'
 # (the docs library and generated README/PROJECT.md link to it, and the sample app IS
 # the project's starting point, so it is never auto-deleted unless -NoSampleApp).
 $doPrune = if ($PSBoundParameters.ContainsKey('Prune')) { [bool]$Prune } else { [bool]$CleanupTemplateFiles }
+# In an existing repo the template installed only a lean set; the prune category paths (app/,
+# test/, docs/, .github/workflows) would target the USER's own folders, so pruning and README
+# rewriting are hard-disabled. The installer's sync.include already scoped what was copied.
+if ($existingRepo) { $CleanupTemplateFiles = $false; $doPrune = $false }
 $keep = [ordered]@{ metaDocs = $false; referenceDocs = $true; issueOps = $true; specs = $true; prTemplate = $true; sampleApp = $true }
 if ($IncludeMetaDocs)  { $keep.metaDocs      = $true }
 if ($NoReferenceDocs)  { $keep.referenceDocs = $false }
@@ -171,11 +254,15 @@ if ($ObjectIdTo -lt $ObjectIdFrom) { throw "ObjectIdTo ($ObjectIdTo) must be >= 
 $oldFrom = [int]$cur.objectIdFrom
 $oldTo   = [int]$cur.objectIdTo
 $offset  = $ObjectIdFrom - $oldFrom
+# Never renumber object IDs in an existing repo — those 5-digit numbers are the user's real
+# objects, not the sample app's. Documented ranges are localized as a literal string instead.
+if ($existingRepo) { $offset = 0 }
 
 Write-Host "`nApplying template configuration:" -ForegroundColor Cyan
+if ($existingRepo) { Write-Host "  mode             existing repo (non-destructive: localizes template files only, no renumber/rename/prune)" -ForegroundColor Yellow }
 Write-Host ("  prefix           {0} -> {1}" -f $cur.appPrefix, $AppPrefix)
 Write-Host ("  ticket prefix    {0} -> {1}" -f $cur.ticketPrefix, $TicketPrefix)
-Write-Host ("  object ID range  {0}-{1} -> {2}-{3}  (offset {4})" -f $oldFrom, $oldTo, $ObjectIdFrom, $ObjectIdTo, $offset)
+Write-Host ("  object ID range  {0}-{1} -> {2}-{3}{4}" -f $oldFrom, $oldTo, $ObjectIdFrom, $ObjectIdTo, $(if ($existingRepo) { '  (docs only; objects not renumbered)' } else { "  (offset $offset)" }))
 Write-Host ("  publisher        {0} -> {1}" -f $cur.publisher, $Publisher)
 Write-Host ("  app name         {0} -> {1}" -f $cur.appName, $AppName)
 Write-Host ("  repo slug        {0} -> {1}" -f $cur.repoSlug, $RepoSlug)
@@ -191,13 +278,33 @@ $thisScript = (Resolve-Path $PSCommandPath).Path
 $mainAppJsonPath = Join-Path $RepoRoot 'app/app.json'
 $testAppJsonPath = Join-Path $RepoRoot 'test/app.json'
 
-$files = Get-ChildItem -Path $RepoRoot -Recurse -File | Where-Object {
-    $p = $_.FullName
-    ($textExt -contains $_.Extension.ToLower()) -and
-    (-not ($excludeDirs | Where-Object { $p -like "*$sep$_$sep*" })) -and
-    ($p -ne $thisScript) -and
-    ($p -ne $configPath) -and
-    ($p -ne $testAppJsonPath)
+if ($existingRepo) {
+    # Localize ONLY the template-owned files we installed — never the user's AL source, their
+    # app.json, or unrelated docs. These roots hold the agents/skills/prompts/instructions,
+    # the spec scaffold, the .vscode config the template wrote, and any root platform files.
+    $ownedRoots = @($ghPrefix, "$specsPrefix/_TEMPLATE", "$custRoot/.vscode", '.github', 'docs') |
+        Where-Object { $_ } | Select-Object -Unique |
+        ForEach-Object { Join-Path $RepoRoot $_ } | Where-Object { Test-Path $_ }
+    $files = @()
+    foreach ($root in $ownedRoots) {
+        $files += Get-ChildItem -Path $root -Recurse -File | Where-Object {
+            $p = $_.FullName
+            ($textExt -contains $_.Extension.ToLower()) -and
+            (-not ($excludeDirs | Where-Object { $p -like "*$sep$_$sep*" })) -and
+            ($p -ne $thisScript) -and ($p -ne $configPath)
+        }
+    }
+    $files = @($files | Sort-Object FullName -Unique)
+}
+else {
+    $files = Get-ChildItem -Path $RepoRoot -Recurse -File | Where-Object {
+        $p = $_.FullName
+        ($textExt -contains $_.Extension.ToLower()) -and
+        (-not ($excludeDirs | Where-Object { $p -like "*$sep$_$sep*" })) -and
+        ($p -ne $thisScript) -and
+        ($p -ne $configPath) -and
+        ($p -ne $testAppJsonPath)
+    }
 }
 
 function Update-Content([string] $text) {
@@ -211,13 +318,20 @@ function Update-Content([string] $text) {
     $text = [regex]::Replace($text, "\b$oldTicket-", "$TicketPrefix-")
     # 3. Bare app/object prefix (object names, identifiers, doc examples)
     $text = [regex]::Replace($text, "\b$oldPrefix", $AppPrefix)
-    # 4. Shift object IDs that fall inside the OLD range
+    # 4. Object IDs. In a fresh template repo, shift the sample app's IDs into the new range.
+    #    In an existing repo we don't renumber (offset is 0); we only localize the range where it
+    #    appears as a documented literal (e.g. "50100-50199" in instructions) so guidance is right.
     if ($offset -ne 0) {
         $text = [regex]::Replace($text, '\b\d{5}\b', {
             param($m)
             $n = [int]$m.Value
             if ($n -ge $oldFrom -and $n -le $oldTo) { ($n + $offset).ToString() } else { $m.Value }
         })
+    }
+    elseif ($existingRepo -and ($ObjectIdFrom -ne $oldFrom -or $ObjectIdTo -ne $oldTo)) {
+        foreach ($dash in @('-', [char]0x2013, [char]0x2014)) {
+            $text = $text.Replace(('{0}{1}{2}' -f $oldFrom, $dash, $oldTo), ('{0}-{1}' -f $ObjectIdFrom, $ObjectIdTo))
+        }
     }
     # 5. ADO -> GitHub work-item linking
     if ($WorkItemSystem -eq 'GitHub') { $text = $text.Replace('AB#', '#') }
@@ -252,46 +366,52 @@ function Set-BcVersion([string]$text) {
     return $text
 }
 
-# --- app/app.json: set name + publisher explicitly (override the generic prefix pass) ---
-$appJsonPath = $mainAppJsonPath
-if (Test-Path $appJsonPath) {
-    $appText = Get-Content $appJsonPath -Raw
-    $appText = [regex]::Replace($appText, '("name"\s*:\s*")[^"]*(")', "`${1}$AppName`${2}")
-    $appText = [regex]::Replace($appText, '("publisher"\s*:\s*")[^"]*(")', "`${1}$Publisher`${2}")
-    $appText = Set-BcVersion $appText
-    if ($PSCmdlet.ShouldProcess($appJsonPath, 'Set app name + publisher + BC version')) {
-        Set-Content -Path $appJsonPath -Value $appText -NoNewline
+# --- Sample app manifests (app/ + test/). Only for a fresh template repo: in an existing repo
+#     these paths point at the user's real, production manifests, so we never touch name,
+#     publisher, BC version, or object IDs there. ---
+if (-not $existingRepo) {
+    # --- app/app.json: set name + publisher explicitly (override the generic prefix pass) ---
+    $appJsonPath = $mainAppJsonPath
+    if (Test-Path $appJsonPath) {
+        $appText = Get-Content $appJsonPath -Raw
+        $appText = [regex]::Replace($appText, '("name"\s*:\s*")[^"]*(")', "`${1}$AppName`${2}")
+        $appText = [regex]::Replace($appText, '("publisher"\s*:\s*")[^"]*(")', "`${1}$Publisher`${2}")
+        $appText = Set-BcVersion $appText
+        if ($PSCmdlet.ShouldProcess($appJsonPath, 'Set app name + publisher + BC version')) {
+            Set-Content -Path $appJsonPath -Value $appText -NoNewline
+        }
+    }
+
+    # --- test/app.json: handled explicitly so the Microsoft test-library dependencies
+    #     (Library Assert / Any) are never renamed. Excluded from the generic pass above
+    #     so the original app name + publisher survive for these precise edits. ---
+    if (Test-Path $testAppJsonPath) {
+        $testText = Get-Content $testAppJsonPath -Raw
+        $testText = $testText.Replace($cur.repoSlug, $RepoSlug)
+        $testText = $testText.Replace($cur.adoOrg, $AdoOrg)
+        if ($WorkItemSystem -eq 'GitHub') { $testText = $testText.Replace('AB#', '#') }
+        if ($offset -ne 0) {
+            $testText = [regex]::Replace($testText, '\b\d{5}\b', {
+                param($m)
+                $n = [int]$m.Value
+                if ($n -ge $oldFrom -and $n -le $oldTo) { ($n + $offset).ToString() } else { $m.Value }
+            })
+        }
+        # Rename the production-app reference: top-level name ("<AppName> Tests") and the
+        # dependency on the production app both contain the old app name.
+        $testText = $testText.Replace($cur.appName, $AppName)
+        # Replace only the partner publisher entries; leave "Microsoft" dependencies intact.
+        $testText = [regex]::Replace($testText, '("publisher"\s*:\s*")' + [regex]::Escape($cur.publisher) + '(")', "`${1}$Publisher`${2}")
+        $testText = Set-BcVersion $testText
+        if ($PSCmdlet.ShouldProcess($testAppJsonPath, 'Update test app manifest')) {
+            Set-Content -Path $testAppJsonPath -Value $testText -NoNewline
+        }
     }
 }
 
-# --- test/app.json: handled explicitly so the Microsoft test-library dependencies
-#     (Library Assert / Any) are never renamed. Excluded from the generic pass above
-#     so the original app name + publisher survive for these precise edits. ---
-if (Test-Path $testAppJsonPath) {
-    $testText = Get-Content $testAppJsonPath -Raw
-    $testText = $testText.Replace($cur.repoSlug, $RepoSlug)
-    $testText = $testText.Replace($cur.adoOrg, $AdoOrg)
-    if ($WorkItemSystem -eq 'GitHub') { $testText = $testText.Replace('AB#', '#') }
-    if ($offset -ne 0) {
-        $testText = [regex]::Replace($testText, '\b\d{5}\b', {
-            param($m)
-            $n = [int]$m.Value
-            if ($n -ge $oldFrom -and $n -le $oldTo) { ($n + $offset).ToString() } else { $m.Value }
-        })
-    }
-    # Rename the production-app reference: top-level name ("<AppName> Tests") and the
-    # dependency on the production app both contain the old app name.
-    $testText = $testText.Replace($cur.appName, $AppName)
-    # Replace only the partner publisher entries; leave "Microsoft" dependencies intact.
-    $testText = [regex]::Replace($testText, '("publisher"\s*:\s*")' + [regex]::Escape($cur.publisher) + '(")', "`${1}$Publisher`${2}")
-    $testText = Set-BcVersion $testText
-    if ($PSCmdlet.ShouldProcess($testAppJsonPath, 'Update test app manifest')) {
-        Set-Content -Path $testAppJsonPath -Value $testText -NoNewline
-    }
-}
-
-# --- Rename AL files carrying the old prefix in their name ---
-if ($cur.appPrefix -ne $AppPrefix) {
+# --- Rename AL files carrying the old prefix in their name (fresh template repo only; in an
+#     existing repo this would rename the user's own files) ---
+if (-not $existingRepo -and $cur.appPrefix -ne $AppPrefix) {
     $renameTargets = Get-ChildItem -Path $RepoRoot -Recurse -File |
         Where-Object { $_.Name -like "*$($cur.appPrefix)*" -and ($_.FullName -notlike "*$sep.git$sep*") }
     foreach ($t in $renameTargets) {
@@ -420,7 +540,10 @@ $linkLine
 - All AL object names use the ``$AppPrefix`` prefix (see [AL coding standards](.github/instructions/al-coding-standards.instructions.md)).
 "@
 if ($PSCmdlet.ShouldProcess((Join-Path $RepoRoot 'PROJECT.md'), 'Write PROJECT.md')) {
-    Set-Content -Path (Join-Path $RepoRoot 'PROJECT.md') -Value $projectMd
+    # In an existing repo, keep PROJECT.md alongside the customizations (e.g. app/PROJECT.md)
+    # rather than adding a file to the user's repo root.
+    $projectMdPath = if ($existingRepo -and $custRoot) { Join-Path $RepoRoot (Join-Path $custRoot 'PROJECT.md') } else { Join-Path $RepoRoot 'PROJECT.md' }
+    Set-Content -Path $projectMdPath -Value $projectMd
 }
 
 # --- Detect whether this is the template repo itself (never prune/clean it) ---
@@ -548,7 +671,15 @@ if ($doPrune) {
 
 Write-Host "`nTemplate initialized." -ForegroundColor Green
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  1. Review the diff (git status / git diff)."
-Write-Host "  2. Generate fresh GUIDs for the 'id' in app/app.json AND test/app.json."
-Write-Host ("  3. BC version set from template.config.json bcVersion (application {0}, platform {1}, runtime {2}). Edit that block and re-run to retarget." -f $(if($bcApplication){$bcApplication}else{'unchanged'}), $(if($bcPlatform){$bcPlatform}else{'unchanged'}), $(if($bcRuntime){$bcRuntime}else{'unchanged'}))
-Write-Host "  4. Commit: the template is ready for your first feature."
+if ($existingRepo) {
+    Write-Host "  1. Review the diff (git status / git diff) - only template-owned files under '$custRoot' should change."
+    Write-Host "  2. Resolve any '*.template' files the installer left next to your existing configs (merge, then delete)."
+    Write-Host "  3. Your AL source, app.json, object IDs and README were intentionally left untouched."
+    Write-Host "  4. Commit the localized customizations."
+}
+else {
+    Write-Host "  1. Review the diff (git status / git diff)."
+    Write-Host "  2. Generate fresh GUIDs for the 'id' in app/app.json AND test/app.json."
+    Write-Host ("  3. BC version set from template.config.json bcVersion (application {0}, platform {1}, runtime {2}). Edit that block and re-run to retarget." -f $(if($bcApplication){$bcApplication}else{'unchanged'}), $(if($bcPlatform){$bcPlatform}else{'unchanged'}), $(if($bcRuntime){$bcRuntime}else{'unchanged'}))
+    Write-Host "  4. Commit: the template is ready for your first feature."
+}
