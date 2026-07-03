@@ -25,6 +25,14 @@ Combines spec-driven development, GitHub Copilot custom agents for every workflo
 
 ## The Full BC Development Workflow
 
+The same eight-stage lifecycle runs whether you track work in **Azure DevOps Boards** or in
+**GitHub Issues + Projects** — only the work-item mechanics differ (the initializer wires exactly
+one backend at Q7). Unsure which stage you're in? Give **`bc-orchestrator`** the ticket/issue
+number and it routes you to the right agent. Full decision map:
+[`.github/WHEN-TO-USE.md`](.github/WHEN-TO-USE.md).
+
+### Backend: Azure DevOps Boards
+
 ```
 ADO Ticket
     │
@@ -70,6 +78,67 @@ Documentation PR Reviewed & Merged
     ▼
 ADO Ticket Closed ✅
 ```
+
+### Backend: GitHub Issues & Projects
+
+The flow below shows a single request travelling from a customer call to a closed issue — who
+does what, which agent drives it, and how the **Issue** and its **Project board status** change at
+each step. (Project statuses are illustrative — name your board columns however your team likes.)
+
+```mermaid
+flowchart TD
+    CALL["📞 Request arrives<br/>(call, email, Teams)"] --> PM
+
+    PM["🧭 bc-pm · TRIAGE<br/>create + triage the Issue"]
+    PM -->|"Issue created, labeled,<br/>added to Project → <i>Triage → Backlog</i>"| PLAN
+
+    PLAN["📝 bc-plan · PLAN<br/>write user story + acceptance criteria<br/>(Epic/Feature ➜ create sub-issues)"]
+    PLAN -->|"Issue body updated → <i>Ready</i>"| SPEC
+
+    SPEC["📐 bc-spec · SPEC<br/>author specs/ABC-{ID}-*/ (4 docs)"]
+    SPEC -->|"spec PR merged → <i>In Spec</i>"| DEV
+
+    DEV["🔨 bc-dev · BUILD<br/>feature/ABC-{ID}-* · AL objects + tests · app.json bump"]
+    DEV -->|"branch pushed → <i>In Progress</i>"| PR
+
+    PR["🚀 bc-pr · SHIP<br/>open PR (Closes #ID), run AL checklist, link Issue"]
+    PR -->|"PR opened → <i>In Review</i>"| REVIEW{"Review"}
+
+    REVIEW -->|"changes requested"| DEV
+    REVIEW -->|"approved + merged to main<br/>(Closes #ID auto-links)"| DEPLOY
+
+    DEPLOY["📦 bc-deploy · SHIP<br/>compose release/YYYY-MM-wave-N → deploy TEST"]
+    DEPLOY -->|"→ <i>Testing / UAT</i>"| TEST{"Customer test"}
+
+    TEST -->|"bug found"| DEV
+    TEST -->|"approved"| DOC
+
+    DOC["📖 bc-doc · DOCS<br/>functional docs + changelog (PROD gate)"]
+    DOC -->|"docs PR merged"| PROD
+
+    PROD["📦 bc-deploy · SHIP<br/>deploy PROD (BC Admin Center)"]
+    PROD -->|"Issue auto-closes on merge"| DONE["✅ Issue Done / Closed"]
+```
+
+**Which agent, step by step**
+
+| # | You want to… | Switch to | What happens in GitHub | Issue / board status |
+|---|---|---|---|---|
+| 1 | Capture an incoming request | **bc-pm** | New **Issue** opened from the template, labeled, added to the Project | `Triage` |
+| 2 | Triage, dedupe, prioritize, groom | **bc-pm** | Labels/priority set, duplicates linked, intake accepted | `Backlog` |
+| 3 | Shape the user story + testable criteria | **bc-plan** | Issue **body** rewritten (story + AC). For an Epic/Feature, child **sub-issues** are created per story | `Ready` |
+| 4 | Write the developer-ready spec | **bc-spec** | `specs/ABC-{ID}-*/` committed on a spec branch; spec **PR** opened & merged | `In Spec` |
+| 5 | Implement the AL objects + tests | **bc-dev** | `feature/ABC-{ID}-*` branch; objects, tests, `app.json` version bump | `In Progress` |
+| 6 | Open the pull request | **bc-pr** | **PR** with `Closes #ID`, AL quality checklist, work-item link | `In Review` |
+| 7 | Handle review feedback | **bc-pr** / **bc-dev** | Changes-requested loops back to build; on merge the Issue auto-closes via `Closes #ID` | merged to `main` |
+| 8 | Ship a release to TEST | **bc-deploy** | `release/YYYY-MM-wave-N` composed from selected merges; deployed to TEST | `Testing / UAT` |
+| 9 | Write customer-facing docs (PROD gate) | **bc-doc** | `docs/functional/ABC-{ID}-*.md` + changelog; docs **PR** merged | — |
+| 10 | Deploy to PROD | **bc-deploy** | PROD deploy via BC Admin Center | `Done` ✅ |
+
+> **Tip — status automation:** if you use `Closes #ID` (or `Fixes #ID`) in the PR body, merging it
+> **auto-closes** the linked Issue. Pair that with a GitHub **Projects** workflow ("Item closed → set
+> status to Done", "PR opened → In Review") so board columns update themselves as the agents work.
+> Sub-issues let an Epic/Feature (step 3) roll its children up automatically.
 
 ---
 
