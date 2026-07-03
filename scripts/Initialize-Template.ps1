@@ -89,6 +89,16 @@ if (-not (Test-Path $configPath)) {
 $config = Get-Content $configPath -Raw | ConvertFrom-Json
 $cur = $config.values
 
+# Honor a relocated customizations layout (e.g. app/.github) recorded by the installer,
+# so agent model-writing / tool-trimming / pruning target the right folder. Platform
+# files (workflows, ISSUE_TEMPLATE, PR template, docs) always stay at the repo root.
+$custRoot = ''
+if ($cur.PSObject.Properties['sync'] -and $cur.sync.PSObject.Properties['customizationsPath'] -and $cur.sync.customizationsPath -and $cur.sync.customizationsPath -ne '.') {
+    $custRoot = ([string]$cur.sync.customizationsPath).Trim().TrimEnd('/', '\')
+}
+$ghPrefix = if ($custRoot) { "$custRoot/.github" } else { '.github' }
+$specsPrefix = if ($custRoot) { "$custRoot/specs" } else { 'specs' }
+
 function Read-Value([string] $prompt, $default) {
     if (-not $Interactive) { return $default }
     $shown = if ($default -is [array]) { $default -join ',' } else { $default }
@@ -298,7 +308,7 @@ if ($cur.appPrefix -ne $AppPrefix) {
 
 # --- Sync each agent's model: line from config.models ---
 if (-not $SkipModels -and $config.models) {
-    $agentsDir = Join-Path $RepoRoot '.github/agents'
+    $agentsDir = Join-Path $RepoRoot "$ghPrefix/agents"
     foreach ($prop in $config.models.PSObject.Properties) {
         if ($prop.Name -eq '_readme') { continue }
         $agentPath = Join-Path $agentsDir ("{0}.agent.md" -f $prop.Name)
@@ -321,7 +331,7 @@ if (-not $SkipModels -and $config.models) {
 # them so derived repos ship a lean, relevant toolset. (github/* is always kept:
 # code + PRs live on GitHub regardless of the work-item system.)
 if ($WorkItemSystem -eq 'GitHub') {
-    $agentsDir = Join-Path $RepoRoot '.github/agents'
+    $agentsDir = Join-Path $RepoRoot "$ghPrefix/agents"
     if (Test-Path $agentsDir) {
         Get-ChildItem $agentsDir -Filter *.agent.md | ForEach-Object {
             $aText = Get-Content $_.FullName -Raw
@@ -503,13 +513,15 @@ if ($doPrune) {
     }
     else {
         # Category -> paths (mirrors sync.include in Install-IntoExistingRepo / Update-FromTemplate).
+        # Relocated categories (metaDocs, specs) follow customizationsPath; platform files
+        # (issueOps workflows/templates, PR template, docs, sample app) stay at the repo root.
         $categoryPaths = [ordered]@{
-            metaDocs      = @('.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md')
+            metaDocs      = @("$ghPrefix/AGENT-ARCHITECTURE.md", "$ghPrefix/WHEN-TO-USE.md", "$ghPrefix/SKILLS.md")
             referenceDocs = @('docs')
             issueOps      = @('.github/ISSUE_TEMPLATE', '.github/ISSUE_ORCHESTRATION.md',
                 '.github/workflows/issue-implementation.yml', '.github/workflows/issue-orchestrator.yml',
                 '.github/workflows/issue-planning.yml')
-            specs         = @('specs/_TEMPLATE')
+            specs         = @("$specsPrefix/_TEMPLATE")
             prTemplate    = @('.github/PULL_REQUEST_TEMPLATE.md')
             sampleApp     = @('app', 'test', 'bc-alm-template.code-workspace')
         }
