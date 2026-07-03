@@ -4,6 +4,8 @@
 > `specs/<Area>/` the first time the area gains a story (e.g. `specs/Finance/`). Free-form and any
 > depth — `specs/Finance/Payments/` is fine too. Delete sections you don't need.
 
+**Area:** **Index** · [Roadmap](roadmap.md)
+
 ## Purpose
 
 > What this module/area is about and which part of the business or app it covers.

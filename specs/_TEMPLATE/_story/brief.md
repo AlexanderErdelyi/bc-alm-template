@@ -2,6 +2,8 @@
 
 > Replace this line with a plain-language title of what the customer wants.
 
+**Story:** [Index](index.md) · **Brief** · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)
+
 ---
 
 ## Ticket Reference

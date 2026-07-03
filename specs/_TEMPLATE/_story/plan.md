@@ -2,6 +2,8 @@
 
 > Technical specification for developers. Written after brief.md is approved.
 
+**Story:** [Index](index.md) · [Brief](brief.md) · **Plan** · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)
+
 ---
 
 ## Technical Summary

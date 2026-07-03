@@ -3,6 +3,8 @@
 > Story overview & navigation. Copy this whole `_story/` folder to
 > `specs/<Area>/<type>-<ID>-<slug>/` (e.g. `specs/Finance/Payments/us-123-payment-tolerance/`).
 
+**Story:** **Index** · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md) · [↑ Area](../index.md)
+
 | | |
 |---|---|
 | **Status** | <!-- Draft / Spec review / In development / In test / Done --> |
