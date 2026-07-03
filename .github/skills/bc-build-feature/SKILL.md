@@ -29,6 +29,15 @@ Read the spec for the ticket:
 Search for existing objects you will extend. Then summarise: what to create, what to modify,
 in what order.
 
+**Confirm the working branch — reuse before you create.** Run `git branch --show-current` first.
+**If you are already on a feature/bugfix/hotfix branch for this ticket, stay on it** — a branch
+"belongs to" the ticket if its name contains the ticket ID (e.g. `feature/2117-…`,
+`feature/NOB-2117-…`), regardless of prefix or exact wording. Do **not** create a second branch and
+do **not** rename the one you are on. Only create a branch when you are on `main` (or a branch for a
+different ticket): cut it from an up-to-date `main` following the repo's convention in
+[`docs/branching-strategy.md`](../../../docs/branching-strategy.md). When in doubt about whether the
+current branch is the right one, ask the user rather than creating a new branch.
+
 **If the story is broken into tasks** (task sub-folders `NN-<task-slug>/` and a story `roadmap.md`
 instead of a story-level `plan.md`), read the `roadmap.md` for order/dependencies and build the
 **approved** tasks in ordinal order — each task's `plan.md` + `acceptance-criteria.md` is its own

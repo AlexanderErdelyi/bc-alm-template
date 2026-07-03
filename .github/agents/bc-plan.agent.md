@@ -11,7 +11,7 @@ handoffs:
     prompt: "This request is not ready to plan — it needs triage (priority, labels, duplicate check, backlog placement). Take over following the bc-triage-backlog skill, then return to bc-plan."
   - label: "BUILD · Hand off to the developer"
     agent: "bc-dev"
-    prompt: "The spec is complete and the user story now carries a spec summary. Take over: locate the spec with specs/**/*-{ID}-*/, create/confirm the feature branch, and implement the AL objects following the bc-build-feature skill."
+    prompt: "The spec is complete and the user story now carries a spec summary. Take over: locate the spec with specs/**/*-{ID}-*/, confirm the working branch (reuse the branch you're already on if its name contains the ticket ID — only create one from main if there is none), and implement the AL objects following the bc-build-feature skill."
 ---
 
 You are the BC Planner agent for Business Central ALM. Your job is the **PLAN** phase: turn a raw

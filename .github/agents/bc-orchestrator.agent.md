@@ -15,7 +15,7 @@ handoffs:
     prompt: "The orchestrator detected the SPEC phase for this ticket. Take over: create or complete the story folder under its area (specs/<Area>/<type>-{ID}-*/ with index, brief, plan, acceptance-criteria, change-log) following the bc-spec-author skill, then have the user open a spec PR."
   - label: "BUILD · Implement the feature"
     agent: "bc-dev"
-    prompt: "The orchestrator detected the BUILD phase. Take over: read the spec, create/confirm the feature branch, implement the AL objects following the bc-build-feature skill and the al-coding-standards instructions, bump app.json, and add tests."
+    prompt: "The orchestrator detected the BUILD phase. Take over: read the spec, confirm the working branch (reuse the branch you're already on if its name contains the ticket ID — only create one from main if there is none), implement the AL objects following the bc-build-feature skill and the al-coding-standards instructions, bump app.json, and add tests."
   - label: "SHIP · Prepare the pull request"
     agent: "bc-pr"
     prompt: "The orchestrator detected the SHIP phase. Take over: run bc-review-self, then compose the PR description and quality checklist following the bc-ship-pull-request skill and link the ADO work item."
@@ -63,13 +63,20 @@ If the story folder exists, check that its documents are present:
   - Action: "Spec folder exists but is incomplete. Missing files: [list missing]. Switch to the **bc-spec agent** to complete the spec, then open a spec PR."
 
 ### Step 3 — Check for feature branch
-Look for a branch named `feature/ABC-{ID}-*` in the repository.
+Look for a branch that **belongs to this ticket** — i.e. any local or remote branch whose name
+contains the ticket ID (`*{ID}*`, e.g. `feature/2117-…`, `feature/ABC-2117-…`), and check the branch
+you are currently on (`git branch --show-current`). Match on the **ID**, not the exact prefixed
+pattern — a branch counts even if it omits the app prefix or uses different wording.
 
-- **Spec complete, no branch** → Stage: **READY FOR DEVELOPMENT**
-  - Action: "Spec is complete. Create your feature branch: `git checkout -b feature/ABC-{ID}-short-description`. Then switch to the **bc-dev agent** to begin AL implementation."
+- **Spec complete, already on that branch** → Stage: **READY FOR DEVELOPMENT**
+  - Action: "You're already on the feature branch for this ticket. Switch to the **bc-dev agent** to begin/continue AL implementation — do not create a new branch."
+- **Spec complete, branch exists but not checked out** → Stage: **READY FOR DEVELOPMENT**
+  - Action: "A feature branch for this ticket already exists (`<name>`). Check it out (`git switch <name>`) — do not create a new one — then switch to the **bc-dev agent**."
+- **Spec complete, no branch for this ticket** → Stage: **READY FOR DEVELOPMENT**
+  - Action: "Spec is complete and no branch exists for this ticket. Create one from an up-to-date `main` per [`docs/branching-strategy.md`](../../docs/branching-strategy.md) (e.g. `git checkout -b feature/ABC-{ID}-short-description`). Then switch to the **bc-dev agent** to begin AL implementation."
 
 ### Step 4 — Check for open pull request
-Look for an open PR from `feature/ABC-{ID}-*` targeting `main`.
+Look for an open PR from the ticket's branch (name contains `{ID}`) targeting `main`.
 
 - **Branch exists, no open PR** → Stage: **IN DEVELOPMENT**
   - Action: "Feature branch exists but no open PR yet. Switch to the **bc-dev agent** to continue implementation, or to the **bc-pr agent** when ready to create the PR."
