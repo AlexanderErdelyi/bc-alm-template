@@ -40,11 +40,13 @@ skills, we don't add new roles.
 - **E7** ✅ build gate additions to `bc-build-feature` — module-wide `al_build`/`al_get_diagnostics`,
   acceptance-criteria status update in the spec, review gate before committing.
 
-### Wave 3 — P3 (document, don't over-engineer)
+### Wave 3 — P3 (document, don't over-engineer) ✅ **done**
 - **E5** ✅ **done** — delivered early as a new dual-backend skill `bc-breakdown-feature`
   (Azure DevOps Task carrier **and** GitHub sub-issue / Project field). Answers open question Q2.
-- **E8** Mode B branching — document as optional.
-- **E9** skill-authoring convention — meta guidance in `SKILLS.md`.
+- **E8** ✅ Mode B branching — documented as an optional integration-branch pattern in
+  `docs/branching-strategy.md`.
+- **E9** ✅ skill-authoring convention — documented in `SKILLS.md` (section shape + portability
+  conventions + registration checklist).
 
 ## Technical approach & generalization rules
 
