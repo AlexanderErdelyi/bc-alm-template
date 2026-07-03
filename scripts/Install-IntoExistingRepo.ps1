@@ -27,7 +27,9 @@
 
     Content categories (see 'sync.include' in template.config.json):
       * Core (always)  - agents, skills, instructions, copilot-instructions.md,
-                         template.config.json, the sync workflow + scripts.
+                         template.config.json, the shared scripts.
+      * syncWorkflow   - GitHub Actions template-sync (.github/workflows/template-sync.yml
+                         + .templatesyncignore); auto-skipped for Azure DevOps-only repos.
       * metaDocs       - .github/AGENT-ARCHITECTURE.md, WHEN-TO-USE.md, SKILLS.md
                          (relocated alongside the customizations when -CustomizationsPath is set)
       * referenceDocs  - the docs/ library (bcquality, branching, workflow, ...)
@@ -90,6 +92,11 @@ param(
     [switch] $NoSpecs,
     [switch] $NoPrTemplate,
 
+    # Skip the GitHub Actions template-sync workflow (+ .templatesyncignore). Auto-defaults
+    # to skipped for Azure DevOps-only repos (ADO markers present and no root .github/workflows).
+    # Ongoing sync then runs via scripts/Update-FromTemplate.ps1 (or an ADO pipeline) instead.
+    [switch] $NoSyncWorkflow,
+
     [string] $SourceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
@@ -120,7 +127,8 @@ function Read-TargetSync {
         }
     }
     $cp = if ($c.values.sync.PSObject.Properties['customizationsPath'] -and $c.values.sync.customizationsPath) { [string]$c.values.sync.customizationsPath } else { '.' }
-    return [pscustomobject]@{ include = $inc; customizationsPath = $cp }
+    $sw = if ($c.values.sync.PSObject.Properties['syncWorkflow']) { [bool]$c.values.sync.syncWorkflow } else { $true }
+    return [pscustomobject]@{ include = $inc; customizationsPath = $cp; syncWorkflow = $sw }
 }
 
 function Apply-IncludeFlags([System.Collections.Specialized.OrderedDictionary] $inc) {
@@ -149,6 +157,16 @@ function Detect-CustomizationsPath {
     return $null
 }
 
+# The template-sync workflow is a GitHub Action; it never runs in an Azure DevOps repo.
+# Default it OFF when we see ADO markers and no existing GitHub Actions folder, so an
+# ADO-only repo isn't handed a dead root .github/workflows it never asked for.
+function Detect-SyncWorkflowDefault {
+    $ado = @('.devops', '.azuredevops', 'azure-pipelines.yml') | Where-Object { Test-Path (Join-Path $TargetRepo $_) }
+    $hasGhActions = Test-Path (Join-Path $TargetRepo '.github/workflows')
+    if ($ado -and -not $hasGhActions) { return $false }
+    return $true
+}
+
 function Read-YesNo([string] $label, [bool] $default) {
     $hint = if ($default) { 'Y/n' } else { 'y/N' }
     while ($true) {
@@ -159,7 +177,7 @@ function Read-YesNo([string] $label, [bool] $default) {
     }
 }
 
-function Prompt-Profile([System.Collections.Specialized.OrderedDictionary] $inc, [string] $custPath) {
+function Prompt-Profile([System.Collections.Specialized.OrderedDictionary] $inc, [string] $custPath, [bool] $syncWorkflow) {
     Write-Host "`nConfigure the overlay (press Enter to accept the [default]):" -ForegroundColor White
     $cp = (Read-Host "  Customizations folder ('.' = repo root, or e.g. 'app') [$custPath]").Trim()
     if ([string]::IsNullOrWhiteSpace($cp)) { $cp = $custPath }
@@ -169,12 +187,13 @@ function Prompt-Profile([System.Collections.Specialized.OrderedDictionary] $inc,
     $inc.specs = Read-YesNo "Include spec scaffold (specs/_TEMPLATE)?" $inc.specs
     $inc.prTemplate = Read-YesNo "Include PR template (PULL_REQUEST_TEMPLATE.md)?" $inc.prTemplate
     $inc.sampleApp = Read-YesNo "Copy the sample AL app (app/ + test/ + workspace)?" $inc.sampleApp
-    return @{ include = $inc; customizationsPath = $cp }
+    $sw = Read-YesNo "Install the GitHub Actions template-sync workflow? (No for Azure DevOps-only repos)" $syncWorkflow
+    return @{ include = $inc; customizationsPath = $cp; syncWorkflow = $sw }
 }
 
 # Ensure the target has a template.config.json (seed from the template's when missing)
 # and write the resolved 'sync' block into it.
-function Save-SyncConfig([System.Collections.Specialized.OrderedDictionary] $inc, [string] $custPath) {
+function Save-SyncConfig([System.Collections.Specialized.OrderedDictionary] $inc, [string] $custPath, [bool] $syncWorkflow) {
     if (-not (Test-Path $targetConfig)) {
         if ($PSCmdlet.ShouldProcess($targetConfig, "Seed template.config.json from template")) {
             Copy-Item (Join-Path $SourceRoot 'template.config.json') $targetConfig -Force
@@ -190,6 +209,8 @@ function Save-SyncConfig([System.Collections.Specialized.OrderedDictionary] $inc
     }
     $sync = $c.values.sync
     $sync.customizationsPath = $custPath
+    if ($sync.PSObject.Properties['syncWorkflow']) { $sync.syncWorkflow = $syncWorkflow }
+    else { $sync | Add-Member -NotePropertyName syncWorkflow -NotePropertyValue $syncWorkflow }
     $incObj = [pscustomobject]@{
         metaDocs = $inc.metaDocs; referenceDocs = $inc.referenceDocs; issueOps = $inc.issueOps
         specs    = $inc.specs; prTemplate = $inc.prTemplate; sampleApp = $inc.sampleApp
@@ -200,7 +221,7 @@ function Save-SyncConfig([System.Collections.Specialized.OrderedDictionary] $inc
     if ($PSCmdlet.ShouldProcess($targetConfig, "Write sync/include config")) {
         ($c | ConvertTo-Json -Depth 12) | Set-Content -Path $targetConfig -Encoding UTF8
     }
-    Write-Host "  config     template.config.json sync -> customizationsPath='$custPath', include=[$(( $inc.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key }) -join ', ')]" -ForegroundColor Green
+    Write-Host "  config     template.config.json sync -> customizationsPath='$custPath', syncWorkflow=$syncWorkflow, include=[$(( $inc.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key }) -join ', ')]" -ForegroundColor Green
 }
 
 # --- Resolve the profile for this run --------------------------------------------
@@ -209,6 +230,7 @@ if ($existing -and -not $Configure) {
     # Execute run with a config already present: honor it (flags still layer on top).
     $include = Apply-IncludeFlags $existing.include
     $custPath = if ($PSBoundParameters.ContainsKey('CustomizationsPath')) { $CustomizationsPath } else { $existing.customizationsPath }
+    $syncWorkflow = if ($NoSyncWorkflow) { $false } else { [bool]$existing.syncWorkflow }
 }
 else {
     $include = Apply-IncludeFlags (Get-LeanInclude)
@@ -225,9 +247,13 @@ else {
             $custPath = $CustomizationsPath
         }
     }
+    $syncWorkflow = if ($NoSyncWorkflow) { $false } else { Detect-SyncWorkflowDefault }
+    if (-not $syncWorkflow -and -not $NoSyncWorkflow) {
+        Write-Host "  detected an Azure DevOps repo with no GitHub Actions -> skipping the template-sync workflow" -ForegroundColor Cyan
+    }
     if ($Configure -and $Interactive) {
-        $picked = Prompt-Profile $include $custPath
-        $include = $picked.include; $custPath = $picked.customizationsPath
+        $picked = Prompt-Profile $include $custPath $syncWorkflow
+        $include = $picked.include; $custPath = $picked.customizationsPath; $syncWorkflow = $picked.syncWorkflow
     }
 }
 
@@ -239,12 +265,13 @@ Write-Host "Overlaying BC ALM template" -ForegroundColor White
 Write-Host "  from: $SourceRoot"
 Write-Host "  to  : $TargetRepo"
 if ($custRoot) { Write-Host "  customizations -> $custRoot/.github (platform files stay at repo root)" -ForegroundColor Cyan }
+if (-not $syncWorkflow) { Write-Host "  template-sync GitHub Action: skipped (use scripts/Update-FromTemplate.ps1 for ongoing sync)" -ForegroundColor Cyan }
 Write-Host ("  include: " + (($include.GetEnumerator() | ForEach-Object { "$($_.Key)=$([bool]$_.Value)" }) -join ', ')) -ForegroundColor DarkGray
 Write-Host ""
 
 # --- CONFIGURE step: write config and stop ---------------------------------------
 if ($Configure) {
-    Save-SyncConfig $include $custPath
+    Save-SyncConfig $include $custPath $syncWorkflow
     Write-Host "`nConfigured. Review '$targetConfig', then run WITHOUT -Configure to copy the enabled content:" -ForegroundColor White
     Write-Host "  pwsh ./scripts/Install-IntoExistingRepo.ps1 -TargetRepo '$TargetRepo' -WhatIf   # preview" -ForegroundColor DarkGray
     return
@@ -306,17 +333,17 @@ function Copy-Tree([string] $relDir, [string] $policy) {
     }
 }
 
-# Core: always copied (the point of the template + the sync machinery).
+# Core: always copied (the point of the template + the shared scripts).
 $addTrees = @('.github/agents', '.github/skills', '.github/prompts', '.github/instructions')
 $addFiles = @(
-    '.github/workflows/template-sync.yml',
     'scripts/Initialize-Template.ps1',
     'scripts/Add-BCQuality.ps1',
     'scripts/Start-ALLanguageServer.ps1',
     'scripts/Update-FromTemplate.ps1',
-    'scripts/Enable-CopilotCustomizations.ps1',
-    '.templatesyncignore'
+    'scripts/Enable-CopilotCustomizations.ps1'
 )
+# GitHub Actions template-sync machinery (skipped for Azure DevOps-only repos).
+if ($syncWorkflow) { $addFiles += '.github/workflows/template-sync.yml', '.templatesyncignore' }
 
 # Optional categories.
 if ($include.metaDocs) { $addFiles += '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md' }
@@ -358,7 +385,7 @@ if ($include.sampleApp) {
 
 # Establish/refresh the target's template.config.json sync block (never clobbers the
 # rest of an existing config; seeds the file from the template when missing).
-Save-SyncConfig $include $custPath
+Save-SyncConfig $include $custPath $syncWorkflow
 
 Write-Host "`nSummary: $($script:added) added/overwritten, $($script:skipped) skipped, $($script:merged) need manual merge (.template)" -ForegroundColor White
 
@@ -381,7 +408,12 @@ else {
     Write-Host "        pwsh ./scripts/Enable-CopilotCustomizations.ps1"
 }
 Write-Host "  6. Later, pull template updates any time with: pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf"
-Write-Host "     (or let the '.github/workflows/template-sync.yml' Action open a PR for you). Both honor the"
+if ($syncWorkflow) {
+    Write-Host "     (or let the '.github/workflows/template-sync.yml' Action open a PR for you). Both honor the"
+}
+else {
+    Write-Host "     (the GitHub Actions template-sync workflow was skipped for this repo). It honors the"
+}
 Write-Host "     'sync' block in template.config.json - customizations location, model/toolset toggles, and the"
 Write-Host "     content categories you selected here (excluded categories are never re-added)."
 $off = @($include.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })

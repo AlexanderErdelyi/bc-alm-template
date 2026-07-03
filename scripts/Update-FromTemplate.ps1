@@ -60,6 +60,7 @@ $RepoRoot = (Resolve-Path $RepoRoot).Path
 # --- Read the sync configuration (template.config.json 'values.sync') ------------
 $sync = [pscustomobject]@{
     customizationsPath = '.'
+    syncWorkflow       = $true
     updateModels       = $false
     updateExtensions   = $false
     updateInstructions = $true
@@ -78,6 +79,7 @@ if (Test-Path $configPath) {
     if ($config -and $config.values -and $config.values.sync) {
         $s = $config.values.sync
         if ($s.PSObject.Properties['customizationsPath'] -and $s.customizationsPath) { $sync.customizationsPath = [string]$s.customizationsPath }
+        if ($s.PSObject.Properties['syncWorkflow'])       { $sync.syncWorkflow       = [bool]$s.syncWorkflow }
         if ($s.PSObject.Properties['updateModels'])       { $sync.updateModels       = [bool]$s.updateModels }
         if ($s.PSObject.Properties['updateExtensions'])   { $sync.updateExtensions   = [bool]$s.updateExtensions }
         if ($s.PSObject.Properties['updateInstructions']) { $sync.updateInstructions = [bool]$s.updateInstructions }
@@ -95,7 +97,7 @@ if ($sync.customizationsPath -and $sync.customizationsPath -ne '.') {
     $custRoot = $sync.customizationsPath.Trim().TrimEnd('/', '\')
 }
 
-Write-Host "Sync config: customizationsPath='$($sync.customizationsPath)', updateModels=$($sync.updateModels), updateExtensions=$($sync.updateExtensions), updateInstructions=$($sync.updateInstructions)" -ForegroundColor DarkGray
+Write-Host "Sync config: customizationsPath='$($sync.customizationsPath)', syncWorkflow=$($sync.syncWorkflow), updateModels=$($sync.updateModels), updateExtensions=$($sync.updateExtensions), updateInstructions=$($sync.updateInstructions)" -ForegroundColor DarkGray
 $inc = $sync.include
 Write-Host "  include: metaDocs=$($inc.metaDocs), referenceDocs=$($inc.referenceDocs), issueOps=$($inc.issueOps), specs=$($inc.specs), prTemplate=$($inc.prTemplate)" -ForegroundColor DarkGray
 
@@ -115,18 +117,18 @@ if ($inc.referenceDocs) { $rootTrees += 'docs' }
 if ($inc.specs)         { $rootTrees += 'specs/_TEMPLATE' }
 if ($inc.issueOps)      { $rootTrees += '.github/ISSUE_TEMPLATE' }
 
-# Core files always refreshed (the sync machinery + shared scripts/config).
+# Core files always refreshed (shared scripts/config).
 $rootFiles = @(
-    '.github/workflows/template-sync.yml',
     'scripts/Initialize-Template.ps1',
     'scripts/Add-BCQuality.ps1',
     'scripts/Start-ALLanguageServer.ps1',
     'scripts/Update-FromTemplate.ps1',
     'scripts/Enable-CopilotCustomizations.ps1',
     'scripts/Install-IntoExistingRepo.ps1',
-    '.vscode/tasks.json',
-    '.templatesyncignore'
+    '.vscode/tasks.json'
 )
+# GitHub Actions template-sync machinery (skipped for Azure DevOps-only repos).
+if ($sync.syncWorkflow) { $rootFiles += '.github/workflows/template-sync.yml', '.templatesyncignore' }
 if ($inc.metaDocs) {
     $rootFiles += '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md'
 }
