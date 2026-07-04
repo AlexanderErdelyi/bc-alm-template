@@ -62,7 +62,11 @@ spec author first.
   codes, IDs, etc.).
 - **Event subscribers over base modifications.**
 - **Read-only queries** use `SetLoadFields` / `ReadIsolation(IsolationLevel::ReadUncommitted)`.
-- Naming: objects PascalCase + prefix; locals lowerCamelCase; params/globals PascalCase.
+- Naming: objects PascalCase + prefix; **all variables — locals, globals, params — PascalCase**.
+- `#region`/`#endregion` to group members (not banner comments); `///` XML doc comments on
+  public/global procedures and custom events.
+- Page-level `ApplicationArea` (not per-control); promoted actions get an `actionref` in
+  `area(Promoted)`; tooltips live on the table field, inherited by pages.
 
 See `references/al-patterns.md` for copy-ready snippets.
 
@@ -83,10 +87,18 @@ See `references/al-patterns.md` for copy-ready snippets.
 
 ## 6 — Final validation & spec status
 After the objects are in, validate the **whole module**, not just the last file you touched:
-- Run `al_build` and `al_get_diagnostics` across the app project; resolve every error and every
-  in-scope warning before proceeding.
-- Update the spec's acceptance criteria: in `specs/**/*-{ID}-*/acceptance-criteria.md`, mark each
-  criterion you have verified (e.g. `Open → Pass`). Commit this together with the code.
+- Run `al_build` and `al_get_diagnostics` across the app project; resolve **every error and
+  every new warning** — not just the ones you consider "in scope." A stray "object is not
+  assigned with AL Object ID Ninja" warning means an ID was hand-picked instead of reserved —
+  fix it via `ninjaNextId` (release the wrong ID and retake if there's a collision), don't
+  ignore it. Pre-existing warnings on code you didn't touch remain out of scope.
+- Update the spec status back into the folder, all committed together with the code:
+  - `acceptance-criteria.md` — mark each criterion you verified (`Open → Pass`, or
+    `Pass (manual — no test app)` when the repo has no separate test project).
+  - For a broken-down story, tick the task's checkboxes in its `NN-<task-slug>/plan.md`.
+  - When a story `roadmap.md` exists, update the finished task's **Status** column and the
+    **Current focus / Next action** line at the top so the orchestrator/PM agents can see
+    progress without opening every task folder.
 - **Review gate — ask before committing.** Summarise what changed, the build/diagnostics result,
   and the AC status, then confirm with the user before you commit. Never auto-commit a red build.
 
@@ -121,7 +133,12 @@ internals), drop a **changelog fragment** so it can be assembled at release time
 - [ ] `app/app.json` version bumped per the table.
 - [ ] Test codeunit in the `test/` project covers the acceptance criteria.
 - [ ] Permission set updated; `DataClassification` on all new fields.
-- [ ] Module-wide `al_build` clean; verified acceptance criteria marked in the spec.
+- [ ] All variables PascalCase; `#region`s not banners; `///` docs on public procedures;
+      page-level `ApplicationArea` with promoted `actionref`s; tooltips on table fields.
+- [ ] Module-wide `al_build` clean — no errors and **no new warnings** (all new object IDs
+      reserved in Ninja); verified acceptance criteria marked in the spec.
+- [ ] Spec status written back — `acceptance-criteria.md` (and, for broken-down stories, the
+      task's `plan.md` checkboxes + the story `roadmap.md` Status/Current-focus).
 - [ ] Changelog fragment added/updated (if the repo uses `changelog.d/` and the change is user-facing).
 
 ## Next step

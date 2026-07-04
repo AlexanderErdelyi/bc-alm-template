@@ -59,6 +59,13 @@ If the story folder exists, check that its documents are present:
 - `acceptance-criteria.md`
 - `change-log.md`
 
+> **Broken-down story?** If there's a `roadmap.md` instead of (or alongside) a flat `plan.md`,
+> the story has been split into task sub-folders (`NN-<task-slug>/`). Read `roadmap.md`'s
+> **Current status** block (Current focus / Next action) and its per-task **Status** column first —
+> that's the fastest signal for where things stand. Then check the in-progress task's own
+> `plan.md`/`acceptance-criteria.md` inside its `NN-*/` folder for the detailed completeness check
+> below. Skip tasks the roadmap marks not-yet-approved/parked — they aren't part of the current stage.
+
 - **Incomplete** → Stage: **SPEC IN PROGRESS**
   - Action: "Spec folder exists but is incomplete. Missing files: [list missing]. Switch to the **bc-spec agent** to complete the spec, then open a spec PR."
 

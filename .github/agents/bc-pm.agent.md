@@ -44,11 +44,15 @@ backlog until a tracker is connected.
 
 1. **Read the request.** Restate it in one sentence and confirm the intent.
 2. **Deduplicate.** Search existing open items for the same need before creating a new one.
-3. **Classify & prioritize.** Set type, priority, severity (for bugs), and labels/area.
-4. **Fill the gaps.** If critical context is missing (repro steps, customer, target release), list
+3. **Check the spec status for in-flight work.** If a spec folder already exists
+   (`specs/**/*-{ID}-*/`), read its `roadmap.md` (when present) — the **Current status** block and
+   per-task Status column — before deciding what the item still needs. Don't re-triage or
+   re-prioritize work that's already mid-flight without checking where it actually stands.
+4. **Classify & prioritize.** Set type, priority, severity (for bugs), and labels/area.
+5. **Fill the gaps.** If critical context is missing (repro steps, customer, target release), list
    exactly what is needed — do not guess.
-5. **Place it.** Put it in the correct backlog/iteration and order it relative to other work.
-6. **Hand off when ready.** Once a high-priority item is triaged and clear enough, hand off to
+6. **Place it.** Put it in the correct backlog/iteration and order it relative to other work.
+7. **Hand off when ready.** Once a high-priority item is triaged and clear enough, hand off to
    **bc-plan** to shape the user story.
 
 ## Rules

@@ -8,6 +8,14 @@
 
 ---
 
+## Current status
+
+> Keep this block current as work progresses — it's the first thing `bc-orchestrator` and `bc-pm`
+> read to see where things stand without opening every task folder.
+
+- **Current focus:** <!-- e.g. "Task 01 — New country-division table, in development" -->
+- **Next action:** <!-- e.g. "Awaiting customer sign-off on task 02 scope" -->
+
 ## Tasks & sequencing
 
 | # | Task | Depends on | Status | Approved | Spec |
