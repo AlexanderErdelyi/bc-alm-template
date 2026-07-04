@@ -32,10 +32,12 @@ tableextension 50100 MyCustomerExt extends Customer
 
 | Scope | Convention | Example |
 |---|---|---|
-| Local variable | lowerCamelCase | `var toleranceAmount: Decimal;` |
+| Local variable | PascalCase | `var ToleranceAmount: Decimal;` |
 | Global variable | PascalCase | `var TotalAmount: Decimal;` |
 | Parameter | PascalCase | `procedure Calculate(Amount: Decimal)` |
 | Label/text constant | PascalCase + suffix | `NoAmountErr`, `PostedMsg`, `DeleteQst` |
+
+All variables — local, global, and parameters alike — use **PascalCase**. There is no lowerCamelCase tier in AL code generated for this repo.
 
 Label suffixes:
 - `Err` — error message: `NoCustomerErr`
@@ -199,6 +201,108 @@ Each codeunit should have one clear purpose. Split codeunits when they grow beyo
 - `"ABC Payment Validation"` — validation logic only
 
 Do not create one "utility" codeunit that handles everything.
+
+---
+
+## Code Regions & Comments
+
+Group object members with `#region` / `#endregion` instead of banner comments (`// ----`). Use inline comments to explain **why**, not what — the code itself should already say what it does.
+
+```al
+// ✅ Correct
+#region Tolerance Calculation
+
+procedure CalculateTolerance(Amount: Decimal; TolerancePct: Decimal): Decimal
+begin
+    // Round to whole cents — BC posts G/L entries at 2-decimal precision regardless of setup
+    exit(Round(Amount * TolerancePct / 100, 0.01));
+end;
+
+#endregion
+
+// ❌ Wrong — banner comment instead of a region
+// ------------------------------------------
+// TOLERANCE CALCULATION
+// ------------------------------------------
+```
+
+---
+
+## XML Documentation Comments
+
+Every `public` or `global` procedure, and every custom event, gets a `///` XML doc comment summarizing what it does, its parameters, and its return value. Local/private helper procedures do not require one unless their behavior is non-obvious.
+
+```al
+/// <summary>
+/// Calculates the allowed payment tolerance amount for an invoice.
+/// </summary>
+/// <param name="Amount">The invoice amount to calculate tolerance against.</param>
+/// <param name="TolerancePct">The tolerance percentage from the payment setup.</param>
+/// <returns>The tolerance amount, rounded to 2 decimals.</returns>
+procedure CalculateTolerance(Amount: Decimal; TolerancePct: Decimal): Decimal
+```
+
+---
+
+## Page & UI Conventions
+
+- Set `ApplicationArea` **once at the page level** (or on the group/repeater), never repeated on every individual control.
+- Every promoted action must have an `actionref` inside an `area(Promoted)` block — do not rely on the action definition alone to appear on the ribbon.
+
+```al
+// ✅ Correct — ApplicationArea set once, promoted action has an actionref
+page 50100 "ABC Payment Setup Card"
+{
+    ApplicationArea = All;
+    // ...
+    actions
+    {
+        area(Processing)
+        {
+            action(RecalculateTolerance)
+            {
+                Caption = 'Recalculate Tolerance';
+                Image = Refresh;
+
+                trigger OnAction()
+                begin
+                    // ...
+                end;
+            }
+        }
+        area(Promoted)
+        {
+            actionref(RecalculateTolerance_Promoted; RecalculateTolerance) { }
+        }
+    }
+}
+```
+
+---
+
+## Tooltips
+
+Tooltips for table fields live on the **table field itself** (`ToolTip` property) so every page reusing that field inherits it automatically — do not duplicate the same tooltip text on each page. Page-only elements (actions, page-level fields with no table field) need their own `ToolTip`.
+
+```al
+// ✅ Correct — tooltip on the table field, inherited by every page
+field(50100; "ABC Payment Tolerance %"; Decimal)
+{
+    Caption = 'Payment Tolerance %';
+    ToolTip = 'Specifies the percentage tolerance allowed for underpayment.';
+    DataClassification = CustomerContent;
+}
+```
+
+---
+
+## Zero Warnings on New/Changed Code
+
+New or modified code must compile with **zero new warnings** — not just zero errors.
+
+- Reserve every new object ID via Object ID Ninja (`ninjaNextId`) before use. A "not assigned with AL Object ID Ninja" compiler warning means the ID was hand-picked instead of reserved — fix by reserving it (release + retake on a collision), not by ignoring the warning.
+- Do not introduce new usages of deprecated APIs (a new `[Obsolete]` warning on code you touched is in scope; a pre-existing one on unrelated code is not).
+- Pre-existing warnings on code you did not touch are out of scope for the current change — do not sweep unrelated files to "fix" them as a side effect of an unrelated PR.
 
 ---
 

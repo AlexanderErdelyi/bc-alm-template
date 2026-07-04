@@ -171,9 +171,16 @@ Check every piece of AL code against these rules. Flag violations clearly.
 
 ### Naming
 - Objects: PascalCase with prefix — `"Payment Tolerance Mgt."`
-- Local variables: lowerCamelCase — `var toleranceAmount: Decimal;`
-- Global variables and parameters: PascalCase — `procedure Calculate(Amount: Decimal)`
+- All variables — local, global, and parameters — PascalCase: `var ToleranceAmount: Decimal;`, `procedure Calculate(Amount: Decimal)`
 - Labels: PascalCase ending in Lbl, Msg, Err, Qst — `NoAmountErr`, `ConfirmDeleteQst`
+
+### Regions, XML Docs & UI Conventions
+- Group members with `#region` / `#endregion`, not banner comments
+- `///` XML doc comments on every public/global procedure and custom event
+- `ApplicationArea` set once at the page level, never repeated per control
+- Promoted actions need an `actionref` in `area(Promoted)`
+- Tooltips live on the table field (`ToolTip` property), inherited by pages — not duplicated per page
+- Zero new compiler warnings: every new object ID reserved via Object ID Ninja (`ninjaNextId`) before use
 
 ### Hardcoded Values — NEVER
 ```al
@@ -291,5 +298,8 @@ Before telling the user to open a PR, verify:
 - [ ] Test codeunit created in the `test/` project and covers acceptance criteria
 - [ ] Permission set updated for all new objects
 - [ ] `DataClassification` set on all new table fields
+- [ ] `#region`/`#endregion` used, `///` XML docs on public procedures, `ApplicationArea` set at page level with promoted `actionref`s, tooltips on table fields
+- [ ] Module-wide `#al_build` clean — no errors and no new warnings (all new object IDs reserved in Ninja)
+- [ ] Spec status written back — `plan.md`/`acceptance-criteria.md`/`roadmap.md` updated (see `bc-build-feature` Step 6)
 
 When all items are checked, tell the user: "Implementation is ready. Switch to the **BC PR agent** to prepare your pull request."
