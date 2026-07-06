@@ -55,7 +55,7 @@ Given an existing flat story at `specs/<Area>/<type>-<ID>-<slug>/` (with `index.
    Each task folder holds `plan.md` + `acceptance-criteria.md` (+ optional `change-log.md`).
 4. **Relocate the technical detail.** Move the content of the story-level `plan.md` /
    `acceptance-criteria.md` **down into the relevant task folders** (each task gets the slice that
-   belongs to it, with its own Task Breakdown checklist). Then **delete the two story-level files** —
+   belongs to it, with its own Task Breakdown status table). Then **delete the two story-level files** —
    their detail now lives per task, and the story keeps `brief`/`roadmap`/`index`/`change-log`.
 5. **Fill in the roadmap & index tables.** List every task with its order, dependencies, status, and
    approval state. An unapproved / future task **stays parked in the roadmap**, flagged, until it is

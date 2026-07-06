@@ -110,14 +110,20 @@
 
 ## Task Breakdown
 
-> The ordered, checkable list BUILD executes. Keep it here in `plan.md` unless the story grows large
-> enough to justify a separate `tasks.md`. Each task should touch only a few files and map back to an
-> object above and/or an acceptance criterion.
+> The ordered list BUILD executes. Keep it here in `plan.md` unless the story grows large enough to
+> justify task sub-folders. Each task should touch only a few files and map back to an object above
+> and/or an acceptance criterion.
 
-- [ ] <!-- e.g. Create table 50100 "ABC Setup" with fields … -->
-- [ ] <!-- e.g. Add event subscriber in codeunit 50103 … -->
-- [ ] <!-- e.g. Add page extension 50101 to surface the field -->
-- [ ] <!-- e.g. Write tests for AC-01…AC-03 -->
+**Status legend:** 🟪 Open · 🟦 In progress · 🟩 Ready for TEST · ✅ Done · 🔴 Blocked
+
+Track progress by editing **only the Status cell** of a row — rows stay in place so diffs stay easy to follow.
+
+| # | Status | Task |
+|---|---|---|
+| 1 | 🟪 Open | <!-- e.g. Create table 50100 "ABC Setup" with fields … --> |
+| 2 | 🟪 Open | <!-- e.g. Add event subscriber in codeunit 50103 … --> |
+| 3 | 🟪 Open | <!-- e.g. Add page extension 50101 to surface the field --> |
+| 4 | 🟪 Open | <!-- e.g. Write tests for AC-01…AC-03 --> |
 
 ---
 

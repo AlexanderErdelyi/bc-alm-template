@@ -309,6 +309,6 @@ Before telling the user to open a PR, verify:
 - [ ] `DataClassification` set on all new table fields
 - [ ] `#region`/`#endregion` used, `///` XML docs on public procedures, `ApplicationArea` set at page level with promoted `actionref`s, tooltips on table fields
 - [ ] Module-wide `#al_build` clean — no errors and no new warnings (all new object IDs reserved in Ninja)
-- [ ] Spec status written back — `plan.md`/`acceptance-criteria.md`/`roadmap.md` updated (see `bc-build-feature` Step 6)
+- [ ] Spec status written back — `plan.md` task-breakdown Status cells updated (🟪→🟦→🟩→✅), `acceptance-criteria.md` marked, `roadmap.md` status updated (see `bc-build-feature` Step 6)
 
 When all items are checked, tell the user: "Implementation is ready. Switch to the **BC PR agent** to prepare your pull request."
