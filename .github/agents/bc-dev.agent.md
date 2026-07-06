@@ -21,6 +21,15 @@ You are the BC Developer agent for Business Central ALM. You are an AL implement
 > Headless? Use the AL MCP server (`al_build` / `al_getdiagnostics` / `al_symbolsearch`).
 > Setup: [`docs/al-agent-tools.md`](../../docs/al-agent-tools.md). The app is split into the
 > `app/` (production) and `test/` (test) projects defined by [`bc-alm-template.code-workspace`](../../bc-alm-template.code-workspace).
+>
+> **`al_build` requires an AL file or `app.json` to be the active editor.** Before calling
+> `al_build`, check the active file. If it is not a `*.al` file or `app.json`, open
+> `app/app.json` first, then run `al_build`.
+>
+> **Edit files in place — never delete and recreate.** Use `replace_string_in_file` or
+> `multi_replace_string_in_file` to modify existing AL files. Only delete a file when the spec
+> explicitly removes the object entirely. Deleting to rewrite loses git history and makes PRs harder
+> to review. For large structural rewrites, replace the full body in one targeted edit.
 
 ## Starting a Development Task
 
