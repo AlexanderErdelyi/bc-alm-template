@@ -63,10 +63,16 @@
 
 ## Task Breakdown
 
-> The ordered, checkable list BUILD executes for this task.
+> The ordered list BUILD executes for this task.
 
-- [ ] <!-- e.g. Create table 50100 "ABC Country Division" with fields … -->
-- [ ] <!-- e.g. Write tests for AC-01…AC-03 -->
+**Status legend:** 🟪 Open · 🟦 In progress · 🟩 Ready for TEST · ✅ Done · 🔴 Blocked
+
+Track progress by editing **only the Status cell** of a row — rows stay in place so diffs stay easy to follow.
+
+| # | Status | Task |
+|---|---|---|
+| 1 | 🟪 Open | <!-- e.g. Create table 50100 "ABC Country Division" with fields … --> |
+| 2 | 🟪 Open | <!-- e.g. Write tests for AC-01…AC-03 --> |
 
 ---
 

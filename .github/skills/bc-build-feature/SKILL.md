@@ -105,7 +105,10 @@ After the objects are in, validate the **whole module**, not just the last file 
 - Update the spec status back into the folder, all committed together with the code:
   - `acceptance-criteria.md` — mark each criterion you verified (`Open → Pass`, or
     `Pass (manual — no test app)` when the repo has no separate test project).
-  - For a broken-down story, tick the task's checkboxes in its `NN-<task-slug>/plan.md`.
+  - `plan.md` task breakdown — the breakdown is a single status table; update **only the
+    Status cell** of each row you advanced (🟪 Open → 🟦 In progress → 🟩 Ready for TEST →
+    ✅ Done, or 🔴 Blocked). Never move rows between sections or rewrite the task text. For a
+    broken-down story, do this in the relevant task's `NN-*/plan.md`.
   - When a story `roadmap.md` exists, update the finished task's **Status** column and the
     **Current focus / Next action** line at the top so the orchestrator/PM agents can see
     progress without opening every task folder.
@@ -147,8 +150,8 @@ internals), drop a **changelog fragment** so it can be assembled at release time
       page-level `ApplicationArea` with promoted `actionref`s; tooltips on table fields.
 - [ ] Module-wide `al_build` clean — no errors and **no new warnings** (all new object IDs
       reserved in Ninja); verified acceptance criteria marked in the spec.
-- [ ] Spec status written back — `acceptance-criteria.md` (and, for broken-down stories, the
-      task's `plan.md` checkboxes + the story `roadmap.md` Status/Current-focus).
+- [ ] Spec status written back — `plan.md` task-breakdown Status cells updated,
+      `acceptance-criteria.md` marked, `roadmap.md` status updated.
 - [ ] Changelog fragment added/updated (if the repo uses `changelog.d/` and the change is user-facing).
 
 ## Next step
