@@ -21,6 +21,16 @@ procedure of the **`bc-dev`** agent.
 > (ALTool) or the AL MCP server. The production app lives in `app/` and tests in `test/`
 > (see [`bc-alm-template.code-workspace`](../../../bc-alm-template.code-workspace)).
 > Setup: [`docs/al-agent-tools.md`](../../../docs/al-agent-tools.md).
+>
+> **`al_build` requires an AL file or `app.json` to be the active editor.** Before calling
+> `al_build`, confirm the active file is a `*.al` file or `app.json`. If it is not, open
+> `app/app.json` (or any `.al` file in the project) as the active editor first, then run `al_build`.
+>
+> **Edit files in place — never delete and recreate.** Always use `replace_string_in_file` or
+> `multi_replace_string_in_file` to modify existing AL files. Only delete a file when the spec
+> explicitly removes the object entirely (e.g. "delete CU 80015"). Deleting a file to rewrite it
+> clean loses git history and makes PRs harder to review. For large structural rewrites, replace the
+> full body in one or two targeted edits.
 
 ## 1 — Orient
 Read the spec for the ticket:
