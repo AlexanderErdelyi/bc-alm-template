@@ -1,0 +1,82 @@
+name: VS Code extension
+
+# Builds, tests and packages the BC ALM VS Code extension (vscode-extension/).
+# Push a tag like ext-v0.1.0 to publish the .vsix as a GitHub release asset.
+# Template-repo only: projects created from the template drop this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vscode-extension/**"
+      - ".github/workflows/vscode-extension.yml"
+    tags:
+      - "ext-v*"
+  pull_request:
+    paths:
+      - "vscode-extension/**"
+      - ".github/workflows/vscode-extension.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.repository == 'AlexanderErdelyi/bc-alm-template'
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test (compile + unit and integration tests)
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
+          npm test
+
+      - name: Package VSIX
+        run: npx vsce package --no-dependencies --out bc-alm.vsix
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: bc-alm-vsix
+          path: vscode-extension/bc-alm.vsix
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/ext-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: bc-alm-vsix
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#ext-v}"
+          mv bc-alm.vsix "bc-alm-${VERSION}.vsix"
+          gh release create "$TAG" "bc-alm-${VERSION}.vsix" \
+            --repo "${{ github.repository }}" \
+            --title "BC ALM VS Code extension ${VERSION}" \
+            --notes "Install: Extensions view → … → Install from VSIX. See docs/vscode-extension.md."

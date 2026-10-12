@@ -11,6 +11,10 @@
 #   * include             - per-category switches (metaDocs, referenceDocs, issueOps,
 #                           specs, prTemplate); a category set to false is never
 #                           copied or re-added
+#   * components          - per-component policy (disabled / keepLocal ids), shared
+#                           with the BC ALM VS Code extension
+# template.lock.json records what each managed file was synced from; files you edited
+# since the last sync are kept and reported instead of being overwritten.
 #
 # Everything NOT listed here (and not excluded by a sync toggle) is "template-managed"
 # and will be refreshed from the template (agents, skills, instructions, scripts,
@@ -22,6 +26,8 @@ test/
 
 # --- One-time initializer output / configured values ---
 template.config.json
+template.lock.json
+.bc-alm/
 PROJECT.md
 .github/copilot-instructions.md
 .vscode/launch.json
@@ -44,6 +50,8 @@ LICENSE
 CONTRIBUTING.md
 bootstrap.ps1
 scripts/Install-IntoExistingRepo.ps1
+vscode-extension/
+.github/workflows/vscode-extension.yml
 
 # --- The sync workflow keeps updating itself; that's intentional, so it is
 #     NOT ignored. Remove the leading '#' below if you want to pin your own copy.

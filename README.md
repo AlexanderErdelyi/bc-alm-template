@@ -323,6 +323,25 @@ your own copy. Don't clone directly — the template structure is what you're co
 > **Settings → General → Template repository**. Also consider protecting `main`
 > (Settings → Branches) since the workflow assumes `main` is production-ready.
 
+### 1a. Or: use the BC ALM VS Code extension
+
+Prefer clicking over scripts? The **BC ALM** extension ([`vscode-extension/`](vscode-extension/))
+wraps everything below in VS Code:
+
+- **New Project from Template…** / **Add BC ALM to This Repository…** guide you through prefix,
+  range, repo, work-item system and content categories, then run the scripts for you.
+- A **Components** view shows every agent, skill, prompt, instruction and workflow with its
+  status (up to date, update available, conflict, modified, custom, disabled). You can update,
+  3-way merge, keep your version, disable, or install individual components.
+- **Save to My Template…** pushes your customizations to your own template repository
+  (overwrite or save as new; direct commit or PR). **Contribute to Source Template** opens a PR
+  upstream.
+- A **Guidance & What's New** view shows best practices, template changes and Copilot updates.
+  Live validation flags outdated agent/skill/prompt frontmatter.
+
+Install the VSIX from the [Releases](https://github.com/AlexanderErdelyi/bc-alm-template/releases)
+page (`ext-v*` tags). Full guide: [docs/vscode-extension.md](docs/vscode-extension.md).
+
 ### 1b. Or: add the template to an existing repo
 
 Already have a BC repo? Overlay the template instead of starting fresh — **no clone required**.
@@ -539,6 +558,10 @@ your local customizations even as you pull template improvements:
     "specs": true,              // specs/_TEMPLATE scaffold
     "prTemplate": true,         // .github/PULL_REQUEST_TEMPLATE.md
     "sampleApp": false          // demo app/ + test/ (install-time only)
+  },
+  "components": {               // per-component policy (ids: agent:<name>, skill:<folder>, prompt:<name>, …)
+    "disabled": [],             // never installed or re-added
+    "keepLocal": []             // never overwritten; you own these
   }
 }
 ```
@@ -552,8 +575,20 @@ your local customizations even as you pull template improvements:
 | `updateInstructions` | `true` | When `false`, `.github/instructions` (your AL coding standards) is not refreshed. |
 | `include.*` | see above | Per-category on/off switches for optional content (meta-docs, `docs/`, issue-ops pipeline, specs scaffold, PR template, sample app). A category set to `false` is **never copied by the installer and never re-added by sync** — so a repo that opted out of, say, the docs library or the GitHub issue-ops pipeline stays lean. The template ships them all on; `Install-IntoExistingRepo.ps1` writes a leaner profile (meta-docs / docs / issue-ops / sample app off) that you pick during its `-Configure` step. |
 
+| `components.disabled` | `[]` | Component ids (e.g. `agent:bc-deploy`, `skill:bc-ship-release`, `workflow:issue-planning`) that are never installed or re-added. The VS Code extension moves disabled files to `.bc-alm/disabled/`. |
+| `components.keepLocal` | `[]` | Component ids that sync never overwrites, so you own them. The extension still shows when upstream changed them. |
+
 The values map (`models` in `template.config.json`) is the single source of truth for `updateModels: false`
 re-application — update a model there once and every sync keeps it.
+
+#### Your edits survive updates (`template.lock.json`)
+
+Sync records a baseline in `template.lock.json`: for every synced file, the template commit and a
+hash of what was installed. On the next sync, a file that still matches its hash is updated.
+A file **you edited** is kept and listed instead of overwritten. Use `-OverwriteLocalChanges`
+to take the template version anyway, or use the VS Code extension for a 3-way merge. Files
+removed upstream are reported, never deleted. Commit the lock so the template-sync Action and
+your teammates share the same baseline.
 
 #### Keep your own tools across syncs (`extraTools`)
 
@@ -728,8 +763,10 @@ bc-alm-template/
 ├── app/                                    ← Sample production app (app.json + src/)
 ├── test/                                   ← Sample test app (app.json + src/, depends on app/)
 ├── bc-alm-template.code-workspace          ← Multi-root workspace (app/ + test/); enables parent-repo customization discovery
-├── template.config.json                    ← Project tokens (prefix, range, org…) for the initializer
+├── template.config.json                    ← Project tokens (prefix, range, org…) + sync/component policy
+├── template.lock.json                      ← (in projects) Sync baseline: template commit + hash per file
 ├── .templatesyncignore                     ← Project-owned paths never overwritten by template updates
+├── vscode-extension/                       ← BC ALM VS Code extension (template repo only; see docs/vscode-extension.md)
 ├── scripts/
 │   ├── Initialize-Template.ps1             ← Guided/CI setup: replace tokens across the repo
 │   ├── Install-IntoExistingRepo.ps1        ← Overlay the template onto an existing repo
@@ -743,6 +780,7 @@ bc-alm-template/
 │   ├── spec-driven-development.md          ← Spec-driven dev explained
 │   ├── al-agent-tools.md                   ← AL LSP / AL MCP server / ALTool for agents
 │   ├── bcquality.md                        ← Optional Microsoft BCQuality knowledge base for AL review
+│   ├── vscode-extension.md                 ← BC ALM VS Code extension guide
 │   └── al-go-upgrade.md                    ← Optional AL-Go for GitHub upgrade path
 ├── .github/
 │   ├── copilot-instructions.md             ← Repo-wide Copilot instructions

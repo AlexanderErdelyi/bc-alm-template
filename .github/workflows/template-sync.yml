@@ -7,7 +7,11 @@ name: Template sync
 #   * updateModels        - re-applies your agent 'model:' choices when false
 #   * updateExtensions    - keeps your .vscode/extensions.json when false
 #   * updateInstructions  - keeps your .github/instructions when false
+#   * components          - disabled / keepLocal component ids are skipped
 # Your AL code, specs, PROJECT.md and token-injected files are never touched.
+# template.lock.json (committed with the PR) records the synced baseline; files you
+# edited since the last sync are kept and listed in the run log instead of overwritten.
+# The template URL and branch default to the lock's first source (falls back to main).
 #
 # Runs weekly and on demand from the Actions tab (Run workflow). Review the PR it
 # opens, resolve anything you want to keep, then merge.
@@ -35,7 +39,7 @@ jobs:
 
       - name: Refresh template-managed files (honors template.config.json sync block)
         shell: pwsh
-        run: ./scripts/Update-FromTemplate.ps1 -Branch main
+        run: ./scripts/Update-FromTemplate.ps1
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v7
@@ -51,6 +55,8 @@ jobs:
 
             Refreshed via `scripts/Update-FromTemplate.ps1`, which honors the `sync`
             block in `template.config.json` (customizations location + model/toolset
-            toggles). Your AL code, specs, and configured values are untouched.
+            toggles, per-component disabled/keepLocal policy). Files you edited locally since
+            the last sync are kept (see the workflow log), and `template.lock.json` records the
+            new baseline. Your AL code, specs, and configured values are untouched.
 
             Review the diff and merge what you want to keep.
