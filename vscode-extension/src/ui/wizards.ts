@@ -5,7 +5,9 @@ import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
 import { readProjectConfig, writeComponentPolicy } from '../core/config';
 import { git } from '../core/exec';
+import { detectRepoValues, DetectedValues } from '../core/detect';
 import { ExistingRepoOptions, findPowerShell, initializeArgs, installArgs, InitValues, NewProjectOptions, runScript } from '../core/init';
+import { STATE_DIR, stateDirOf } from '../core/layout';
 import { emptyLock, ensureSource, readLock } from '../core/lock';
 import { ProjectOps } from '../core/operations';
 import { KIND_LABELS } from '../core/paths';
@@ -38,22 +40,29 @@ const PREFIX_RE = /^[A-Za-z][A-Za-z0-9]{1,9}$/;
 
 type ValueDefaults = Partial<Omit<InitValues, 'workItemSystem' | 'extraTools'>>;
 
-async function askValues(defaults: ValueDefaults, folderName: string): Promise<InitValues> {
-    const appPrefix = await input('App prefix used in AL object names (e.g. CON, ACME)', defaults.appPrefix ?? '',
+async function askValues(defaults: ValueDefaults, folderName: string, detected?: DetectedValues): Promise<InitValues> {
+    const from = (hit: unknown, src: string) => hit ? ` — suggested from ${src}` : '';
+    const appJsonRel = detected?.appJson ? path.basename(path.dirname(detected.appJson)) + '/app.json' : 'app.json';
+    const appPrefix = await input(`App prefix used in AL object names (e.g. CON, ACME)${from(detected?.appPrefix, detected?.prefixSource ?? '')}`, defaults.appPrefix ?? '',
         v => PREFIX_RE.test(v.trim()) ? undefined : '2-10 letters/digits, starting with a letter');
     const ticketPrefix = await input('Work-item key used in branch names / commits (PREFIX-123). Leave empty for bare IDs.', defaults.ticketPrefix ?? appPrefix.trim());
-    const appName = await input('App display name (app.json "name")', defaults.appName ?? `${appPrefix.trim()} ${folderName}`);
-    const publisher = await input('Publisher (app.json "publisher")', defaults.publisher ?? '');
-    const range = await input('Assigned AL object ID range (from-to)', `${defaults.objectIdFrom ?? 50100}-${defaults.objectIdTo ?? 50199}`, v => {
+    const appName = await input(`App display name (app.json "name")${from(detected?.appName, appJsonRel)}`, defaults.appName ?? `${appPrefix.trim()} ${folderName}`);
+    const publisher = await input(`Publisher (app.json "publisher")${from(detected?.publisher, appJsonRel)}`, defaults.publisher ?? '');
+    const range = await input(`Assigned AL object ID range (from-to)${from(detected?.objectIdFrom, `${appJsonRel} idRanges`)}`, `${defaults.objectIdFrom ?? 50100}-${defaults.objectIdTo ?? 50199}`, v => {
         const m = /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(v);
         if (!m) { return 'Use the form 50100-50199'; }
         return +m[1] < +m[2] ? undefined : '"from" must be lower than "to"';
     });
     const [objectIdFrom, objectIdTo] = range.split(/[-–]/).map(s => parseInt(s.trim(), 10));
-    const wis = need(await vscode.window.showQuickPick([
+    const wisItems = [
         { label: 'Azure DevOps', description: 'Work items, AB#123 commit links, ADO MCP tools', v: 'ADO' as const },
         { label: 'GitHub Issues', description: '#123 links; ADO tools are removed from agents', v: 'GitHub' as const }
-    ], { placeHolder: 'Where are your work items?', ignoreFocusOut: true })).v;
+    ];
+    if (detected?.workItemSystem) {
+        wisItems.sort((a, b) => (a.v === detected.workItemSystem ? -1 : 0) - (b.v === detected.workItemSystem ? -1 : 0));
+        wisItems[0].description = `(detected from the git remote) ${wisItems[0].description}`;
+    }
+    const wis = need(await vscode.window.showQuickPick(wisItems, { placeHolder: 'Where are your work items?', ignoreFocusOut: true })).v;
     let adoOrg: string | undefined, adoProject: string | undefined;
     if (wis === 'ADO') {
         adoOrg = await input('Azure DevOps organization', defaults.adoOrg && defaults.adoOrg !== 'your-organization' ? defaults.adoOrg : '');
@@ -101,8 +110,8 @@ async function pickComponents(catalog: Catalog, title: string): Promise<string[]
     return [...comps.keys()].filter(id => !keep.has(id));
 }
 
-/** After the scripts ran: drop deselected components, then record the lock baseline. */
-async function finishProject(root: string, repo: TemplateRepo, sha: string, dropped: string[], log: vscode.OutputChannel): Promise<{ tracked: number; differing: number }> {
+/** After the scripts ran: drop deselected components, install ticked ones the scripts did not copy, then record the lock baseline. */
+async function finishProject(root: string, repo: TemplateRepo, sha: string, dropped: string[], log: vscode.OutputChannel): Promise<{ tracked: number; differing: number; installed: number }> {
     const project = readProjectConfig(root);
     if (!project) { throw new Error('template.config.json was not written by the initializer.'); }
     let catalog = await buildCatalog(repo, sha, project);
@@ -123,16 +132,56 @@ async function finishProject(root: string, repo: TemplateRepo, sha: string, drop
     const lock = readLock(root) ?? emptyLock();
     ensureSource(lock, { name: repo.spec.name, url: repo.spec.url, ref: repo.spec.ref }, true);
     const ops = new ProjectOps(root, project, lock, [catalog]);
-    let tracked = 0, differing = 0;
+    let tracked = 0, differing = 0, installed = 0;
+    const taken = new Set<string>();
+    for (const c of status.components) {
+        if (c.disabled || !SELECTABLE_KINDS.includes(c.ref.kind)) { continue; }
+        for (const f of c.files) {
+            if (f.template && (f.status === 'available' || f.status === 'missing' || f.status === 'new')) {
+                ops.take(f);
+                taken.add(f.destRel);
+                installed++;
+                log.appendLine(`  installed ${f.destRel}`);
+            }
+        }
+    }
+    tracked += installed;
     for (const f of status.files) {
-        if (!f.template || f.status === 'available' || f.status === 'disabled' || f.status === 'new') { continue; }
+        if (taken.has(f.destRel) || !f.template || f.status === 'available' || f.status === 'disabled' || f.status === 'new') { continue; }
         if (ops.adoptLocal(f)) {
             tracked++;
             if (f.status !== 'current') { differing++; log.appendLine(`  baseline differs from template transform: ${f.destRel}`); }
         }
     }
     ops.save();
-    return { tracked, differing };
+    return { tracked, differing, installed };
+}
+
+const SELECTABLE_KINDS: string[] = ['agent', 'skill', 'prompt', 'instruction'];
+
+/** '*.template' side files the installer wrote next to existing files (for manual merge). */
+function findTemplateSideFiles(root: string): string[] {
+    const out: string[] = [];
+    const walk = (dir: string, depth: number) => {
+        if (depth > 4) { return; }
+        let entries: fs.Dirent[];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+            if (e.isDirectory()) {
+                if (!['.git', 'node_modules', '.alpackages', '.alcache', '.snapshots'].includes(e.name)) { walk(path.join(dir, e.name), depth + 1); }
+            } else if (e.name.endsWith('.template')) {
+                out.push(path.relative(root, path.join(dir, e.name)).split(path.sep).join('/'));
+            }
+        }
+    };
+    walk(root, 0);
+    return out;
+}
+
+/** The template script to run, preferring the .bc-alm/scripts location. */
+function projectScript(root: string, name: string): string {
+    const p = path.join(root, STATE_DIR, 'scripts', name);
+    return fs.existsSync(p) ? p : path.join(root, 'scripts', name);
 }
 
 function pwshPath(): string | undefined {
@@ -203,15 +252,37 @@ export async function newProjectWizard(state: ProjectState, log: vscode.OutputCh
 
 export async function addToExistingRepoWizard(state: ProjectState, log: vscode.OutputChannel): Promise<void> {
     const folders = (vscode.workspace.workspaceFolders ?? []).filter(f => f.uri.scheme === 'file');
-    let target: string;
+    let picked: string;
     const browse = 'Browse…';
     const pick = await vscode.window.showQuickPick([...folders.map(f => ({ label: f.name, description: f.uri.fsPath, p: f.uri.fsPath })), { label: browse, description: '', p: '' }],
         { placeHolder: 'Repository to add the BC ALM setup to', ignoreFocusOut: true });
     if (need(pick).label === browse) {
-        target = need(await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Add BC ALM here' }))[0].fsPath;
-    } else { target = pick!.p; }
-    if (fs.existsSync(path.join(target, 'template.config.json'))) {
-        const go = await vscode.window.showWarningMessage('This repository already has template.config.json. Use the BC ALM view to update it instead. Re-install anyway (existing template files are overwritten)?', { modal: true }, 'Re-install');
+        picked = need(await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Add BC ALM here' }))[0].fsPath;
+    } else { picked = pick!.p; }
+    picked = realPath(picked);
+
+    // Install at the git repository root, even when an app subfolder (multi-root workspace) was picked.
+    let target = picked;
+    let custDefault = '.';
+    const top = (await git(['rev-parse', '--show-toplevel'], picked, { allowFailure: true })).stdout.trim();
+    if (top) {
+        const repoRoot = realPath(path.resolve(top));
+        const rel = path.relative(repoRoot, picked);
+        if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+            const relFwd = rel.split(path.sep).join('/');
+            const where = need(await vscode.window.showQuickPick([
+                { label: `Repository root (${path.basename(repoRoot)})`, description: 'Recommended', detail: `BC ALM goes into ${repoRoot}; agents/skills can still live under ${relFwd}/`, root: true },
+                { label: `Only ${relFwd}/`, description: '', detail: `Treat ${picked} as its own project (not recommended inside a git repo)`, root: false }
+            ], { placeHolder: `${relFwd} is inside the git repository ${repoRoot}`, ignoreFocusOut: true }));
+            if (where.root) {
+                target = repoRoot;
+                const wsRoot = folders.some(f => realPath(f.uri.fsPath).toLowerCase() === repoRoot.toLowerCase());
+                if (!wsRoot) { custDefault = relFwd; }
+            }
+        }
+    }
+    if (stateDirOf(target) || fs.existsSync(path.join(target, 'template.config.json'))) {
+        const go = await vscode.window.showWarningMessage('This repository already has a BC ALM setup (template.config.json). Use the BC ALM view to update it instead. Re-run the setup anyway? Your existing files are kept; only missing template files are added.', { modal: true }, 'Re-run setup');
         need(go);
     }
     const spec = await pickSource('Template to install from');
@@ -225,12 +296,25 @@ export async function addToExistingRepoWizard(state: ProjectState, log: vscode.O
     });
 
     const appFolders = fs.readdirSync(target, { withFileTypes: true }).filter(d => d.isDirectory() && fs.existsSync(path.join(target, d.name, 'app.json'))).map(d => d.name);
-    const custPick = need(await vscode.window.showQuickPick([
-        { label: '.', description: 'Repository root (default)' },
+    const custItems = [
+        { label: '.', description: 'Repository root' },
         ...appFolders.map(f => ({ label: f, description: `Put .github customizations under ${f}/ (for opening that folder directly)` }))
-    ], { placeHolder: 'Where should agents / skills / prompts live?', ignoreFocusOut: true }));
+    ];
+    if (custDefault !== '.' && !custItems.some(i => i.label === custDefault)) { custItems.push({ label: custDefault, description: '' }); }
+    const first = custItems.find(i => i.label === custDefault)!;
+    first.description = `${first.description ? first.description + ' — ' : ''}recommended${custDefault !== '.' ? ' (the repo root is not a workspace folder)' : ''}`;
+    custItems.sort((a, b) => (a === first ? -1 : 0) - (b === first ? -1 : 0));
+    const custPick = need(await vscode.window.showQuickPick(custItems, { placeHolder: 'Where should agents / skills / prompts live?', ignoreFocusOut: true }));
 
-    const values = await askValues({ ...cfg.values, appPrefix: '', publisher: '', ticketPrefix: undefined, appName: undefined }, path.basename(target));
+    const detected = await detectRepoValues(target, picked !== target ? picked : undefined);
+    if (detected.appJson) { log.appendLine(`Suggesting values from ${detected.appJson}${detected.adoOrg || detected.repoSlug ? ' and the git remote' : ''}.`); }
+    const values = await askValues({
+        ...cfg.values,
+        appPrefix: detected.appPrefix ?? '', publisher: detected.publisher ?? '', ticketPrefix: undefined, appName: detected.appName,
+        objectIdFrom: detected.objectIdFrom ?? cfg.values?.objectIdFrom, objectIdTo: detected.objectIdTo ?? cfg.values?.objectIdTo,
+        adoOrg: detected.adoOrg ?? '', adoProject: detected.adoProject ?? '', repoSlug: detected.repoSlug ?? '',
+        defaultBranch: detected.defaultBranch ?? cfg.values?.defaultBranch
+    }, path.basename(target), detected);
     const content = await pickContent([
         { key: 'specs', label: 'Spec scaffold (specs/_TEMPLATE)', detail: 'Used by bc-spec / bc-dev', on: true },
         { key: 'prTemplate', label: 'Pull request template', detail: 'Skipped automatically if you already have one', on: true },
@@ -245,12 +329,12 @@ export async function addToExistingRepoWizard(state: ProjectState, log: vscode.O
     const opts: ExistingRepoOptions = {
         customizationsPath: custPick.label, includeMetaDocs: content.has('metaDocs'), includeReferenceDocs: content.has('referenceDocs'),
         includeIssueOps: content.has('issueOps'), includeSampleApp: content.has('sampleApp'), noSpecs: !content.has('specs'),
-        noPrTemplate: !content.has('prTemplate'), noSyncWorkflow: !content.has('syncWorkflow'), force: true
+        noPrTemplate: !content.has('prTemplate'), noSyncWorkflow: !content.has('syncWorkflow')
     };
 
     log.show(true);
     log.appendLine(`\n=== Add BC ALM to ${target} (from ${repo.label} @ ${sha.slice(0, 7)}) ===`);
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bc-alm-src-'));
+    const tmp = realPath(fs.mkdtempSync(path.join(os.tmpdir(), 'bc-alm-src-')));
     try {
         const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Adding BC ALM setup' }, async progress => {
             const pwsh = await findPowerShell(pwshPath());
@@ -259,16 +343,27 @@ export async function addToExistingRepoWizard(state: ProjectState, log: vscode.O
             progress.report({ message: 'copying files…' });
             await runScript(pwsh, path.join(tmp, 'scripts', 'Install-IntoExistingRepo.ps1'), installArgs(target, tmp, opts), target, s => log.append(s));
             progress.report({ message: 'applying your values…' });
-            await runScript(pwsh, path.join(target, 'scripts', 'Initialize-Template.ps1'), initializeArgs(values, undefined, true), target, s => log.append(s));
+            await runScript(pwsh, projectScript(target, 'Initialize-Template.ps1'), initializeArgs(values, undefined, true), target, s => log.append(s));
             progress.report({ message: 'recording template baseline…' });
             return finishProject(target, repo, sha, dropped, log);
         });
-        log.appendLine(`Tracked ${result.tracked} template file(s) in template.lock.json.`);
-        vscode.window.showInformationMessage(`BC ALM setup added (${result.tracked} template files tracked). Review the changes in Source Control and commit them.`);
+        log.appendLine(`Tracked ${result.tracked} template file(s) in ${STATE_DIR}/template.lock.json${result.installed ? ` (${result.installed} added after the installer)` : ''}.`);
+        const side = findTemplateSideFiles(target);
+        if (side.length) {
+            log.appendLine(`Review these '.template' files (the template's version of a file you already have), merge what you want, then delete them:`);
+            for (const s of side) { log.appendLine(`  ${s}`); }
+        }
+        const msg = `BC ALM setup added to ${path.basename(target)} (${result.tracked} template files tracked; bookkeeping in ${STATE_DIR}/).`
+            + (side.length ? ` ${side.length} '.template' file(s) need a manual merge — see the output.` : '') + ' Review the changes in Source Control and commit them.';
+        vscode.window.showInformationMessage(msg);
         await state.refresh(false, true);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
+}
+
+function realPath(p: string): string {
+    try { return fs.realpathSync.native(p); } catch { return p; }
 }
 
 type UpdateAction = 'take' | 'merge' | 'delete';

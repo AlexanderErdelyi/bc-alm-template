@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0
+
+- Template bookkeeping now lives in `.bc-alm/`: config, lock, `PROJECT.md`,
+  `.templatesyncignore` and template scripts. Root-layout projects are migrated automatically, or
+  with **Move BC ALM Files into .bc-alm/**.
+- Add BC ALM to This Repository:
+  - targets the git root, not the selected workspace folder;
+  - prefills name, publisher, ID range, prefix, work-item system and ADO/GitHub details from
+    `app.json`, AppSourceCop and the git remote;
+  - no longer overwrites existing files, and lists the `*.template` files to merge;
+  - components you ticked are installed and show as up to date, not "available".
+- Fixed: template files were skipped when the temp folder resolved to a Windows short (8.3) path.
+- Fixed: the initializer no longer rewrites the template scripts and the sync workflow guard with
+  project values. Previously the first sync after initializing a GitHub project dropped the `#`
+  link conversion.
+
 ## 0.1.0
 
 Initial release.

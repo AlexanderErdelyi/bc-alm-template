@@ -1,5 +1,6 @@
-import { ProjectConfig, TemplateValues } from './config';
-import { isReparamTarget, componentOf } from './paths';
+import { custRoot, ProjectConfig, TemplateValues } from './config';
+import { fromBcAlmLayout, relocationDepth, toBcAlmLayout } from './layout';
+import { isReparamTarget, componentOf, resolveDest } from './paths';
 import { escapeRegExp, normalizeText } from './util';
 
 /**
@@ -128,6 +129,9 @@ export function transformTemplateFile(srcRel: string, rawText: string, ctx: Tran
     let s = normalizeText(rawText);
     if (isReparamTarget(srcRel, project.sync)) {
         s = reparameterize(s, ctx.from, project.values);
+        if (project.sync.stateDir) {
+            s = toBcAlmLayout(s, relocationDepth(resolveDest(srcRel, project.sync), custRoot(project.sync)));
+        }
     }
     const ref = componentOf(srcRel);
     if (ref.kind === 'agent' && !project.sync.updateModels && project.models[ref.name]) {
@@ -188,6 +192,11 @@ export function generalize(srcRel: string, localText: string, project: ProjectCo
         }
         if (s !== before) {
             changes.push(`project values -> template placeholders (${[v.appPrefix + '→' + target.appPrefix, v.repoSlug + '→' + target.repoSlug].join(', ')})`);
+        }
+        if (project.sync.stateDir) {
+            const b2 = s;
+            s = fromBcAlmLayout(s, relocationDepth(resolveDest(srcRel, project.sync), custRoot(project.sync)));
+            if (s !== b2) { changes.push('.bc-alm/ file references -> template root paths'); }
         }
     }
     return { text: s, changes };

@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
 import { CONFIG_FILE, ProjectConfig, readProjectConfig } from '../core/config';
+import { STATE_DIR } from '../core/layout';
 import { LockFile, LockSource, readLock } from '../core/lock';
 import { ComponentState, computeStatus, FileState, ProjectStatus } from '../core/status';
 import { TemplateRepo, TemplateRepoRegistry, TemplateSourceSpec } from '../core/templateRepo';
@@ -30,10 +31,11 @@ export async function saveSettingsSources(list: TemplateSourceSpec[]): Promise<v
     await vscode.workspace.getConfiguration('bcAlm').update('templateSources', list, vscode.ConfigurationTarget.Global);
 }
 
-/** Finds the BC ALM project root among the workspace folders (first folder with template.config.json). */
+/** Finds the BC ALM project root among the workspace folders (first folder with template.config.json at its root or in .bc-alm/). */
 export function findProjectRoot(): string | undefined {
     for (const f of vscode.workspace.workspaceFolders ?? []) {
-        if (f.uri.scheme === 'file' && fs.existsSync(path.join(f.uri.fsPath, CONFIG_FILE))) { return f.uri.fsPath; }
+        if (f.uri.scheme !== 'file') { continue; }
+        if (fs.existsSync(path.join(f.uri.fsPath, STATE_DIR, CONFIG_FILE)) || fs.existsSync(path.join(f.uri.fsPath, CONFIG_FILE))) { return f.uri.fsPath; }
     }
     return undefined;
 }

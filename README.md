@@ -396,7 +396,7 @@ suffix so you can diff and merge by hand.
 + `.templatesyncignore`) never runs there, so the installer **auto-skips it** when it sees ADO markers
 (`.devops`/`.azuredevops`/`azure-pipelines.yml`) and no existing `.github/workflows` — no dead root
 `.github/` is created. Pass `-NoSyncWorkflow` to force it off anywhere. Ongoing template updates then
-run via `pwsh ./scripts/Update-FromTemplate.ps1` (or an ADO pipeline) instead. Also turn off the
+run via `pwsh ./.bc-alm/scripts/Update-FromTemplate.ps1` (or an ADO pipeline) instead. Also turn off the
 issue-ops pipeline (it's off by default) and keep work-item links on `AB#` by initializing with
 `workItemSystem=ADO`.
 
@@ -413,8 +413,18 @@ because GitHub Actions and
 Copilot on github.com only read the root `.github/`. The choice is recorded in `template.config.json`
 (`sync.customizationsPath`) so later syncs keep writing to the same place.
 
-Then continue with step 2 (run the initializer) inside your repo. The overlay also drops in
-[`.templatesyncignore`](.templatesyncignore) and `scripts/Update-FromTemplate.ps1` so you can
+**The template's own bookkeeping lives in `.bc-alm/`.** The overlay keeps your repo root clean:
+`template.config.json`, `template.lock.json`, `PROJECT.md`, `.templatesyncignore` and the
+template scripts (`Initialize-Template.ps1`, `Update-FromTemplate.ps1`, …) go into a single
+`.bc-alm/` folder instead of the root and `scripts/`. The agents, skills, instructions and
+workflows stay where Copilot and GitHub expect them. Projects created earlier with the root layout
+are moved into `.bc-alm/` automatically by the next `Update-FromTemplate.ps1` run (or the
+extension's **Move BC ALM Files into .bc-alm/** command). Pass `-ClassicLayout` to keep the old
+layout.
+
+Then continue with step 2 (run the initializer) inside your repo:
+`pwsh ./.bc-alm/scripts/Initialize-Template.ps1 -ExistingRepo -Interactive`. The overlay also drops
+in `.bc-alm/.templatesyncignore` and `.bc-alm/scripts/Update-FromTemplate.ps1` so you can
 [pull later template updates](#7-keep-in-sync-with-the-template) the same way.
 
 ### 2. Initialize the template for your project

@@ -82,6 +82,9 @@ export function resolveDest(srcRel: string, sync: SyncConfig): string {
         || /^specs(\/|$)/.test(srcRel) || /^\.vscode(\/|$)/.test(srcRel) || META_DOCS.includes(srcRel))) {
         return `${cr}/${srcRel}`;
     }
+    if (sync.stateDir && (/^scripts\//.test(srcRel) || srcRel === '.templatesyncignore')) {
+        return `${sync.stateDir}/${srcRel}`;
+    }
     return srcRel;
 }
 
@@ -94,6 +97,10 @@ export function srcFromDest(destRel: string, sync: SyncConfig): string {
             || /^\.vscode(\/|$)/.test(rest) || META_DOCS.includes(rest)) {
             return rest;
         }
+    }
+    if (sync.stateDir && destRel.startsWith(sync.stateDir + '/')) {
+        const rest = destRel.slice(sync.stateDir.length + 1);
+        if (/^scripts\//.test(rest) || rest === '.templatesyncignore') { return rest; }
     }
     return destRel;
 }

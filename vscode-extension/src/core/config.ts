@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { statePath, stateDirOf } from './layout';
 
 export interface SyncInclude {
     metaDocs: boolean;
@@ -25,6 +26,8 @@ export interface SyncConfig {
     updateInstructions: boolean;
     include: SyncInclude;
     components: ComponentPolicy;
+    /** Not persisted: '.bc-alm' when the project keeps its BC ALM files in .bc-alm/, '' for the root layout. */
+    stateDir: string;
 }
 
 export interface ExtraTools {
@@ -68,7 +71,8 @@ export function defaultSync(): SyncConfig {
         updateExtensions: false,
         updateInstructions: true,
         include: { metaDocs: true, referenceDocs: true, issueOps: true, specs: true, prTemplate: true },
-        components: { disabled: [], keepLocal: [] }
+        components: { disabled: [], keepLocal: [] },
+        stateDir: ''
     };
 }
 
@@ -124,10 +128,13 @@ export function parseConfig(raw: any): ProjectConfig {
 }
 
 export function readProjectConfig(root: string): ProjectConfig | undefined {
-    const file = path.join(root, CONFIG_FILE);
+    const stateDir = stateDirOf(root);
+    const file = statePath(root, CONFIG_FILE, stateDir);
     if (!fs.existsSync(file)) { return undefined; }
     const text = fs.readFileSync(file, 'utf8');
-    return parseConfig(JSON.parse(text.replace(/^\uFEFF/, '')));
+    const cfg = parseConfig(JSON.parse(text.replace(/^\uFEFF/, '')));
+    cfg.sync.stateDir = stateDir;
+    return cfg;
 }
 
 /** Custom-izations root ('' = repo root). Mirrors $custRoot in the PowerShell scripts. */
@@ -141,7 +148,7 @@ export function custRoot(sync: SyncConfig): string {
  * preserving every other key and the 2-space formatting the scripts use.
  */
 export function writeComponentPolicy(root: string, policy: ComponentPolicy): void {
-    const file = path.join(root, CONFIG_FILE);
+    const file = statePath(root, CONFIG_FILE);
     const raw = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
     raw.values = raw.values || {};
     raw.values.sync = raw.values.sync || {};
