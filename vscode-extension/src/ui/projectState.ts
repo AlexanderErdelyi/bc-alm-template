@@ -1,9 +1,8 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
-import { CONFIG_FILE, ProjectConfig, readProjectConfig } from '../core/config';
-import { STATE_DIR } from '../core/layout';
+import { ProjectConfig, readProjectConfig } from '../core/config';
+import { resolveProjectRoot } from '../core/layout';
 import { LockFile, LockSource, readLock } from '../core/lock';
 import { ComponentState, computeStatus, FileState, ProjectStatus } from '../core/status';
 import { TemplateRepo, TemplateRepoRegistry, TemplateSourceSpec } from '../core/templateRepo';
@@ -31,11 +30,15 @@ export async function saveSettingsSources(list: TemplateSourceSpec[]): Promise<v
     await vscode.workspace.getConfiguration('bcAlm').update('templateSources', list, vscode.ConfigurationTarget.Global);
 }
 
-/** Finds the BC ALM project root among the workspace folders (first folder with template.config.json at its root or in .bc-alm/). */
+/**
+ * Finds the BC ALM project root for the workspace. Workspace folders may be the repo root, a
+ * subfolder of it (multi-root workspaces that open app/ and test/), or the .bc-alm folder itself.
+ */
 export function findProjectRoot(): string | undefined {
     for (const f of vscode.workspace.workspaceFolders ?? []) {
         if (f.uri.scheme !== 'file') { continue; }
-        if (fs.existsSync(path.join(f.uri.fsPath, STATE_DIR, CONFIG_FILE)) || fs.existsSync(path.join(f.uri.fsPath, CONFIG_FILE))) { return f.uri.fsPath; }
+        const root = resolveProjectRoot(f.uri.fsPath);
+        if (root) { return root; }
     }
     return undefined;
 }

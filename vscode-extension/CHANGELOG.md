@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+- Projects are found when the workspace only opens subfolders of the repository, for example a
+  `.code-workspace` with `app/` and `test/`. The extension walks up to the git root to find
+  `.bc-alm/`, and adding `.bc-alm/` itself as a workspace folder no longer treats it as the
+  project root. Config and lock changes outside the workspace folders are watched too.
+- `PROJECT.md` no longer shows the template's GitHub slug as the repository for Azure DevOps
+  projects.
+
 ## 0.2.0
 
 - Template bookkeeping now lives in `.bc-alm/`: config, lock, `PROJECT.md`,

@@ -56,6 +56,10 @@ Open the **BC ALM** view in the Activity Bar.
   `*.template` file so you can merge and delete them.
 - **What you tick is installed.** Every agent, skill, prompt and instruction you select is
   installed and shows as up to date in the Components view afterwards.
+- **Workspaces that only open subfolders work.** The extension looks for `.bc-alm/` in each
+  workspace folder and its parents, up to the git root. A workspace with only `app/` and `test/`
+  finds the project at the repository root. You don't need to add the repository root or `.bc-alm/`
+  as a workspace folder.
 
 ### Where the files go: `.bc-alm/`
 
