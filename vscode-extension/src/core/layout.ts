@@ -21,6 +21,29 @@ export function stateDirOf(root: string): '' | typeof STATE_DIR {
     return fs.existsSync(path.join(root, STATE_DIR, 'template.config.json')) ? STATE_DIR : '';
 }
 
+/**
+ * The BC ALM project root for a folder opened in VS Code. Handles multi-root workspaces that only
+ * open subfolders of the repo (e.g. app/ and test/) and a workspace folder that is .bc-alm itself:
+ * - a folder named .bc-alm holding template.config.json -> its parent;
+ * - otherwise walk up to the git root (or filesystem root) and return the first folder holding
+ *   .bc-alm/template.config.json; a classic root template.config.json only counts on the folder
+ *   itself or the git root (so a stray config deeper in a tree is not mistaken for a project).
+ */
+export function resolveProjectRoot(folder: string): string | undefined {
+    const start = path.resolve(folder);
+    if (path.basename(start).toLowerCase() === STATE_DIR && fs.existsSync(path.join(start, 'template.config.json'))) {
+        return path.dirname(start);
+    }
+    let classic: string | undefined;
+    for (let dir = start; ; dir = path.dirname(dir)) {
+        if (fs.existsSync(path.join(dir, STATE_DIR, 'template.config.json'))) { return dir; }
+        const isGitRoot = fs.existsSync(path.join(dir, '.git'));
+        if ((dir === start || isGitRoot) && !classic && fs.existsSync(path.join(dir, 'template.config.json'))) { classic = dir; }
+        if (isGitRoot || path.dirname(dir) === dir) { break; }
+    }
+    return classic;
+}
+
 /** Absolute path of a BC ALM state file (config, lock, PROJECT.md) for this project. */
 export function statePath(root: string, file: string, stateDir: string = stateDirOf(root)): string {
     return stateDir ? path.join(root, stateDir, file) : path.join(root, file);

@@ -733,6 +733,8 @@ $linkLine = if ($WorkItemSystem -eq 'GitHub') {
     'Link commits and PRs to Azure DevOps work items with `AB#<id>` (e.g. `AB#123`).'
 }
 $envChain = $Environments -join ' -> '
+# ADO projects keep the template's GitHub slug (so template links stay valid); don't present it as this repo.
+$repoDisplay = if ($WorkItemSystem -eq 'ADO' -and $RepoSlug -match '/bc-alm-template$') { '(none - Azure DevOps repository)' } else { "``$RepoSlug``" }
 # Links in PROJECT.md are relative to wherever it is written.
 $projectMdRel = if ($useLayout) { "$stateDir/PROJECT.md" } elseif ($existingRepo -and $custRoot) { "$custRoot/PROJECT.md" } else { 'PROJECT.md' }
 $pmUp = '../' * ($projectMdRel.Split('/').Count - 1)
@@ -754,7 +756,7 @@ $projectMd = @"
 | App name | $AppName |
 | Publisher | $Publisher |
 | Object ID range | ``$ObjectIdFrom``-``$ObjectIdTo`` |
-| Repository | ``$RepoSlug`` |
+| Repository | $repoDisplay |
 | Work-item system | $WorkItemSystem |
 | Azure DevOps org / project | $AdoOrg / $AdoProject |
 | Default (production) branch | ``$DefaultBranch`` |

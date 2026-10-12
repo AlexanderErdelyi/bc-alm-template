@@ -97,6 +97,20 @@ export async function activate(ext: vscode.ExtensionContext): Promise<void> {
         w.onDidChange(debounce); w.onDidCreate(debounce); w.onDidDelete(debounce);
         ext.subscriptions.push(w);
     }
+    // The project root can sit above the workspace folders (workspace opens only app/ and test/);
+    // workspace globs don't see it, so watch its config/lock explicitly.
+    let rootWatcher: { root: string; w: vscode.FileSystemWatcher } | undefined;
+    ext.subscriptions.push({ dispose: () => rootWatcher?.w.dispose() });
+    ext.subscriptions.push(state.onDidChange(() => {
+        const root = state.root;
+        if (rootWatcher?.root === root) { return; }
+        rootWatcher?.w.dispose();
+        rootWatcher = undefined;
+        if (!root || vscode.workspace.workspaceFolders?.some(f => f.uri.scheme === 'file' && f.uri.fsPath.toLowerCase() === root.toLowerCase())) { return; }
+        const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(root), `{template.config.json,${LOCK_FILE},.bc-alm/template.config.json,.bc-alm/${LOCK_FILE}}`));
+        w.onDidChange(debounce); w.onDidCreate(debounce); w.onDidDelete(debounce);
+        rootWatcher = { root, w };
+    }));
     ext.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(debounce));
 
     const fetchOnStart = vscode.workspace.getConfiguration('bcAlm').get<boolean>('checkForUpdatesOnStartup', true);

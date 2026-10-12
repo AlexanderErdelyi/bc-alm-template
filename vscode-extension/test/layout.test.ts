@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { findAppJson, guessPrefixFromAl, parseRemote } from '../src/core/detect';
-import { fromBcAlmLayout, migrateToBcAlm, needsMigration, relocationDepth, stateDirOf, toBcAlmLayout } from '../src/core/layout';
+import { fromBcAlmLayout, migrateToBcAlm, needsMigration, relocationDepth, resolveProjectRoot, stateDirOf, toBcAlmLayout } from '../src/core/layout';
 import { hashText } from '../src/core/util';
 
 function tmpDir(): string {
@@ -97,4 +97,32 @@ test('findAppJson prefers the production app over the test app; prefix guessed f
         assert.equal(findAppJson(root, path.join(root, 'test')), path.join(root, 'app', 'app.json'));
         assert.equal(guessPrefixFromAl(path.join(root, 'app')), 'RMG');
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('resolveProjectRoot finds the repo root from subfolders and from the .bc-alm folder', () => {
+    const repo = tmpDir();
+    fs.mkdirSync(path.join(repo, '.git'));
+    write(repo, '.bc-alm/template.config.json', '{"initialized":true}');
+    write(repo, 'app/app.json', '{}');
+    write(repo, 'test/app.json', '{}');
+    assert.equal(resolveProjectRoot(repo), repo);
+    assert.equal(resolveProjectRoot(path.join(repo, 'app')), repo);
+    assert.equal(resolveProjectRoot(path.join(repo, 'test')), repo);
+    assert.equal(resolveProjectRoot(path.join(repo, '.bc-alm')), repo);
+});
+
+test('resolveProjectRoot stops at the git root and only accepts classic configs at the folder or git root', () => {
+    const outer = tmpDir();
+    write(outer, '.bc-alm/template.config.json', '{}');
+    const repo = path.join(outer, 'repo');
+    fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+    write(repo, 'app/app.json', '{}');
+    assert.equal(resolveProjectRoot(path.join(repo, 'app')), undefined, 'must not escape the git repository');
+
+    write(repo, 'template.config.json', '{}');
+    assert.equal(resolveProjectRoot(path.join(repo, 'app')), repo, 'classic layout at the git root');
+
+    write(repo, 'app/sub/template.config.json', '{}');
+    assert.equal(resolveProjectRoot(path.join(repo, 'app', 'sub')), path.join(repo, 'app', 'sub'), 'classic config on the opened folder itself');
+    assert.equal(resolveProjectRoot(path.join(repo, 'app')), repo);
 });
