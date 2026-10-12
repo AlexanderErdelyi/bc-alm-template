@@ -36,9 +36,44 @@ Open the **BC ALM** view in the Activity Bar.
 
 | Command | What it does |
 | --- | --- |
-| **BC ALM: New Project from Template…** | Clones a template source into a new folder, asks for prefix, object ID range, repo, work-item system and content categories, then runs `scripts/Initialize-Template.ps1` and records `template.lock.json`. |
-| **BC ALM: Add BC ALM to This Repository…** | Runs `scripts/Install-IntoExistingRepo.ps1` against the open folder (you pick customizations location and categories) and records the baseline. |
+| **BC ALM: New Project from Template…** | Clones a template source into a new folder, asks for prefix, object ID range, repo, work-item system and content categories, then runs `Initialize-Template.ps1` and records `.bc-alm/template.lock.json`. |
+| **BC ALM: Add BC ALM to This Repository…** | Runs `Install-IntoExistingRepo.ps1` against the repository root (you pick customizations location and categories), initializes it and records the baseline. Values are prefilled from your repo, see below. |
 | **Record Template Baseline** | For projects created before the extension existed: writes `template.lock.json` without changing any file. Files that equal an older template version are detected automatically, so they still update cleanly. |
+| **Move BC ALM Files into .bc-alm/** | Moves a root-layout project (config, lock, `PROJECT.md`, template scripts) into `.bc-alm/` and updates references. The extension offers this when it opens such a project. |
+
+### Adding BC ALM to an existing repository
+
+- **Repository root, not a subfolder.** In a multi-root workspace (for example `app/` + `test/`)
+  the wizard resolves the git root. If you picked a subfolder, it asks whether to use the repository
+  root (recommended) or only that folder, and suggests the subfolder as customizations location.
+- **Values come from your repo.** Name, publisher and object ID range come from your app's
+  `app.json` (the non-test app). The prefix comes from AppSourceCop `mandatoryPrefix`, or is guessed
+  from your AL object names. The work-item system, ADO organization/project or GitHub slug and
+  default branch come from the `origin` remote. Each prompt shows where the suggestion came from.
+- **Your files are kept.** Existing files are never overwritten. Merge-sensitive files
+  (`.vscode/*`, `copilot-instructions.md`, the PR template) are written next to yours as
+  `*.template`, and missing patterns are appended to `.gitignore`. The wizard lists every
+  `*.template` file so you can merge and delete them.
+- **What you tick is installed.** Every agent, skill, prompt and instruction you select is
+  installed and shows as up to date in the Components view afterwards.
+
+### Where the files go: `.bc-alm/`
+
+The template's own bookkeeping lives in one folder, so your repo root stays clean:
+
+```
+.bc-alm/
+  template.config.json    # your values and sync settings
+  template.lock.json      # what was installed from which template commit
+  PROJECT.md              # project decisions recorded by the initializer
+  .templatesyncignore
+  scripts/                # Initialize-Template.ps1, Update-FromTemplate.ps1, ...
+```
+
+Agents, skills, prompts, instructions, specs and workflows stay where Copilot and GitHub read them
+(`.github/`, or `<customizationsPath>/.github/`). Root-layout projects are migrated automatically by
+the next `Update-FromTemplate.ps1` run or with **Move BC ALM Files into .bc-alm/**. The scripts
+accept `-ClassicLayout` to keep the old layout.
 
 ## Components view: updates without losing your edits
 

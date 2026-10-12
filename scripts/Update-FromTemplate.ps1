@@ -85,12 +85,167 @@
 param(
     [string] $TemplateUrl = 'https://github.com/AlexanderErdelyi/bc-alm-template.git',
     [string] $Branch = 'main',
-    [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
-    [switch] $OverwriteLocalChanges
+    # Repository root. Default: the folder above scripts/ (or above .bc-alm/scripts/).
+    [string] $RepoRoot = '',
+    [switch] $OverwriteLocalChanges,
+    # Keep config, lock and scripts at the repo root instead of moving them into .bc-alm/.
+    [switch] $ClassicLayout
 )
 
 $ErrorActionPreference = 'Stop'
-$RepoRoot = (Resolve-Path $RepoRoot).Path
+if (-not $RepoRoot) {
+    $RepoRoot = if ((Split-Path (Split-Path $PSScriptRoot -Parent) -Leaf) -eq '.bc-alm') { Join-Path $PSScriptRoot '../..' } else { Join-Path $PSScriptRoot '..' }
+}
+# Long-path form (Resolve-Path / $env:TEMP can return 8.3 names like AERDEL~1).
+$RepoRoot = (Get-Item -LiteralPath (Resolve-Path $RepoRoot).Path).FullName
+
+# --- .bc-alm/ layout (mirrors core/layout.ts in the BC ALM VS Code extension) ----------
+# Projects keep the BC ALM bookkeeping in one folder instead of the repo root:
+#   .bc-alm/template.config.json, .bc-alm/template.lock.json, .bc-alm/scripts/*.ps1,
+#   .bc-alm/.templatesyncignore, .bc-alm/PROJECT.md
+# The template repository itself keeps the classic root layout.
+$bcAlmScripts = @('Initialize-Template', 'Add-BCQuality', 'Start-ALLanguageServer', 'Update-FromTemplate', 'Enable-CopilotCustomizations', 'Install-IntoExistingRepo')
+
+# Rewrite mentions of scripts/X.ps1, template.config.json, template.lock.json and
+# .templatesyncignore to their .bc-alm/ location. $depth = folders the file was relocated by
+# (customizationsPath), so relative links still resolve. Idempotent.
+function ConvertTo-BcAlmLayout([string] $text, [int] $depth = 0) {
+    if (-not $text) { return $text }
+    $pattern = '(?<![A-Za-z0-9_.\\/-])((?:\.\.?[/\\])*|\$\{workspaceFolder\}[/\\])(?:scripts([/\\])(' + ($bcAlmScripts -join '|') + ')\.ps1|template\.(config|lock)\.json|\.templatesyncignore)'
+    $ms = [regex]::Matches($text, $pattern)
+    if ($ms.Count -eq 0) { return $text }
+    $sb = New-Object System.Text.StringBuilder
+    $pos = 0
+    foreach ($m in $ms) {
+        [void]$sb.Append($text, $pos, $m.Index - $pos)
+        $prefix = $m.Groups[1].Value
+        $sep = if ($prefix.EndsWith('\')) { '\' } else { '/' }
+        $up = if ($depth -gt 0 -and ($prefix.StartsWith('${workspaceFolder}') -or $prefix.StartsWith('..'))) { "..$sep" * $depth } else { '' }
+        $rest = if ($m.Groups[3].Success) { 'scripts' + $m.Groups[2].Value + $m.Groups[3].Value + '.ps1' }
+                elseif ($m.Groups[4].Success) { 'template.' + $m.Groups[4].Value + '.json' }
+                else { '.templatesyncignore' }
+        [void]$sb.Append($prefix + $up + '.bc-alm' + $sep + $rest)
+        $pos = $m.Index + $m.Length
+    }
+    [void]$sb.Append($text, $pos, $text.Length - $pos)
+    return $sb.ToString()
+}
+
+function Get-BcAlmHash([string] $path) {
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    $t = [System.IO.File]::ReadAllText($path, $enc)
+    if ($t.Length -gt 0 -and $t[0] -eq [char]0xFEFF) { $t = $t.Substring(1) }
+    $t = $t.Replace("`r`n", "`n").Replace("`r", "`n")
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return -join ($sha.ComputeHash($enc.GetBytes($t)) | ForEach-Object { $_.ToString('x2') }) }
+    finally { $sha.Dispose() }
+}
+
+# Move config, lock, scripts, .templatesyncignore and PROJECT.md of a classic-layout project
+# into .bc-alm/, rename the lock keys and fix the links that pointed at the old locations.
+# Same steps as migrateToBcAlm() + the sync-workflow fix in the VS Code extension.
+function Move-ToBcAlmLayout([string] $root) {
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    $sd = Join-Path $root '.bc-alm'
+    $cr = ''
+    try {
+        $c = [System.IO.File]::ReadAllText((Join-Path $root 'template.config.json'), $enc) | ConvertFrom-Json
+        $cp = [string]$c.values.sync.customizationsPath
+        if ($cp -and $cp -ne '.') { $cr = $cp.Trim().TrimEnd('/', '\').Replace('\', '/') }
+    } catch { }
+    $moved = New-Object System.Collections.Generic.List[string]
+    $mv = {
+        param([string] $from, [string] $to)
+        $f = Join-Path $root $from
+        if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { return $false }
+        $t = Join-Path $root $to
+        $d = Split-Path $t -Parent
+        if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        Move-Item -LiteralPath $f -Destination $t -Force
+        $moved.Add("$from -> $to")
+        return $true
+    }
+    [void](& $mv 'template.config.json' '.bc-alm/template.config.json')
+    [void](& $mv 'template.lock.json' '.bc-alm/template.lock.json')
+    [void](& $mv '.templatesyncignore' '.bc-alm/.templatesyncignore')
+    if (-not (& $mv 'PROJECT.md' '.bc-alm/PROJECT.md') -and $cr) { [void](& $mv "$cr/PROJECT.md" '.bc-alm/PROJECT.md') }
+    foreach ($n in $bcAlmScripts) { [void](& $mv "scripts/$n.ps1" ".bc-alm/scripts/$n.ps1") }
+    $sdir = Join-Path $root 'scripts'
+    if ((Test-Path -LiteralPath $sdir) -and -not (Get-ChildItem -LiteralPath $sdir -Force)) { Remove-Item -LiteralPath $sdir -Force }
+
+    # Lock keys: scripts/X.ps1 and .templatesyncignore now live under .bc-alm/ (kept sorted ordinally).
+    $lockFile = Join-Path $sd 'template.lock.json'
+    if (Test-Path -LiteralPath $lockFile) {
+        $lt = [System.IO.File]::ReadAllText($lockFile, $enc)
+        $keyRe = '^(scripts/(?:' + ($bcAlmScripts -join '|') + ')\.ps1|\.templatesyncignore)$'
+        $fm = [regex]::Match($lt, '(?s)(\r?\n  "files": \{\r?\n)(.*?)(\r?\n  \}\r?\n?\}\s*)$')
+        if ($fm.Success) {
+            $entries = [regex]::Matches($fm.Groups[2].Value, '(?s)    "((?:[^"\\]|\\.)*)": \{.*?\r?\n    \}')
+            $sorted = New-Object 'System.Collections.Generic.SortedDictionary[string,string]' ([System.StringComparer]::Ordinal)
+            foreach ($en in $entries) {
+                $k = $en.Groups[1].Value
+                $nk = if ($k -match $keyRe) { ".bc-alm/$k" } else { $k }
+                $sorted[$nk] = '    "' + $nk + '"' + $en.Value.Substring($k.Length + 6)
+            }
+            $nl = if ($lt.Contains("`r`n")) { "`r`n" } else { "`n" }
+            $body = @($sorted.Values) -join (',' + $nl)
+            $lt = $lt.Substring(0, $fm.Index) + $fm.Groups[1].Value + $body + $fm.Groups[3].Value
+            [System.IO.File]::WriteAllText($lockFile, $lt, $enc)
+        }
+    }
+
+    # README links to PROJECT.md and the update script.
+    $readmes = @('README.md'); if ($cr) { $readmes += "$cr/README.md" }
+    foreach ($r in $readmes) {
+        $f = Join-Path $root $r
+        if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { continue }
+        $t = [System.IO.File]::ReadAllText($f, $enc)
+        $up = '../' * ($r.Split('/').Count - 1)
+        $n = [regex]::Replace($t, '\]\((?:\./)?PROJECT\.md\)', "](${up}.bc-alm/PROJECT.md)")
+        $n = [regex]::Replace($n, '(?<![A-Za-z0-9_.\\/-])((?:\./)?)scripts/Update-FromTemplate\.ps1', '$1.bc-alm/scripts/Update-FromTemplate.ps1')
+        if ($n -ne $t) { [System.IO.File]::WriteAllText($f, $n, $enc); $moved.Add("$r (links)") }
+    }
+
+    # The sync workflow must call the moved script (fixed even when edited; the old path is gone).
+    $wf = Join-Path $root '.github/workflows/template-sync.yml'
+    if (Test-Path -LiteralPath $wf -PathType Leaf) {
+        $t = [System.IO.File]::ReadAllText($wf, $enc)
+        if (-not $t.Contains('.bc-alm/scripts/Update-FromTemplate.ps1')) {
+            $before = Get-BcAlmHash $wf
+            $n = [regex]::Replace($t, '(?<![A-Za-z0-9_.\\/-])\./scripts/Update-FromTemplate\.ps1', './.bc-alm/scripts/Update-FromTemplate.ps1')
+            if ($n -ne $t) {
+                [System.IO.File]::WriteAllText($wf, $n, $enc)
+                $moved.Add('.github/workflows/template-sync.yml (script path)')
+                if (Test-Path -LiteralPath $lockFile) {
+                    $after = Get-BcAlmHash $wf
+                    $lt = [System.IO.File]::ReadAllText($lockFile, $enc)
+                    $em = [regex]::Match($lt, '(?s)"\.github/workflows/template-sync\.yml": \{.*?"installedHash": "([0-9a-f]+)"')
+                    if ($em.Success -and $em.Groups[1].Value -eq $before) {
+                        $g = $em.Groups[1]
+                        $lt = $lt.Substring(0, $g.Index) + $after + $lt.Substring($g.Index + $g.Length)
+                        [System.IO.File]::WriteAllText($lockFile, $lt, $enc)
+                    }
+                }
+            }
+        }
+    }
+    return $moved
+}
+
+# Move a classic-layout project (config/lock/scripts at the root) into .bc-alm/ first.
+$stateDir = ''
+if (Test-Path -LiteralPath (Join-Path $RepoRoot '.bc-alm/template.config.json')) { $stateDir = '.bc-alm' }
+elseif (-not $ClassicLayout -and (Test-Path -LiteralPath (Join-Path $RepoRoot 'template.config.json'))) {
+    $rootCfg = $null
+    try { $rootCfg = Get-Content (Join-Path $RepoRoot 'template.config.json') -Raw | ConvertFrom-Json } catch { }
+    if ($rootCfg -and $rootCfg.PSObject.Properties['initialized'] -and [bool]$rootCfg.initialized -and
+        $PSCmdlet.ShouldProcess($RepoRoot, 'Move config, lock and scripts into .bc-alm/')) {
+        Write-Host "Moving BC ALM files into .bc-alm/" -ForegroundColor Cyan
+        foreach ($m in (Move-ToBcAlmLayout $RepoRoot)) { Write-Host "  moved      $m" -ForegroundColor DarkGray }
+        $stateDir = '.bc-alm'
+    }
+}
+$stateRoot = if ($stateDir) { Join-Path $RepoRoot $stateDir } else { $RepoRoot }
 
 # --- Read the sync configuration (template.config.json 'values.sync') ------------
 $sync = [pscustomobject]@{
@@ -109,7 +264,7 @@ $sync = [pscustomobject]@{
 }
 $policyDisabled = @(); $policyKeep = @()
 $config = $null
-$configPath = Join-Path $RepoRoot 'template.config.json'
+$configPath = Join-Path $stateRoot 'template.config.json'
 if (Test-Path $configPath) {
     try { $config = Get-Content $configPath -Raw | ConvertFrom-Json } catch { $config = $null }
     if ($config -and $config.values -and $config.values.sync) {
@@ -224,7 +379,7 @@ function Get-ComponentId([string] $srcRel) {
 # was installed. With it, a sync can tell "you never touched this file" (safe to update)
 # from "you edited this file" (kept, reported). Without it (first run) the template wins,
 # as before, and the lock is created so later syncs are protected.
-$lockPath = Join-Path $RepoRoot 'template.lock.json'
+$lockPath = Join-Path $stateRoot 'template.lock.json'
 $hasLock = Test-Path -LiteralPath $lockPath
 $lockSources = New-Object System.Collections.Generic.List[object]
 $lockFiles = New-Object System.Collections.Hashtable ([System.StringComparer]::Ordinal)
@@ -275,6 +430,7 @@ function Resolve-Dest([string] $rel) {
     if ($custRoot -and ($r -match '^\.github/(agents|skills|prompts|instructions)(/|$)' -or $r -match '^specs(/|$)' -or $r -match '^\.vscode(/|$)' -or $relocate -contains $r)) {
         return "$custRoot/$r"
     }
+    if ($stateDir -and ($r -match '^scripts/' -or $r -eq '.templatesyncignore')) { return "$stateDir/$r" }
     return $r
 }
 
@@ -377,6 +533,33 @@ function Trim-WorkItemTools {
     }
 }
 
+# Prose/customization files that get project values (and .bc-alm/ paths) applied. Never
+# scripts or workflows. Mirrors isReparamTarget() in the VS Code extension.
+$reparamExt = @('.md', '.json', '.jsonc', '.yml', '.yaml', '.txt')
+$proseRootFiles = @(
+    '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md',
+    '.github/ISSUE_ORCHESTRATION.md', '.github/PULL_REQUEST_TEMPLATE.md', '.vscode/tasks.json'
+)
+function Test-ReparamTarget($e) {
+    if ($proseRootFiles -contains $e.Src) { return $true }
+    $ext = [System.IO.Path]::GetExtension($e.Src).ToLowerInvariant()
+    if ($reparamExt -notcontains $ext) { return $false }
+    foreach ($t in @($customTrees + $rootTrees)) { if ($e.Src.StartsWith("$t/")) { return $true } }
+    return $false
+}
+
+# Point references to the root-level template files at .bc-alm/ (only in the .bc-alm layout).
+function Convert-StagedLayout {
+    if (-not $stateDir) { return }
+    foreach ($e in $staged) {
+        if (-not (Test-ReparamTarget $e)) { continue }
+        $depth = if ($custRoot -and $e.Dest.StartsWith("$custRoot/")) { @($custRoot.Split('/') | Where-Object { $_ }).Count } else { 0 }
+        $text = Read-Text $e.Stage
+        $new = ConvertTo-BcAlmLayout $text $depth
+        if ($new -ne $text) { Write-Text $e.Stage $new }
+    }
+}
+
 # Re-apply this repo's configured values (template.config.json 'values') to the staged
 # files. The template ships its own placeholders (prefix, ticket prefix, repo slug, ADO
 # org, object-ID range, AB# linking), so a plain copy would REVERT the initialization on
@@ -415,18 +598,8 @@ function Reparameterize {
     $prefixEval = [System.Text.RegularExpressions.MatchEvaluator] { param($m) $toPrefix }
     $shiftRange = ($toFrom -ne $fromFrom) -or ($toTo -ne $fromTo)
 
-    # Target only prose/customization files. Never scripts or workflows.
-    $reparamExt = @('.md', '.json', '.jsonc', '.yml', '.yaml', '.txt')
-    $scopes = @($customTrees + $rootTrees)
-    $proseRootFiles = @(
-        '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md',
-        '.github/ISSUE_ORCHESTRATION.md', '.github/PULL_REQUEST_TEMPLATE.md', '.vscode/tasks.json'
-    )
-
     foreach ($e in $staged) {
-        $inTree = [bool]($scopes | Where-Object { $e.Src.StartsWith("$_/") } | Select-Object -First 1)
-        $ext = [System.IO.Path]::GetExtension($e.Src).ToLowerInvariant()
-        if (-not (($inTree -and $reparamExt -contains $ext) -or $proseRootFiles -contains $e.Src)) { continue }
+        if (-not (Test-ReparamTarget $e)) { continue }
         $text = Read-Text $e.Stage
         if ($null -eq $text) { continue }
         $new = $text
@@ -500,6 +673,7 @@ try {
 
     # Same order as the initializer and the VS Code extension's transform.
     Reparameterize
+    Convert-StagedLayout
     Restore-Models
     Trim-WorkItemTools
     Merge-ExtraTools

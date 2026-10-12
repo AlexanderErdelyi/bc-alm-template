@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "alexandererdelyi",
   "license": "MIT",
   "repository": {
@@ -67,108 +67,477 @@
       }
     ],
     "commands": [
-      { "command": "bcAlm.newProject", "title": "New Project from Template…", "category": "BC ALM", "icon": "$(new-folder)" },
-      { "command": "bcAlm.addToExistingRepo", "title": "Add BC ALM to This Repository…", "category": "BC ALM" },
-      { "command": "bcAlm.refresh", "title": "Check for Template Updates", "category": "BC ALM", "icon": "$(refresh)" },
-      { "command": "bcAlm.updateAll", "title": "Apply All Safe Updates", "category": "BC ALM", "icon": "$(cloud-download)" },
-      { "command": "bcAlm.updateComponent", "title": "Update from Template", "category": "BC ALM", "icon": "$(cloud-download)" },
-      { "command": "bcAlm.mergeComponent", "title": "Merge Template Changes (3-way)", "category": "BC ALM", "icon": "$(git-merge)" },
-      { "command": "bcAlm.resetComponent", "title": "Reset to Template Version (discard my changes)", "category": "BC ALM" },
-      { "command": "bcAlm.skipUpdate", "title": "Skip This Update (keep mine)", "category": "BC ALM" },
-      { "command": "bcAlm.showDiff", "title": "Compare with Template", "category": "BC ALM", "icon": "$(diff)" },
-      { "command": "bcAlm.keepLocal", "title": "Always Keep My Version (exclude from sync)", "category": "BC ALM", "icon": "$(pinned)" },
-      { "command": "bcAlm.unkeepLocal", "title": "Resume Template Sync for This Component", "category": "BC ALM", "icon": "$(pin)" },
-      { "command": "bcAlm.disableComponent", "title": "Disable Component", "category": "BC ALM", "icon": "$(circle-slash)" },
-      { "command": "bcAlm.enableComponent", "title": "Enable Component", "category": "BC ALM", "icon": "$(check)" },
-      { "command": "bcAlm.installComponent", "title": "Install Component", "category": "BC ALM", "icon": "$(add)" },
-      { "command": "bcAlm.switchSource", "title": "Track Component from Another Template Source…", "category": "BC ALM" },
-      { "command": "bcAlm.reapplyValues", "title": "Re-apply Project Values to Template Files", "category": "BC ALM" },
-      { "command": "bcAlm.newCustomization", "title": "New Agent / Skill / Prompt / Instruction…", "category": "BC ALM", "icon": "$(add)" },
-      { "command": "bcAlm.saveToTemplate", "title": "Save to My Template…", "category": "BC ALM", "icon": "$(cloud-upload)" },
-      { "command": "bcAlm.contributeUpstream", "title": "Contribute to Source Template (Pull Request)…", "category": "BC ALM", "icon": "$(git-pull-request-create)" },
-      { "command": "bcAlm.createTemplateRepo", "title": "Create My Own Template Repository…", "category": "BC ALM", "icon": "$(repo-create)" },
-      { "command": "bcAlm.addTemplateSource", "title": "Add Template Source…", "category": "BC ALM", "icon": "$(add)" },
-      { "command": "bcAlm.removeTemplateSource", "title": "Remove Template Source", "category": "BC ALM", "icon": "$(trash)" },
-      { "command": "bcAlm.useSourceInProject", "title": "Use in This Project", "category": "BC ALM", "icon": "$(plug)" },
-      { "command": "bcAlm.setPrimarySource", "title": "Set as Primary Source for This Project", "category": "BC ALM", "icon": "$(star)" },
-      { "command": "bcAlm.syncTemplateFromUpstream", "title": "Pull Upstream Updates into My Template (fork sync)", "category": "BC ALM", "icon": "$(repo-sync)" },
-      { "command": "bcAlm.validate", "title": "Validate Copilot Customizations", "category": "BC ALM", "icon": "$(checklist)" },
-      { "command": "bcAlm.reviewWithCopilot", "title": "Review This Customization with Copilot", "category": "BC ALM", "icon": "$(copilot)" },
-      { "command": "bcAlm.openBestPractices", "title": "Open Best-Practices Guide", "category": "BC ALM", "icon": "$(book)" },
-      { "command": "bcAlm.refreshGuidance", "title": "Refresh What's New", "category": "BC ALM", "icon": "$(refresh)" },
-      { "command": "bcAlm.openUrl", "title": "Open Link", "category": "BC ALM" },
-      { "command": "bcAlm.adoptBaseline", "title": "Record Template Baseline (create template.lock.json)", "category": "BC ALM" },
-      { "command": "bcAlm.openFile", "title": "Open Component File", "category": "BC ALM" },
-      { "command": "bcAlm.openFinding", "title": "Open Finding", "category": "BC ALM" }
+      {
+        "command": "bcAlm.newProject",
+        "title": "New Project from Template…",
+        "category": "BC ALM",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "bcAlm.addToExistingRepo",
+        "title": "Add BC ALM to This Repository…",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.refresh",
+        "title": "Check for Template Updates",
+        "category": "BC ALM",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "bcAlm.updateAll",
+        "title": "Apply All Safe Updates",
+        "category": "BC ALM",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "bcAlm.updateComponent",
+        "title": "Update from Template",
+        "category": "BC ALM",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "bcAlm.mergeComponent",
+        "title": "Merge Template Changes (3-way)",
+        "category": "BC ALM",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "bcAlm.resetComponent",
+        "title": "Reset to Template Version (discard my changes)",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.skipUpdate",
+        "title": "Skip This Update (keep mine)",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.showDiff",
+        "title": "Compare with Template",
+        "category": "BC ALM",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "bcAlm.keepLocal",
+        "title": "Always Keep My Version (exclude from sync)",
+        "category": "BC ALM",
+        "icon": "$(pinned)"
+      },
+      {
+        "command": "bcAlm.unkeepLocal",
+        "title": "Resume Template Sync for This Component",
+        "category": "BC ALM",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "bcAlm.disableComponent",
+        "title": "Disable Component",
+        "category": "BC ALM",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "bcAlm.enableComponent",
+        "title": "Enable Component",
+        "category": "BC ALM",
+        "icon": "$(check)"
+      },
+      {
+        "command": "bcAlm.installComponent",
+        "title": "Install Component",
+        "category": "BC ALM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "bcAlm.switchSource",
+        "title": "Track Component from Another Template Source…",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.reapplyValues",
+        "title": "Re-apply Project Values to Template Files",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.newCustomization",
+        "title": "New Agent / Skill / Prompt / Instruction…",
+        "category": "BC ALM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "bcAlm.saveToTemplate",
+        "title": "Save to My Template…",
+        "category": "BC ALM",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "bcAlm.contributeUpstream",
+        "title": "Contribute to Source Template (Pull Request)…",
+        "category": "BC ALM",
+        "icon": "$(git-pull-request-create)"
+      },
+      {
+        "command": "bcAlm.createTemplateRepo",
+        "title": "Create My Own Template Repository…",
+        "category": "BC ALM",
+        "icon": "$(repo-create)"
+      },
+      {
+        "command": "bcAlm.addTemplateSource",
+        "title": "Add Template Source…",
+        "category": "BC ALM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "bcAlm.removeTemplateSource",
+        "title": "Remove Template Source",
+        "category": "BC ALM",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "bcAlm.useSourceInProject",
+        "title": "Use in This Project",
+        "category": "BC ALM",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "bcAlm.setPrimarySource",
+        "title": "Set as Primary Source for This Project",
+        "category": "BC ALM",
+        "icon": "$(star)"
+      },
+      {
+        "command": "bcAlm.syncTemplateFromUpstream",
+        "title": "Pull Upstream Updates into My Template (fork sync)",
+        "category": "BC ALM",
+        "icon": "$(repo-sync)"
+      },
+      {
+        "command": "bcAlm.validate",
+        "title": "Validate Copilot Customizations",
+        "category": "BC ALM",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "bcAlm.reviewWithCopilot",
+        "title": "Review This Customization with Copilot",
+        "category": "BC ALM",
+        "icon": "$(copilot)"
+      },
+      {
+        "command": "bcAlm.openBestPractices",
+        "title": "Open Best-Practices Guide",
+        "category": "BC ALM",
+        "icon": "$(book)"
+      },
+      {
+        "command": "bcAlm.refreshGuidance",
+        "title": "Refresh What's New",
+        "category": "BC ALM",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "bcAlm.openUrl",
+        "title": "Open Link",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.adoptBaseline",
+        "title": "Record Template Baseline (create template.lock.json)",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.migrateLayout",
+        "title": "Move BC ALM Files into .bc-alm/",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.openFile",
+        "title": "Open Component File",
+        "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.openFinding",
+        "title": "Open Finding",
+        "category": "BC ALM"
+      }
     ],
     "menus": {
       "commandPalette": [
-        { "command": "bcAlm.updateComponent", "when": "false" },
-        { "command": "bcAlm.mergeComponent", "when": "false" },
-        { "command": "bcAlm.resetComponent", "when": "false" },
-        { "command": "bcAlm.skipUpdate", "when": "false" },
-        { "command": "bcAlm.keepLocal", "when": "false" },
-        { "command": "bcAlm.unkeepLocal", "when": "false" },
-        { "command": "bcAlm.disableComponent", "when": "false" },
-        { "command": "bcAlm.enableComponent", "when": "false" },
-        { "command": "bcAlm.installComponent", "when": "false" },
-        { "command": "bcAlm.switchSource", "when": "false" },
-        { "command": "bcAlm.removeTemplateSource", "when": "false" },
-        { "command": "bcAlm.useSourceInProject", "when": "false" },
-        { "command": "bcAlm.setPrimarySource", "when": "false" },
-        { "command": "bcAlm.syncTemplateFromUpstream", "when": "false" },
-        { "command": "bcAlm.openUrl", "when": "false" },
-        { "command": "bcAlm.openFile", "when": "false" },
-        { "command": "bcAlm.openFinding", "when": "false" },
-        { "command": "bcAlm.adoptBaseline", "when": "bcAlm.hasProject" }
+        {
+          "command": "bcAlm.updateComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.mergeComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.resetComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.skipUpdate",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.keepLocal",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.unkeepLocal",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.disableComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.enableComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.installComponent",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.switchSource",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.removeTemplateSource",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.useSourceInProject",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.setPrimarySource",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.syncTemplateFromUpstream",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.openUrl",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.openFile",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.openFinding",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.adoptBaseline",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.migrateLayout",
+          "when": "bcAlm.hasProject"
+        }
       ],
       "view/title": [
-        { "command": "bcAlm.refresh", "when": "view == bcAlm.components", "group": "navigation@1" },
-        { "command": "bcAlm.updateAll", "when": "view == bcAlm.components && bcAlm.hasProject", "group": "navigation@2" },
-        { "command": "bcAlm.newCustomization", "when": "view == bcAlm.components && bcAlm.hasProject", "group": "navigation@3" },
-        { "command": "bcAlm.validate", "when": "view == bcAlm.components && bcAlm.hasProject", "group": "navigation@4" },
-        { "command": "bcAlm.newProject", "when": "view == bcAlm.components", "group": "1_project@1" },
-        { "command": "bcAlm.addToExistingRepo", "when": "view == bcAlm.components", "group": "1_project@2" },
-        { "command": "bcAlm.reapplyValues", "when": "view == bcAlm.components && bcAlm.hasProject", "group": "1_project@3" },
-        { "command": "bcAlm.addTemplateSource", "when": "view == bcAlm.sources", "group": "navigation@1" },
-        { "command": "bcAlm.createTemplateRepo", "when": "view == bcAlm.sources", "group": "navigation@2" },
-        { "command": "bcAlm.refreshGuidance", "when": "view == bcAlm.guidance", "group": "navigation@1" },
-        { "command": "bcAlm.openBestPractices", "when": "view == bcAlm.guidance", "group": "navigation@2" }
+        {
+          "command": "bcAlm.refresh",
+          "when": "view == bcAlm.components",
+          "group": "navigation@1"
+        },
+        {
+          "command": "bcAlm.updateAll",
+          "when": "view == bcAlm.components && bcAlm.hasProject",
+          "group": "navigation@2"
+        },
+        {
+          "command": "bcAlm.newCustomization",
+          "when": "view == bcAlm.components && bcAlm.hasProject",
+          "group": "navigation@3"
+        },
+        {
+          "command": "bcAlm.validate",
+          "when": "view == bcAlm.components && bcAlm.hasProject",
+          "group": "navigation@4"
+        },
+        {
+          "command": "bcAlm.newProject",
+          "when": "view == bcAlm.components",
+          "group": "1_project@1"
+        },
+        {
+          "command": "bcAlm.addToExistingRepo",
+          "when": "view == bcAlm.components",
+          "group": "1_project@2"
+        },
+        {
+          "command": "bcAlm.reapplyValues",
+          "when": "view == bcAlm.components && bcAlm.hasProject",
+          "group": "1_project@3"
+        },
+        {
+          "command": "bcAlm.addTemplateSource",
+          "when": "view == bcAlm.sources",
+          "group": "navigation@1"
+        },
+        {
+          "command": "bcAlm.createTemplateRepo",
+          "when": "view == bcAlm.sources",
+          "group": "navigation@2"
+        },
+        {
+          "command": "bcAlm.refreshGuidance",
+          "when": "view == bcAlm.guidance",
+          "group": "navigation@1"
+        },
+        {
+          "command": "bcAlm.openBestPractices",
+          "when": "view == bcAlm.guidance",
+          "group": "navigation@2"
+        }
       ],
       "view/item/context": [
-        { "command": "bcAlm.updateComponent", "when": "viewItem =~ /^component:(update|new|removed)/", "group": "inline@1" },
-        { "command": "bcAlm.mergeComponent", "when": "viewItem =~ /^component:conflict/", "group": "inline@1" },
-        { "command": "bcAlm.installComponent", "when": "viewItem =~ /^component:(available|missing)/", "group": "inline@1" },
-        { "command": "bcAlm.enableComponent", "when": "viewItem =~ /^component:disabled/", "group": "inline@1" },
-        { "command": "bcAlm.showDiff", "when": "viewItem =~ /^(component|file):(update|conflict|modified|missing)/", "group": "inline@2" },
-
-        { "command": "bcAlm.updateComponent", "when": "viewItem =~ /^component:(update|new|removed)/", "group": "1_sync@1" },
-        { "command": "bcAlm.mergeComponent", "when": "viewItem =~ /^component:conflict/", "group": "1_sync@2" },
-        { "command": "bcAlm.skipUpdate", "when": "viewItem =~ /^component:(update|conflict)/", "group": "1_sync@3" },
-        { "command": "bcAlm.resetComponent", "when": "viewItem =~ /^component:(conflict|modified)/", "group": "1_sync@4" },
-        { "command": "bcAlm.showDiff", "when": "viewItem =~ /^(component|file):(update|conflict|modified|missing)/", "group": "1_sync@5" },
-        { "command": "bcAlm.installComponent", "when": "viewItem =~ /^component:(available|missing)/", "group": "1_sync@6" },
-        { "command": "bcAlm.keepLocal", "when": "viewItem =~ /^component:(current|update|conflict|modified)/ && !(viewItem =~ /keepLocal/)", "group": "2_policy@1" },
-        { "command": "bcAlm.unkeepLocal", "when": "viewItem =~ /keepLocal/", "group": "2_policy@1" },
-        { "command": "bcAlm.disableComponent", "when": "viewItem =~ /^component:(current|update|conflict|modified|missing|custom|removed)/", "group": "2_policy@2" },
-        { "command": "bcAlm.enableComponent", "when": "viewItem =~ /^component:disabled/", "group": "2_policy@2" },
-        { "command": "bcAlm.switchSource", "when": "viewItem =~ /^component:(current|update|conflict|modified|available)/", "group": "2_policy@3" },
-        { "command": "bcAlm.saveToTemplate", "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/", "group": "3_publish@1" },
-        { "command": "bcAlm.contributeUpstream", "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/", "group": "3_publish@2" },
-        { "command": "bcAlm.reviewWithCopilot", "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/", "group": "4_guidance@1" },
-
-        { "command": "bcAlm.useSourceInProject", "when": "viewItem =~ /^source:/ && !(viewItem =~ /inProject/) && bcAlm.hasProject", "group": "inline@1" },
-        { "command": "bcAlm.setPrimarySource", "when": "viewItem =~ /inProject/ && !(viewItem =~ /primary/)", "group": "inline@1" },
-        { "command": "bcAlm.syncTemplateFromUpstream", "when": "viewItem =~ /^source:/ && !(viewItem =~ /upstreamDefault/)", "group": "1_source@1" },
-        { "command": "bcAlm.removeTemplateSource", "when": "viewItem =~ /^source:/ && !(viewItem =~ /upstreamDefault/)", "group": "1_source@9" }
+        {
+          "command": "bcAlm.updateComponent",
+          "when": "viewItem =~ /^component:(update|new|removed)/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.mergeComponent",
+          "when": "viewItem =~ /^component:conflict/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.installComponent",
+          "when": "viewItem =~ /^component:(available|missing)/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.enableComponent",
+          "when": "viewItem =~ /^component:disabled/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.showDiff",
+          "when": "viewItem =~ /^(component|file):(update|conflict|modified|missing)/",
+          "group": "inline@2"
+        },
+        {
+          "command": "bcAlm.updateComponent",
+          "when": "viewItem =~ /^component:(update|new|removed)/",
+          "group": "1_sync@1"
+        },
+        {
+          "command": "bcAlm.mergeComponent",
+          "when": "viewItem =~ /^component:conflict/",
+          "group": "1_sync@2"
+        },
+        {
+          "command": "bcAlm.skipUpdate",
+          "when": "viewItem =~ /^component:(update|conflict)/",
+          "group": "1_sync@3"
+        },
+        {
+          "command": "bcAlm.resetComponent",
+          "when": "viewItem =~ /^component:(conflict|modified)/",
+          "group": "1_sync@4"
+        },
+        {
+          "command": "bcAlm.showDiff",
+          "when": "viewItem =~ /^(component|file):(update|conflict|modified|missing)/",
+          "group": "1_sync@5"
+        },
+        {
+          "command": "bcAlm.installComponent",
+          "when": "viewItem =~ /^component:(available|missing)/",
+          "group": "1_sync@6"
+        },
+        {
+          "command": "bcAlm.keepLocal",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified)/ && !(viewItem =~ /keepLocal/)",
+          "group": "2_policy@1"
+        },
+        {
+          "command": "bcAlm.unkeepLocal",
+          "when": "viewItem =~ /keepLocal/",
+          "group": "2_policy@1"
+        },
+        {
+          "command": "bcAlm.disableComponent",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified|missing|custom|removed)/",
+          "group": "2_policy@2"
+        },
+        {
+          "command": "bcAlm.enableComponent",
+          "when": "viewItem =~ /^component:disabled/",
+          "group": "2_policy@2"
+        },
+        {
+          "command": "bcAlm.switchSource",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified|available)/",
+          "group": "2_policy@3"
+        },
+        {
+          "command": "bcAlm.saveToTemplate",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/",
+          "group": "3_publish@1"
+        },
+        {
+          "command": "bcAlm.contributeUpstream",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/",
+          "group": "3_publish@2"
+        },
+        {
+          "command": "bcAlm.reviewWithCopilot",
+          "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/",
+          "group": "4_guidance@1"
+        },
+        {
+          "command": "bcAlm.useSourceInProject",
+          "when": "viewItem =~ /^source:/ && !(viewItem =~ /inProject/) && bcAlm.hasProject",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.setPrimarySource",
+          "when": "viewItem =~ /inProject/ && !(viewItem =~ /primary/)",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.syncTemplateFromUpstream",
+          "when": "viewItem =~ /^source:/ && !(viewItem =~ /upstreamDefault/)",
+          "group": "1_source@1"
+        },
+        {
+          "command": "bcAlm.removeTemplateSource",
+          "when": "viewItem =~ /^source:/ && !(viewItem =~ /upstreamDefault/)",
+          "group": "1_source@9"
+        }
       ],
       "editor/title": [
-        { "command": "bcAlm.reviewWithCopilot", "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/", "group": "navigation" }
+        {
+          "command": "bcAlm.reviewWithCopilot",
+          "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/",
+          "group": "navigation"
+        }
       ],
       "explorer/context": [
-        { "command": "bcAlm.saveToTemplate", "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/", "group": "bcAlm@1" },
-        { "command": "bcAlm.contributeUpstream", "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/", "group": "bcAlm@2" },
-        { "command": "bcAlm.reviewWithCopilot", "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/", "group": "bcAlm@3" }
+        {
+          "command": "bcAlm.saveToTemplate",
+          "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/",
+          "group": "bcAlm@1"
+        },
+        {
+          "command": "bcAlm.contributeUpstream",
+          "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/",
+          "group": "bcAlm@2"
+        },
+        {
+          "command": "bcAlm.reviewWithCopilot",
+          "when": "resourceFilename =~ /\\.(agent|prompt|instructions)\\.md$|^SKILL\\.md$/",
+          "group": "bcAlm@3"
+        }
       ]
     },
     "configuration": {
@@ -186,11 +555,23 @@
           ],
           "items": {
             "type": "object",
-            "required": ["url"],
+            "required": [
+              "url"
+            ],
             "properties": {
-              "name": { "type": "string", "description": "Display name." },
-              "url": { "type": "string", "description": "Git URL (https or ssh) or local path of the template repository." },
-              "ref": { "type": "string", "default": "main", "description": "Branch or tag to track." }
+              "name": {
+                "type": "string",
+                "description": "Display name."
+              },
+              "url": {
+                "type": "string",
+                "description": "Git URL (https or ssh) or local path of the template repository."
+              },
+              "ref": {
+                "type": "string",
+                "default": "main",
+                "description": "Branch or tag to track."
+              }
             }
           }
         },
@@ -222,8 +603,20 @@
         },
         "bcAlm.whatsNew.keywords": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["agent", "skill", "prompt", "instruction", "MCP", "customiz", "VS Code", "coding agent", "model"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "agent",
+            "skill",
+            "prompt",
+            "instruction",
+            "MCP",
+            "customiz",
+            "VS Code",
+            "coding agent",
+            "model"
+          ],
           "description": "Only changelog entries whose title contains one of these keywords (case-insensitive) are shown. Empty = show all."
         }
       }

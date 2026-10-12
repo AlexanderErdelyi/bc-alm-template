@@ -45,7 +45,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $RepoRoot = (Split-Path $PSScriptRoot -Parent),
+    [string] $RepoRoot = $(if ((Split-Path (Split-Path $PSScriptRoot -Parent) -Leaf) -eq '.bc-alm') { Split-Path (Split-Path $PSScriptRoot -Parent) -Parent } else { Split-Path $PSScriptRoot -Parent }),
     [string] $WorkspaceFile = 'bc-alm-template.code-workspace',
     [ValidateSet('Debug', 'Verbose', 'Normal', 'Warning', 'Error')]
     [string] $LogLevel = 'Normal'

@@ -62,8 +62,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoUrl = 'https://github.com/microsoft/BCQuality.git'
 
-# Resolve repo root (script lives in scripts/)
+# Resolve repo root (script lives in scripts/ or .bc-alm/scripts/)
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if ((Split-Path -Leaf $repoRoot) -eq '.bc-alm') { $repoRoot = Split-Path -Parent $repoRoot }
 $destFull = Join-Path $repoRoot $Path
 $customRel = 'custom'
 
@@ -74,7 +75,8 @@ function Assert-Git {
 }
 
 function Update-ConfigFlag([string] $mode) {
-    $cfgPath = Join-Path $repoRoot 'template.config.json'
+    $cfgPath = Join-Path $repoRoot '.bc-alm/template.config.json'
+    if (-not (Test-Path $cfgPath)) { $cfgPath = Join-Path $repoRoot 'template.config.json' }
     if (-not (Test-Path $cfgPath)) { return }
     try {
         $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json

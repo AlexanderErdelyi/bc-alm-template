@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { statePath } from './layout';
 import { normalizeUrl } from './util';
 
 export const LOCK_FILE = 'template.lock.json';
@@ -36,7 +37,7 @@ export function emptyLock(): LockFile {
 }
 
 export function readLock(root: string): LockFile | undefined {
-    const file = path.join(root, LOCK_FILE);
+    const file = statePath(root, LOCK_FILE);
     if (!fs.existsSync(file)) { return undefined; }
     try {
         const raw = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
@@ -62,7 +63,7 @@ export function writeLock(root: string, lock: LockFile): void {
         sources: lock.sources,
         files: sortedFiles
     };
-    fs.writeFileSync(path.join(root, LOCK_FILE), JSON.stringify(out, null, 2) + '\n', 'utf8');
+    fs.writeFileSync(statePath(root, LOCK_FILE), JSON.stringify(out, null, 2) + '\n', 'utf8');
 }
 
 export function ensureSource(lock: LockFile, src: LockSource, primary = false): void {

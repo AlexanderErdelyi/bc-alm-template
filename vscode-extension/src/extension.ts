@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { LOCK_FILE } from './core/lock';
+import { needsMigration } from './core/layout';
 import { registerCommands } from './ui/commands';
 import { CustomizationDiagnostics, TEMPLATE_SCHEME, TemplateContentProvider } from './ui/diagnostics';
 import { ProjectState } from './ui/projectState';
 import { ComponentsTree, GuidanceTree, SourcesTree } from './ui/trees';
 
 const BASELINE_PROMPT_KEY = 'bcAlm.baselinePromptDismissed';
+const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
 
 export async function activate(ext: vscode.ExtensionContext): Promise<void> {
     const log = vscode.window.createOutputChannel('BC ALM');
@@ -63,8 +65,18 @@ export async function activate(ext: vscode.ExtensionContext): Promise<void> {
     };
 
     let baselineAsked = false;
+    let migrationAsked = false;
     ext.subscriptions.push(state.onDidChange(async () => {
         updateBar();
+        if (!state.loading && !migrationAsked && state.root && needsMigration(state.root) && !ext.workspaceState.get<boolean>(MIGRATE_PROMPT_KEY)) {
+            migrationAsked = true;
+            const a = await vscode.window.showInformationMessage(
+                'BC ALM: move this project\'s template files (template.config.json, template.lock.json, scripts/*.ps1, PROJECT.md) into a single .bc-alm/ folder? References in unmodified docs and the sync workflow are updated too.',
+                'Move to .bc-alm/', 'Not Now', "Don't Ask Again");
+            if (a === 'Move to .bc-alm/') { await vscode.commands.executeCommand('bcAlm.migrateLayout'); }
+            if (a === "Don't Ask Again") { await ext.workspaceState.update(MIGRATE_PROMPT_KEY, true); }
+            return;
+        }
         if (state.loading || baselineAsked || !state.status?.noLock || !state.catalogs.length) { return; }
         if (ext.workspaceState.get<boolean>(BASELINE_PROMPT_KEY)) { return; }
         baselineAsked = true;

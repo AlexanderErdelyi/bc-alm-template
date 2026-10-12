@@ -1,7 +1,7 @@
 # .templatesyncignore
 # The human-readable manifest of "project-owned" paths that are NEVER overwritten
 # when syncing updates from the bc-alm-template repository: your real code and the
-# values written by the one-time initializer. scripts/Update-FromTemplate.ps1 (run
+# values written by the one-time initializer. Update-FromTemplate.ps1 (run
 # locally, and by .github/workflows/template-sync.yml) enforces this same set, and
 # additionally honors the 'sync' block in template.config.json:
 #   * customizationsPath - where agents/skills/instructions live (root or app/)
@@ -13,6 +13,8 @@
 #                           copied or re-added
 #   * components          - per-component policy (disabled / keepLocal ids), shared
 #                           with the BC ALM VS Code extension
+# In a project, template.config.json, template.lock.json, PROJECT.md, this file and the
+# shared scripts live in .bc-alm/ (older projects: at the repo root; moved on the next sync).
 # template.lock.json records what each managed file was synced from; files you edited
 # since the last sync are kept and reported instead of being overwritten.
 #

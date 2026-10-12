@@ -1,9 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { CONFIG_FILE, custRoot } from '../core/config';
 import { DependencyGraph, referencedComponents } from '../core/deps';
+import { migrateToBcAlm, needsMigration, rewriteTrackedForLayout, STATE_DIR, statePath } from '../core/layout';
 import { emptyLock, ensureSource, readLock, writeLock } from '../core/lock';
-import { componentOf, resolveDest, srcFromDest } from '../core/paths';
+import { componentOf, isReparamTarget, resolveDest, srcFromDest } from '../core/paths';
 import { createOwnTemplate, DeliveryMode, executePublish, githubSlug, isLocalPath, preparePublish, PublishPlan, syncForkFromUpstream } from '../core/publish';
 import { isValidComponentName, scaffold, scaffoldPath, ScaffoldInput } from '../core/scaffolds';
 import { ComponentState, disabledPath, FileState, STATUS_LABEL } from '../core/status';
@@ -103,6 +105,17 @@ export function registerCommands(cx: CommandContext): void {
         if (state.lastError) { vscode.window.showWarningMessage(`BC ALM: ${state.lastError}`); }
     });
     reg('bcAlm.updateAll', () => updateAllPicker(state, log));
+
+    reg('bcAlm.migrateLayout', async () => {
+        const root = state.root;
+        if (!root || !state.project) { throw new Error('No BC ALM project is open.'); }
+        if (!needsMigration(root)) { vscode.window.showInformationMessage('BC ALM: this project already uses the .bc-alm/ layout.'); return; }
+        const sync = { ...state.project.sync, stateDir: STATE_DIR };
+        const r = migrateToBcAlm(root, custRoot(sync));
+        const changed = rewriteTrackedForLayout(root, custRoot(sync), p => isReparamTarget(p, sync));
+        log.appendLine(`[migrateLayout] ${[...r.moved, ...changed.map(c => `${c} (references)`)].join('\n  ')}`);
+        await done(`Moved ${r.moved.length} BC ALM file(s) into .bc-alm/${changed.length ? ` and updated references in ${changed.length} file(s)` : ''}. Review and commit the change.`);
+    });
 
     reg('bcAlm.adoptBaseline', async () => {
         const ops = state.ops();
@@ -235,7 +248,7 @@ export function registerCommands(cx: CommandContext): void {
         const c = needComponent(arg);
         if (c.implicitKeep) {
             const a = await vscode.window.showInformationMessage(`"${c.ref.name}" is kept local by a sync setting in template.config.json (updateInstructions / updateExtensions). Open it?`, 'Open template.config.json');
-            if (a) { await vscode.window.showTextDocument(vscode.Uri.file(path.join(state.root!, 'template.config.json'))); }
+            if (a) { await vscode.window.showTextDocument(vscode.Uri.file(statePath(state.root!, CONFIG_FILE))); }
             return;
         }
         state.ops().setKeepLocal(c.ref.id, false);
