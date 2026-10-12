@@ -31,6 +31,21 @@
         issueOps, specs, prTemplate). A category set to false is never refreshed or
         re-added, so an existing repo that opted out of, say, the docs/ library or
         the GitHub issue-ops pipeline stays that way across every sync.
+      * components        - per-component policy shared with the BC ALM VS Code
+        extension: 'disabled' (never installed/updated) and 'keepLocal' (keep your
+        version, never updated). Ids look like agent:bc-dev, skill:bc-spec-author,
+        prompt:onboard-app, instruction:al-coding-standards, doc:<name>,
+        workflow:<name> or file:<path>.
+
+    template.lock.json (written by this script and by the VS Code extension) records
+    which template commit each file came from. When it exists:
+
+      * The template URL/branch default to the lock's primary source (your fork or
+        own template), unless -TemplateUrl / -Branch are passed.
+      * Files you changed since the last sync are KEPT and reported instead of being
+        overwritten (merge them in the extension, or pass -OverwriteLocalChanges).
+      * Files of components you never installed are not added.
+    Without a lock (first run) the template wins as before, and the lock is created.
 
     After the refresh, your 'values' choices are re-applied so a sync never reverts
     the initialization:
@@ -61,13 +76,17 @@
     pwsh ./scripts/Update-FromTemplate.ps1
 
 .EXAMPLE
+    pwsh ./scripts/Update-FromTemplate.ps1 -OverwriteLocalChanges
+
+.EXAMPLE
     pwsh ./scripts/Update-FromTemplate.ps1 -TemplateUrl https://github.com/AlexanderErdelyi/bc-alm-template.git -Branch main
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string] $TemplateUrl = 'https://github.com/AlexanderErdelyi/bc-alm-template.git',
     [string] $Branch = 'main',
-    [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+    [switch] $OverwriteLocalChanges
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,6 +107,7 @@ $sync = [pscustomobject]@{
         prTemplate    = $true
     }
 }
+$policyDisabled = @(); $policyKeep = @()
 $config = $null
 $configPath = Join-Path $RepoRoot 'template.config.json'
 if (Test-Path $configPath) {
@@ -103,6 +123,11 @@ if (Test-Path $configPath) {
             foreach ($k in 'metaDocs', 'referenceDocs', 'issueOps', 'specs', 'prTemplate') {
                 if ($s.include.PSObject.Properties[$k]) { $sync.include.$k = [bool]$s.include.$k }
             }
+        }
+        if ($s.PSObject.Properties['components'] -and $s.components) {
+            $c = $s.components
+            if ($c.PSObject.Properties['disabled'])  { $policyDisabled = @($c.disabled  | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
+            if ($c.PSObject.Properties['keepLocal']) { $policyKeep     = @($c.keepLocal | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
         }
     }
 }
@@ -160,17 +185,87 @@ if ($sync.updateExtensions) { $rootFiles += '.vscode/extensions.json' }
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git) { throw "git is required but was not found on PATH." }
 
-$temp = Join-Path ([System.IO.Path]::GetTempPath()) ("bc-template-" + [guid]::NewGuid().ToString('N'))
-Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
-& git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp
-if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+function Read-Text([string] $path) { return [System.IO.File]::ReadAllText($path, $utf8NoBom) }
+function Write-Text([string] $path, [string] $text) { [System.IO.File]::WriteAllText($path, $text, $utf8NoBom) }
 
-$updated = 0; $added = 0; $unchanged = 0; $remodeled = 0; $retooled = 0; $trimmed = 0; $reparamed = 0
-
-function Get-Hash([string] $path) {
-    if (-not (Test-Path $path)) { return $null }
-    return (Get-FileHash -Algorithm SHA256 -Path $path).Hash
+# LF-normalized sha256 (strip BOM, CRLF/CR -> LF, lowercase hex). Identical to hashText() in
+# the BC ALM VS Code extension, so both tools agree on what "unchanged" means in the lock.
+function Get-NormHash([string] $path) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    $text = Read-Text $path
+    if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }
+    $text = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return -join ($sha.ComputeHash($utf8NoBom.GetBytes($text)) | ForEach-Object { $_.ToString('x2') }) }
+    finally { $sha.Dispose() }
 }
+
+function Get-NormUrl([string] $url) {
+    if (-not $url) { return '' }
+    return ($url.Trim().Replace('\', '/') -replace '/+$', '' -replace '(?i)\.git$', '').ToLowerInvariant()
+}
+
+# Component id of a template-relative path (agent:<name>, skill:<folder>, ...). Mirrors
+# componentOf() in the VS Code extension; these ids are what sync.components lists.
+function Get-ComponentId([string] $srcRel) {
+    $r = $srcRel.Replace('\', '/')
+    if ($r -cmatch '^\.github/agents/([^/]+)\.agent\.md$') { return "agent:$($Matches[1])" }
+    if ($r -cmatch '^\.github/skills/([^/]+)/.+$') { return "skill:$($Matches[1])" }
+    if ($r -cmatch '^\.github/prompts/([^/]+)\.prompt\.md$') { return "prompt:$($Matches[1])" }
+    if ($r -cmatch '^\.github/instructions/([^/]+)\.instructions\.md$') { return "instruction:$($Matches[1])" }
+    if ($r -cmatch '^\.github/workflows/([^/]+)\.ya?ml$') { return "workflow:$($Matches[1])" }
+    if ($r -cmatch '^docs/([^/]+?)(\.md)?(/.*)?$') { return "doc:$($Matches[1])" }
+    return "file:$r"
+}
+
+# --- template.lock.json (shared with the VS Code extension) ----------------------
+# Records, per installed file, the template commit + raw template hash + the hash of what
+# was installed. With it, a sync can tell "you never touched this file" (safe to update)
+# from "you edited this file" (kept, reported). Without it (first run) the template wins,
+# as before, and the lock is created so later syncs are protected.
+$lockPath = Join-Path $RepoRoot 'template.lock.json'
+$hasLock = Test-Path -LiteralPath $lockPath
+$lockSources = New-Object System.Collections.Generic.List[object]
+$lockFiles = New-Object System.Collections.Hashtable ([System.StringComparer]::Ordinal)
+if ($hasLock) {
+    try { $lockJson = (Read-Text $lockPath) | ConvertFrom-Json }
+    catch { throw "template.lock.json is not valid JSON: $($_.Exception.Message)" }
+    foreach ($s in @($lockJson.sources)) {
+        if (-not ($s -and $s.url)) { continue }
+        $o = [ordered]@{}
+        if ($s.PSObject.Properties['name'] -and $s.name) { $o.name = [string]$s.name }
+        $o.url = [string]$s.url
+        $o.ref = if ($s.PSObject.Properties['ref'] -and $s.ref) { [string]$s.ref } else { 'main' }
+        $lockSources.Add([pscustomobject]$o)
+    }
+    if ($lockJson.files) {
+        foreach ($p in $lockJson.files.PSObject.Properties) { $lockFiles[$p.Name] = $p.Value }
+    }
+    # The primary lock source is the template this project tracks (a fork or your own
+    # template). Use it unless -TemplateUrl / -Branch were given explicitly.
+    if ($lockSources.Count -gt 0) {
+        if (-not $PSBoundParameters.ContainsKey('TemplateUrl')) { $TemplateUrl = $lockSources[0].url }
+        if (-not $PSBoundParameters.ContainsKey('Branch'))      { $Branch = $lockSources[0].ref }
+    }
+}
+$templateKey = Get-NormUrl $TemplateUrl
+
+if ($policyDisabled.Count -or $policyKeep.Count) {
+    Write-Host ("  components: disabled=[{0}], keepLocal=[{1}]" -f ($policyDisabled -join ', '), ($policyKeep -join ', ')) -ForegroundColor DarkGray
+}
+
+$temp = Join-Path ([System.IO.Path]::GetTempPath()) ("bc-template-" + [guid]::NewGuid().ToString('N'))
+$stage = "$temp-stage"
+Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
+& git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp 2>$null
+if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
+$commit = ([string](& git -C $temp rev-parse HEAD)).Trim()
+
+$updated = 0; $added = 0; $unchanged = 0; $keptLocal = 0; $notInstalled = 0; $otherSource = 0
+$policySkipped = New-Object System.Collections.Generic.HashSet[string]
+$staged = New-Object System.Collections.Generic.List[object]
+$lockChanged = -not $hasLock
 
 # Map a source-relative path to its destination-relative path (relocating the
 # discoverable customizations under $custRoot when configured).
@@ -183,34 +278,35 @@ function Resolve-Dest([string] $rel) {
     return $r
 }
 
-function Update-One([string] $rel) {
+# Stage a template file: copy it to the staging folder so the value/model/tool passes can
+# run on it BEFORE anything in the repo is touched. The final content is then compared
+# against your file and the lock to decide whether it is safe to write.
+function Add-Staged([string] $rel) {
     $src = Join-Path $temp $rel
-    if (-not (Test-Path $src)) { return }
+    if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { return }
+    $comp = Get-ComponentId $rel
+    if ($policyDisabled -contains $comp -or $policyKeep -contains $comp) { [void]$policySkipped.Add($comp); return }
     $destRel = Resolve-Dest $rel
-    $dst = Join-Path $RepoRoot $destRel
-    $dstDir = Split-Path $dst -Parent
-    $existed = Test-Path $dst
-
-    if ($existed -and ((Get-Hash $src) -eq (Get-Hash $dst))) {
-        $script:unchanged++
-        return
-    }
-
-    if ($PSCmdlet.ShouldProcess($dst, "Update $destRel from template")) {
-        if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
-        Copy-Item $src $dst -Force
-    }
-    if ($existed) { Write-Host "  updated    $destRel" -ForegroundColor Yellow; $script:updated++ }
-    else { Write-Host "  added      $destRel" -ForegroundColor Green; $script:added++ }
+    $stagePath = Join-Path $stage $destRel
+    $dir = Split-Path $stagePath -Parent
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force -WhatIf:$false | Out-Null }
+    Copy-Item -LiteralPath $src -Destination $stagePath -Force -WhatIf:$false
+    $staged.Add([pscustomobject]@{ Src = $rel; Dest = $destRel; Stage = $stagePath; Raw = (Get-NormHash $src); Comp = $comp })
 }
 
-function Update-Tree([string] $relDir) {
+function Add-StagedTree([string] $relDir) {
     $srcDir = Join-Path $temp $relDir
-    if (-not (Test-Path $srcDir)) { return }
-    Get-ChildItem $srcDir -Recurse -File | ForEach-Object {
-        $rel = $_.FullName.Substring($temp.Length).TrimStart('\', '/').Replace('\', '/')
-        Update-One $rel
+    if (-not (Test-Path -LiteralPath $srcDir)) { return }
+    $base = (Get-Item -LiteralPath $srcDir).FullName
+    Get-ChildItem -LiteralPath $base -Recurse -File | ForEach-Object {
+        Add-Staged ("$relDir/" + $_.FullName.Substring($base.Length).TrimStart('\', '/').Replace('\', '/'))
     }
+}
+
+# Name of a staged agent/prompt ('bc-dev' for .github/agents/bc-dev.agent.md), else $null.
+function Get-StagedName($entry, [string] $kind) {
+    if ($entry.Src -cmatch "^\.github/$($kind)s/([^/]+)\.$kind\.md$") { return $Matches[1] }
+    return $null
 }
 
 # Re-apply each agent's 'model:' line from template.config.json (values win over
@@ -218,33 +314,27 @@ function Update-Tree([string] $relDir) {
 function Restore-Models {
     if ($sync.updateModels) { return }
     if (-not ($config -and $config.models)) { return }
-    $agentsRel = if ($custRoot) { "$custRoot/.github/agents" } else { '.github/agents' }
-    $agentsDir = Join-Path $RepoRoot $agentsRel
-    if (-not (Test-Path $agentsDir)) { return }
-    foreach ($prop in $config.models.PSObject.Properties) {
-        if ($prop.Name -eq '_readme') { continue }
-        $agentPath = Join-Path $agentsDir ("{0}.agent.md" -f $prop.Name)
-        if (-not (Test-Path $agentPath)) { continue }
+    foreach ($e in $staged) {
+        $name = Get-StagedName $e 'agent'
+        if (-not $name -or $name -eq '_readme') { continue }
+        $prop = $config.models.PSObject.Properties[$name]
+        if (-not $prop) { continue }
         $model = [string]$prop.Value
-        $aText = Get-Content $agentPath -Raw
+        $aText = Read-Text $e.Stage
         $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', ('model: "{0}"' -f $model))
         if ($newText -ne $aText) {
-            if ($PSCmdlet.ShouldProcess($agentPath, "Re-apply model $model")) {
-                Set-Content -Path $agentPath -Value $newText -NoNewline
-            }
-            Write-Host ("  model      {0,-16} -> {1}" -f $prop.Name, $model) -ForegroundColor Magenta
-            $script:remodeled++
+            Write-Text $e.Stage $newText
+            Write-Verbose ("model      {0,-16} -> {1}" -f $name, $model)
         }
     }
 }
 
 # Add project-specific extra tool IDs (template.config.json values.extraTools) to each
-# agent + prompt 'tools:' list. The refresh just overwrote those files with the template's
-# generic toolsets, so we re-append your custom tools (additive, de-duplicated) to keep
-# them across syncs. Mirrors Restore-Models for the 'tools:' frontmatter line.
+# agent + prompt 'tools:' list. The template ships generic toolsets, so we re-append your
+# custom tools (additive, de-duplicated) to keep them across syncs.
 function Add-ExtraToolsToFile([string] $filePath, [string[]] $extra) {
-    if (-not $extra -or $extra.Count -eq 0 -or -not (Test-Path $filePath)) { return }
-    $text = Get-Content $filePath -Raw
+    if (-not $extra -or $extra.Count -eq 0 -or -not (Test-Path -LiteralPath $filePath)) { return }
+    $text = Read-Text $filePath
     $m = [regex]::Match($text, '(?m)^tools:\s*\[(.*)\]\s*$')
     if (-not $m.Success) { return }
     $existing = @(); foreach ($t in ($m.Groups[1].Value -split ',')) { $tt = $t.Trim().Trim("'`""); if ($tt) { $existing += $tt } }
@@ -252,12 +342,8 @@ function Add-ExtraToolsToFile([string] $filePath, [string[]] $extra) {
     foreach ($e in ($extra | ForEach-Object { $_ -split '\s*,\s*' })) { $en = ([string]$e).Trim().Trim("'`""); if ($en -and ($existing -notcontains $en)) { $existing += $en; $addedTools += $en } }
     if ($addedTools.Count -eq 0) { return }
     $newLine = 'tools: [' + (($existing | ForEach-Object { "'$_'" }) -join ', ') + ']'
-    $newText = $text.Replace($m.Value, $newLine)
-    if ($PSCmdlet.ShouldProcess($filePath, ("Add extra tools: {0}" -f ($addedTools -join ', ')))) {
-        Set-Content -Path $filePath -Value $newText -NoNewline
-    }
-    Write-Host ("  tools      {0,-28} += {1}" -f (Split-Path $filePath -Leaf), ($addedTools -join ', ')) -ForegroundColor Cyan
-    $script:retooled++
+    Write-Text $filePath ($text.Replace($m.Value, $newLine))
+    Write-Verbose ("tools      {0,-28} += {1}" -f (Split-Path $filePath -Leaf), ($addedTools -join ', '))
 }
 
 function Merge-ExtraTools {
@@ -267,60 +353,43 @@ function Merge-ExtraTools {
     $perAgent  = if ($et.PSObject.Properties['agents'])  { $et.agents }  else { $null }
     $perPrompt = if ($et.PSObject.Properties['prompts']) { $et.prompts } else { $null }
     if (-not ($all.Count -or $perAgent -or $perPrompt)) { return }
-    Write-Host "`nRe-applying your extra tools (values.extraTools)" -ForegroundColor White
-    $agentsDir  = if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/agents" }  else { Join-Path $RepoRoot '.github/agents' }
-    $promptsDir = if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/prompts" } else { Join-Path $RepoRoot '.github/prompts' }
-    if (Test-Path $agentsDir) {
-        Get-ChildItem $agentsDir -Filter *.agent.md | ForEach-Object {
-            $name = $_.BaseName -replace '\.agent$', ''
-            $extra = @($all); if ($perAgent -and $perAgent.PSObject.Properties[$name]) { $extra += @($perAgent.$name) }
-            Add-ExtraToolsToFile $_.FullName $extra
-        }
-    }
-    if (Test-Path $promptsDir) {
-        Get-ChildItem $promptsDir -Filter *.prompt.md | ForEach-Object {
-            $name = $_.BaseName -replace '\.prompt$', ''
-            $extra = @($all); if ($perPrompt -and $perPrompt.PSObject.Properties[$name]) { $extra += @($perPrompt.$name) }
-            Add-ExtraToolsToFile $_.FullName $extra
+    foreach ($e in $staged) {
+        foreach ($kind in 'agent', 'prompt') {
+            $name = Get-StagedName $e $kind
+            if (-not $name) { continue }
+            $per = if ($kind -eq 'agent') { $perAgent } else { $perPrompt }
+            $extra = @($all); if ($per -and $per.PSObject.Properties[$name]) { $extra += @($per.$name) }
+            Add-ExtraToolsToFile $e.Stage $extra
         }
     }
 }
 
 # Keep GitHub-work-item repos lean: strip the azure-devops/* MCP group the template
-# ships in agent/prompt toolsets (the refresh re-adds it). Mirrors the initializer's trim.
+# ships in agent/prompt toolsets. Mirrors the initializer's trim.
 function Trim-WorkItemTools {
     if (-not ($config -and $config.values -and $config.values.PSObject.Properties['workItemSystem'])) { return }
     if ([string]$config.values.workItemSystem -ne 'GitHub') { return }
-    $dirs = @()
-    $dirs += if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/agents" }  else { Join-Path $RepoRoot '.github/agents' }
-    $dirs += if ($custRoot) { Join-Path $RepoRoot "$custRoot/.github/prompts" } else { Join-Path $RepoRoot '.github/prompts' }
-    foreach ($d in $dirs) {
-        if (-not (Test-Path $d)) { continue }
-        Get-ChildItem $d -File | Where-Object { $_.Name -match '\.(agent|prompt)\.md$' } | ForEach-Object {
-            $t = Get-Content $_.FullName -Raw
-            $n = $t.Replace(", 'azure-devops/*'", '').Replace("'azure-devops/*', ", '').Replace("'azure-devops/*'", '')
-            if ($n -ne $t) {
-                if ($PSCmdlet.ShouldProcess($_.FullName, 'Trim azure-devops/* (GitHub work items)')) { Set-Content -Path $_.FullName -Value $n -NoNewline }
-                Write-Host ("  tools      trimmed azure-devops/* from {0}" -f $_.Name) -ForegroundColor DarkYellow
-                $script:trimmed++
-            }
-        }
+    foreach ($e in $staged) {
+        if (-not ((Get-StagedName $e 'agent') -or (Get-StagedName $e 'prompt'))) { continue }
+        $t = Read-Text $e.Stage
+        $n = $t.Replace(", 'azure-devops/*'", '').Replace("'azure-devops/*', ", '').Replace("'azure-devops/*'", '')
+        if ($n -ne $t) { Write-Text $e.Stage $n; Write-Verbose ("tools      trimmed azure-devops/* from {0}" -f $e.Src) }
     }
 }
 
-# Re-apply this repo's configured values (template.config.json 'values') to the freshly
-# refreshed files. The template ships its own placeholders (prefix, ticket prefix, repo slug,
-# ADO org, object-ID range, AB# linking), so a plain copy would REVERT the initialization on
-# every sync. This mirrors Initialize-Template.ps1's Update-Content, using the template clone's
-# own config as the 'from' side and this repo's config as the 'to' side. It deliberately skips
-# scripts and the template-sync workflow: that workflow's slug guard must keep pointing at the
-# template, not this repo.
+# Re-apply this repo's configured values (template.config.json 'values') to the staged
+# files. The template ships its own placeholders (prefix, ticket prefix, repo slug, ADO
+# org, object-ID range, AB# linking), so a plain copy would REVERT the initialization on
+# every sync. This mirrors Initialize-Template.ps1's Update-Content, using the template
+# clone's own config as the 'from' side and this repo's config as the 'to' side. It
+# deliberately skips scripts and the template-sync workflow: that workflow's slug guard
+# must keep pointing at the template, not this repo.
 function Reparameterize {
     if (-not ($config -and $config.values)) { return }
     $v = $config.values
     $tpl = $null
     $tplCfg = Join-Path $temp 'template.config.json'
-    if (Test-Path $tplCfg) { try { $tpl = (Get-Content $tplCfg -Raw | ConvertFrom-Json).values } catch { $tpl = $null } }
+    if (Test-Path $tplCfg) { try { $tpl = (Read-Text $tplCfg | ConvertFrom-Json).values } catch { $tpl = $null } }
     if (-not $tpl) { return }
 
     $fromPrefix = [string]$tpl.appPrefix
@@ -348,26 +417,17 @@ function Reparameterize {
 
     # Target only prose/customization files. Never scripts or workflows.
     $reparamExt = @('.md', '.json', '.jsonc', '.yml', '.yaml', '.txt')
-    $targets = New-Object System.Collections.Generic.List[string]
-    foreach ($t in ($customTrees + $rootTrees)) {
-        $destDir = Join-Path $RepoRoot (Resolve-Dest $t)
-        if (Test-Path $destDir) {
-            Get-ChildItem $destDir -Recurse -File |
-                Where-Object { $reparamExt -contains $_.Extension.ToLower() } |
-                ForEach-Object { $targets.Add($_.FullName) }
-        }
-    }
+    $scopes = @($customTrees + $rootTrees)
     $proseRootFiles = @(
         '.github/AGENT-ARCHITECTURE.md', '.github/WHEN-TO-USE.md', '.github/SKILLS.md',
         '.github/ISSUE_ORCHESTRATION.md', '.github/PULL_REQUEST_TEMPLATE.md', '.vscode/tasks.json'
     )
-    foreach ($f in $proseRootFiles) {
-        $dest = Join-Path $RepoRoot (Resolve-Dest $f)
-        if (Test-Path $dest) { $targets.Add($dest) }
-    }
 
-    foreach ($path in ($targets | Select-Object -Unique)) {
-        $text = Get-Content $path -Raw
+    foreach ($e in $staged) {
+        $inTree = [bool]($scopes | Where-Object { $e.Src.StartsWith("$_/") } | Select-Object -First 1)
+        $ext = [System.IO.Path]::GetExtension($e.Src).ToLowerInvariant()
+        if (-not (($inTree -and $reparamExt -contains $ext) -or $proseRootFiles -contains $e.Src)) { continue }
+        $text = Read-Text $e.Stage
         if ($null -eq $text) { continue }
         $new = $text
         if ($fromSlug) { $new = $new.Replace($fromSlug, $toSlug) }
@@ -381,38 +441,145 @@ function Reparameterize {
         }
         if ($wis -eq 'GitHub') { $new = $new.Replace('AB#', '#') }
         if ($new -ne $text) {
-            $rel = $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
-            if ($PSCmdlet.ShouldProcess($path, 'Re-apply configured values (prefix/ticket/slug/org/range)')) {
-                Set-Content -Path $path -Value $new -NoNewline
-            }
-            Write-Host ("  values     re-applied to {0}" -f $rel) -ForegroundColor Blue
-            $script:reparamed++
+            Write-Text $e.Stage $new
+            Write-Verbose ("values     re-applied to {0}" -f $e.Dest)
         }
     }
 }
 
-try {
-    Write-Host "`nRefreshing template-managed files" -ForegroundColor White
-    foreach ($t in $customTrees) { Update-Tree $t }
-    foreach ($t in $rootTrees) { Update-Tree $t }
-    foreach ($f in $rootFiles) { Update-One $f }
-
-    Write-Host "`nRe-applying your configured values (prefix/ticket/slug/org/range)" -ForegroundColor White
-    Reparameterize
-
-    if (-not $sync.updateModels) {
-        Write-Host "`nRe-applying your agent models (sync.updateModels = false)" -ForegroundColor White
-        Restore-Models
+function Set-LockEntry($entry, [string] $installedHash) {
+    $lockFiles[$entry.Dest] = [pscustomobject][ordered]@{
+        source        = $TemplateUrl
+        path          = $entry.Src
+        commit        = $commit
+        templateHash  = $entry.Raw
+        installedHash = $installedHash
     }
+    $script:lockChanged = $true
+}
 
+# Serialize exactly like writeLock() in the VS Code extension (2-space JSON, files sorted
+# ordinally, trailing newline) so the two tools never produce noisy diffs of each other.
+function Write-Lock {
+    $J = { param($s) ([string]$s | ConvertTo-Json -Compress) }
+    $nl = "`n"
+    $comment = 'Managed by the BC ALM VS Code extension and scripts/Update-FromTemplate.ps1. Records which template version each template-managed file came from so updates never silently overwrite your own changes. Commit this file.'
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append('{' + $nl)
+    [void]$sb.Append('  "$comment": ' + (& $J $comment) + ',' + $nl)
+    [void]$sb.Append('  "version": 1,' + $nl)
+    if ($lockSources.Count -eq 0) { [void]$sb.Append('  "sources": [],' + $nl) }
+    else {
+        $parts = foreach ($s in $lockSources) {
+            $props = @()
+            foreach ($k in 'name', 'url', 'ref') { if ($s.PSObject.Properties[$k] -and $s.$k) { $props += ('      "{0}": {1}' -f $k, (& $J $s.$k)) } }
+            '    {' + $nl + ($props -join (',' + $nl)) + $nl + '    }'
+        }
+        [void]$sb.Append('  "sources": [' + $nl + ($parts -join (',' + $nl)) + $nl + '  ],' + $nl)
+    }
+    [string[]]$keys = @($lockFiles.Keys)
+    [System.Array]::Sort($keys, [System.StringComparer]::Ordinal)
+    if ($keys.Count -eq 0) { [void]$sb.Append('  "files": {}' + $nl) }
+    else {
+        $parts = foreach ($k in $keys) {
+            $e = $lockFiles[$k]
+            $props = foreach ($f in 'source', 'path', 'commit', 'templateHash', 'installedHash') { '      "{0}": {1}' -f $f, (& $J $e.$f) }
+            '    ' + (& $J $k) + ': {' + $nl + ($props -join (',' + $nl)) + $nl + '    }'
+        }
+        [void]$sb.Append('  "files": {' + $nl + ($parts -join (',' + $nl)) + $nl + '  }' + $nl)
+    }
+    [void]$sb.Append('}' + $nl)
+    Write-Text $lockPath $sb.ToString()
+}
+
+try {
+    Write-Host "`nStaging template-managed files" -ForegroundColor White
+    foreach ($t in $customTrees) { Add-StagedTree $t }
+    foreach ($t in $rootTrees) { Add-StagedTree $t }
+    foreach ($f in $rootFiles) { Add-Staged $f }
+
+    # Same order as the initializer and the VS Code extension's transform.
+    Reparameterize
+    Restore-Models
     Trim-WorkItemTools
     Merge-ExtraTools
+
+    # Components the project already has (any local file or lock entry). With a lock, files
+    # of components you never installed are not added - install those from the extension.
+    $installedComps = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($e in $staged) { if (Test-Path -LiteralPath (Join-Path $RepoRoot $e.Dest)) { [void]$installedComps.Add($e.Comp) } }
+    foreach ($le in $lockFiles.Values) { if ($le.path) { [void]$installedComps.Add((Get-ComponentId ([string]$le.path))) } }
+
+    Write-Host "`nRefreshing template-managed files" -ForegroundColor White
+    foreach ($e in $staged) {
+        $dst = Join-Path $RepoRoot $e.Dest
+        $le = $lockFiles[$e.Dest]
+        if ($le -and (Get-NormUrl ([string]$le.source)) -ne $templateKey) { $otherSource++; continue }
+        $newHash = Get-NormHash $e.Stage
+        $localHash = Get-NormHash $dst
+        $action = $null
+
+        if ($null -eq $localHash) {
+            if ($le -and -not $OverwriteLocalChanges) {
+                Write-Host "  kept       $($e.Dest) (deleted locally; -OverwriteLocalChanges restores it)" -ForegroundColor DarkYellow
+                $keptLocal++; continue
+            }
+            if ($hasLock -and -not $le -and -not $installedComps.Contains($e.Comp)) { $notInstalled++; continue }
+            $action = 'add'
+        }
+        elseif ($localHash -eq $newHash) { $action = 'current' }
+        elseif (($le -and $localHash -eq [string]$le.installedHash) -or -not $hasLock -or $OverwriteLocalChanges) { $action = 'update' }
+        else {
+            $why = if ($le) { 'you changed it since the last sync' } else { 'differs and has no sync baseline' }
+            Write-Host "  kept       $($e.Dest) ($why; use the VS Code extension to merge, or -OverwriteLocalChanges)" -ForegroundColor DarkYellow
+            $keptLocal++; continue
+        }
+
+        if ($action -eq 'current') {
+            $unchanged++
+            if (-not $le -or [string]$le.templateHash -ne $e.Raw -or [string]$le.installedHash -ne $newHash -or [string]$le.path -ne $e.Src) { Set-LockEntry $e $newHash }
+            continue
+        }
+        if ($PSCmdlet.ShouldProcess($dst, "Update $($e.Dest) from template")) {
+            $dstDir = Split-Path $dst -Parent
+            if (-not (Test-Path -LiteralPath $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
+            Copy-Item -LiteralPath $e.Stage -Destination $dst -Force
+        }
+        Set-LockEntry $e $newHash
+        if ($action -eq 'add') { Write-Host "  added      $($e.Dest)" -ForegroundColor Green; $added++ }
+        else { Write-Host "  updated    $($e.Dest)" -ForegroundColor Yellow; $updated++ }
+    }
+
+    # Tracked files the template no longer ships: report, never delete.
+    $removed = @()
+    foreach ($k in @($lockFiles.Keys)) {
+        $le = $lockFiles[$k]
+        if ((Get-NormUrl ([string]$le.source)) -ne $templateKey) { continue }
+        if (-not (Test-Path -LiteralPath (Join-Path $temp ([string]$le.path)))) {
+            if (Test-Path -LiteralPath (Join-Path $RepoRoot $k)) { $removed += $k }
+        }
+    }
+
+    if (-not ($lockSources | Where-Object { (Get-NormUrl $_.url) -eq $templateKey })) {
+        $lockSources.Add([pscustomobject][ordered]@{ url = $TemplateUrl; ref = $Branch }); $lockChanged = $true
+    }
+    else {
+        foreach ($s in $lockSources) { if ((Get-NormUrl $s.url) -eq $templateKey -and $s.ref -ne $Branch) { $s.ref = $Branch; $lockChanged = $true } }
+    }
+    if ($lockChanged -and $PSCmdlet.ShouldProcess($lockPath, 'Record synced template versions')) { Write-Lock }
 }
 finally {
-    if (Test-Path $temp) { Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue }
+    foreach ($d in $temp, $stage) { if (Test-Path $d) { Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue -WhatIf:$false } }
 }
 
-Write-Host "`nSummary: $added added, $updated updated, $reparamed re-parameterized, $remodeled models re-applied, $retooled tool lists extended, $trimmed trimmed, $unchanged already current." -ForegroundColor White
+Write-Host "`nSummary: $added added, $updated updated, $unchanged already current, $keptLocal kept (local changes)." -ForegroundColor White
+if ($policySkipped.Count) { Write-Host ("Skipped by sync.components policy: {0}." -f (($policySkipped | Sort-Object) -join ', ')) -ForegroundColor DarkGray }
+if ($notInstalled) { Write-Host "$notInstalled file(s) belong to template components you have not installed (add them from the BC ALM VS Code extension)." -ForegroundColor DarkGray }
+if ($otherSource) { Write-Host "$otherSource file(s) are tracked from another template source and were left alone." -ForegroundColor DarkGray }
+if ($removed.Count) {
+    Write-Host "No longer shipped by the template (left in place; delete if you don't need them):" -ForegroundColor DarkYellow
+    $removed | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkYellow }
+}
 if (-not $sync.updateExtensions) { Write-Host "Kept your .vscode/extensions.json (sync.updateExtensions = false)." -ForegroundColor DarkGray }
 if (-not $sync.updateInstructions) { Write-Host "Kept your .github/instructions (sync.updateInstructions = false)." -ForegroundColor DarkGray }
 $excluded = @()
@@ -424,4 +591,4 @@ if (-not $inc.prTemplate)    { $excluded += 'prTemplate' }
 if ($excluded.Count) { Write-Host ("Skipped disabled content categories (sync.include): {0}." -f ($excluded -join ', ')) -ForegroundColor DarkGray }
 Write-Host "Project-owned files (app/, test/, specs/, PROJECT.md, template.config.json," -ForegroundColor DarkGray
 Write-Host "copilot-instructions.md, .vscode/launch.json|mcp.json|settings.json) were left untouched." -ForegroundColor DarkGray
-Write-Host "`nNext: review 'git diff', then commit the updates you want to keep." -ForegroundColor White
+Write-Host "`nNext: review 'git diff', then commit the updates you want to keep (including template.lock.json)." -ForegroundColor White

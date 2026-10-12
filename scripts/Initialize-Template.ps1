@@ -615,11 +615,12 @@ if ($CleanupTemplateFiles) {
     }
     else {
         Write-Host "`nCleaning up template-only files" -ForegroundColor Cyan
-        $removeList = @('CONTRIBUTING.md', 'scripts/Install-IntoExistingRepo.ps1', 'bootstrap.ps1')
+        $removeList = @('CONTRIBUTING.md', 'scripts/Install-IntoExistingRepo.ps1', 'bootstrap.ps1',
+            'vscode-extension', '.github/workflows/vscode-extension.yml')
         foreach ($rel in $removeList) {
             $p = Join-Path $RepoRoot $rel
             if (Test-Path $p) {
-                if ($PSCmdlet.ShouldProcess($p, 'Remove template-only file')) { Remove-Item $p -Force }
+                if ($PSCmdlet.ShouldProcess($p, 'Remove template-only file')) { Remove-Item $p -Recurse -Force }
                 Write-Host "  removed    $rel" -ForegroundColor DarkGray
             }
         }
