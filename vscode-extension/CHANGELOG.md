@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1 — Marketplace preparation
+
+- New extension icon and Marketplace metadata (keywords, links, banner). The extension is
+  marked as a **preview**. (#76)
+- The publisher ID is now `AlexanderErdelyi`, matching the Visual Studio Marketplace publisher.
+  (#76)
+- BC ALM runs only in **trusted** workspaces and is disabled in Restricted Mode and virtual
+  workspaces, because it runs git, the GitHub CLI and PowerShell. (#76)
+
 ## 0.4.0 — Template catalogs, variants and versions
 
 - **Template catalogs**: a repository can hold several templates, the root template plus one

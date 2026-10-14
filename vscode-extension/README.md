@@ -49,6 +49,8 @@ Business Central projects: its Copilot agents, skills, prompts, instructions and
 - `git` on PATH.
 - PowerShell 7 (`pwsh`) or Windows PowerShell 5.1, for creating and adding projects.
 - Optional: GitHub CLI (`gh`) for pull requests, forks and fork sync.
+- A trusted workspace. BC ALM runs git and PowerShell, so it is disabled in Restricted Mode and
+  in virtual workspaces.
 
 ## Getting started
 
