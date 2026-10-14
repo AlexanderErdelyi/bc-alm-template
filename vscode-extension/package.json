@@ -994,6 +994,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test \"out/test/*.test.js\"",
+    "validate:catalog": "node out/src/cli/validate.js --root .. --base origin/main",
     "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run compile"
   },

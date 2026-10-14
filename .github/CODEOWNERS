@@ -1,0 +1,11 @@
+# Code owners review pull requests that touch their paths.
+# Template catalog: each .templates/<id>/ folder is owned by its template.maintainers;
+# everything else (including the root template "bc-alm") by the repository owners.
+
+*                       @AlexanderErdelyi
+
+/.templates/README.md   @AlexanderErdelyi
+/.templates/bc-alm-lite/ @AlexanderErdelyi
+
+# Add a line per new template, e.g.:
+# /.templates/bc-upgrade/ @your-github-login @a-colleague
