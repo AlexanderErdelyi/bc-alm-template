@@ -6,6 +6,8 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-15
+
 ### Added
 
 - A **Sponsor** button on the extension page in VS Code and a support link in the README. They
