@@ -1,7 +1,9 @@
 name: VS Code extension
 
 # Builds, tests and packages the BC ALM VS Code extension (vscode-extension/).
-# Push a tag like ext-v0.1.0 to publish the .vsix as a GitHub release asset.
+# Release: push a tag ext-vX.Y.Z matching package.json "version" (ext-vX.Y.Z-pre for a pre-release).
+# The VSIX goes to a GitHub release, then - after approval in the "marketplace" environment - to the
+# Visual Studio Marketplace and (when OVSX_PAT is set) Open VSX. See docs/vscode-extension.md.
 # Template-repo only: projects created from the template drop this workflow.
 
 on:
@@ -25,12 +27,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     if: github.repository == 'AlexanderErdelyi/bc-alm-template'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     defaults:
       run:
         working-directory: vscode-extension
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Version guard (tag must match package.json)
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          PRERELEASE=false
+          if [ "$REF_TYPE" = "tag" ]; then
+            if [[ ! "$TAG" =~ ^ext-v([0-9]+\.[0-9]+\.[0-9]+)(-pre)?$ ]]; then
+              echo "::error::Tag '$TAG' must look like ext-vX.Y.Z or ext-vX.Y.Z-pre."
+              exit 1
+            fi
+            if [ "${BASH_REMATCH[1]}" != "$PKG_VERSION" ]; then
+              echo "::error::Tag '$TAG' does not match package.json version '$PKG_VERSION'. Bump package.json (or fix the tag) - nothing was published."
+              exit 1
+            fi
+            [ -n "${BASH_REMATCH[2]}" ] && PRERELEASE=true
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Version $PKG_VERSION (pre-release: $PRERELEASE)"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -49,13 +77,34 @@ jobs:
           npm test
 
       - name: Package VSIX
-        run: npx vsce package --no-dependencies --out bc-alm.vsix
+        env:
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          FLAGS="--no-dependencies"
+          [ "$PRERELEASE" = "true" ] && FLAGS="$FLAGS --pre-release"
+          npx vsce package $FLAGS --out bc-alm.vsix
+
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; if ($2 == v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::CHANGELOG.md has no '## $VERSION' section; the release gets generic notes."
+            echo "See CHANGELOG.md." > release-notes.md
+          fi
+          printf '\n---\nInstall from the Extensions view (search "BC ALM"), or download the .vsix below and use **Extensions → … → Install from VSIX**.\n' >> release-notes.md
 
       - name: Upload VSIX
         uses: actions/upload-artifact@v4
         with:
           name: bc-alm-vsix
-          path: vscode-extension/bc-alm.vsix
+          path: |
+            vscode-extension/bc-alm.vsix
+            vscode-extension/release-notes.md
 
   release:
     needs: build
@@ -73,10 +122,73 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
         run: |
-          VERSION="${TAG#ext-v}"
           mv bc-alm.vsix "bc-alm-${VERSION}.vsix"
+          FLAGS=()
+          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
           gh release create "$TAG" "bc-alm-${VERSION}.vsix" \
             --repo "${{ github.repository }}" \
-            --title "BC ALM VS Code extension ${VERSION}" \
-            --notes "Install: Extensions view → … → Install from VSIX. See docs/vscode-extension.md."
+            --title "BC ALM VS Code extension ${VERSION}$([ "$PRERELEASE" = "true" ] && echo ' (pre-release)')" \
+            --notes-file release-notes.md \
+            "${FLAGS[@]}"
+
+  publish:
+    needs: [build, release]
+    if: startsWith(github.ref, 'refs/tags/ext-v')
+    runs-on: ubuntu-latest
+    # Required reviewer + ext-v* tag policy; holds VSCE_PAT (and optionally OVSX_PAT).
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      # Pinned vsce/ovsx from the lockfile; no compile - the tested VSIX is published as-is.
+      - name: Install publishing tools
+        run: npm ci --ignore-scripts
+
+      - name: Download the tested VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: bc-alm-vsix
+          path: vscode-extension/dist
+
+      # vsce and ovsx read VSCE_PAT / OVSX_PAT from the environment, so tokens never appear on a command line.
+      - name: Publish to the Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT is not set in the 'marketplace' environment."
+            exit 1
+          fi
+          FLAGS=()
+          [ "$PRERELEASE" = "true" ] && FLAGS+=(--pre-release)
+          npx vsce publish --packagePath dist/bc-alm.vsix "${FLAGS[@]}"
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::warning::OVSX_PAT is not set in the 'marketplace' environment - skipped Open VSX (the Marketplace publish succeeded)."
+            exit 0
+          fi
+          # Pre-release is read from the VSIX (packaged with --pre-release in the build job).
+          npx ovsx publish dist/bc-alm.vsix
