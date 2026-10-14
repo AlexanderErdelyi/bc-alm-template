@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.0 — Multi-template management
+
+- **Template manifests**: a template repository can describe itself in a top-level `template`
+  block in `template.config.json` (`id`, `name`, `description`, `version`, `icon`). Sources
+  without one fall back to the repository name. (#58)
+- **Components grouped by template**: the Components view groups components by template, plus
+  a **Local** group for project-only files. Switch with **Group Components by Template/Kind**
+  or `bcAlm.components.groupBy`. (#59)
+- **Turn a whole template on or off**: **Disable Template**, **Enable Template**, **Activate
+  Only This Template** and **Switch Active Templates…** (also from the status bar). Disabled
+  templates are stored in `values.sync.templates.disabled` and honored by
+  `Update-FromTemplate.ps1`. Your edits are kept, as with single components. (#60)
+- **Choose Components…** per source: pick what you take from each template. Dependencies are
+  added automatically, and components you left out are recorded as `exclude` in the lock, so
+  they don't show up as new again. (#61)
+- **Create New Template…**: a blank template, one seeded from this project's components (project
+  values are turned back into placeholders), or a copy of an existing template under a new
+  identity. The repository is created on GitHub and added as a source. (#62)
+- **Template Sources view**:
+  - shows the template name, the ref and "n components · m installed";
+  - classifies errors (no access, bad ref, network);
+  - adds **Change Branch/Tag…** and **Open Template Repository**;
+  - offers **Choose Components…** after **Use in This Project**.
+  "Create Template" is now **Copy a Template into My Own Repository…**. (#63)
+- **Team sharing**: **Share Template Sources with My Team…** copies a settings snippet or saves
+  it to workspace settings. **Add This Project's Sources to My Settings** picks up the sources
+  recorded in a teammate's `.bc-alm/template.lock.json`. (#64)
+
 ## 0.2.2
 
 - Fixed: Publish / Contribute Upstream no longer fails with `EPERM` on Windows when removing its

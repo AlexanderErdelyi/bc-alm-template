@@ -16,6 +16,12 @@ Business Central projects: its Copilot agents, skills, prompts, instructions and
 - **Pick what you use**: install, disable, or pin ("always keep my version") individual
   components. The same policy is honored by `Update-FromTemplate.ps1` and the template-sync
   GitHub Action.
+- **Multiple templates**: use several templates side by side, for example BC ALM plus a BC
+  upgrade template. Components are grouped by template. You can:
+  - turn a whole template on or off, or **Activate Only This Template**;
+  - **Choose Components…** per source;
+  - **Create New Template…**: blank, seeded from your project, or copied;
+  - **Share Template Sources** with your team.
 - **Your own template**: create a company template, add more template sources, **save** a
   customized component to it (overwrite or save as new; commit or PR), sync it from upstream,
   or **contribute** improvements back upstream. Create Template offers:
@@ -52,6 +58,7 @@ Full guide: [docs/vscode-extension.md](https://github.com/AlexanderErdelyi/bc-al
 | Setting | Purpose |
 | --- | --- |
 | `bcAlm.templateSources` | Template repositories (URL or local path), refs and optional `upstream` to sync from. |
+| `bcAlm.components.groupBy` | Group the Components view by template, kind, or automatically. |
 | `bcAlm.checkForUpdatesOnStartup` | Check for template updates when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | Minimum minutes between automatic fetches. |
 | `bcAlm.powershellPath` | PowerShell executable for project creation. |
