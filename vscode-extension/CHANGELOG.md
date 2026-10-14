@@ -6,6 +6,8 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-15
+
 ### Fixed
 
 - The version and installs badges on the Marketplace page work again. shields.io retired its
