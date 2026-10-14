@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
+import { changelogSection, compareSemver, LATEST_REF, pinnedVersion, templateVersionTags } from '../core/catalogAuthoring';
 import { classifySourceError } from '../core/access';
 import { manifestOf, ProjectConfig, readProjectConfig, TemplateManifest, templateIdFromUrl } from '../core/config';
 import { resolveProjectRoot } from '../core/layout';
@@ -31,6 +32,14 @@ export interface SourceInfo extends TemplateSourceSpec {
     disabled?: boolean;
     /** Another loaded source uses the same template id. */
     duplicateOf?: string;
+    /** Template id this variant extends (same repository). */
+    variantOf?: string;
+    /** Newest released version (tag `<id>/v<version>`). */
+    latestVersion?: string;
+    /** Released version the source follows (pinned tag or "latest"). */
+    resolvedVersion?: string;
+    /** A newer release than the pinned tag exists. */
+    upgrade?: { tag: string; version: string; notes?: string };
 }
 
 export interface TemplateGroup {
@@ -141,6 +150,22 @@ export class ProjectState implements vscode.Disposable {
                 }
                 return repo;
             };
+            const versions = async (info: SourceInfo, repo: TemplateRepo) => {
+                const id = info.manifest?.id;
+                info.variantOf = info.manifest?.extends;
+                if (!id) { return; }
+                try {
+                    const tags = templateVersionTags(await repo.mirror.tags(), id);
+                    const pinned = pinnedVersion(info.ref, id);
+                    info.latestVersion = tags[0]?.version;
+                    info.resolvedVersion = info.ref === LATEST_REF ? tags[0]?.version : pinned;
+                    if (pinned && tags[0] && compareSemver(tags[0].version, pinned) > 0) {
+                        const tagSha = await repo.mirror.resolve(`refs/tags/${tags[0].tag}`);
+                        const notes = changelogSection(await repo.mirror.readFile(tagSha, repo.writePath('CHANGELOG.md')), tags[0].version);
+                        info.upgrade = { tag: tags[0].tag, version: tags[0].version, ...(notes ? { notes } : {}) };
+                    }
+                } catch { /* version info is optional */ }
+            };
             const fail = (info: SourceInfo, e: unknown) => {
                 const err = e as Error & { detail?: string };
                 info.error = err.detail ? err.message : classifySourceError(err.message, info.url, info.ref).message;
@@ -156,6 +181,7 @@ export class ProjectState implements vscode.Disposable {
                         this.catalogs.push(cat);
                         info.manifest = cat.manifest;
                         info.componentCount = new Set([...cat.files.values()].map(f => f.component.id)).size;
+                        await versions(info, repo);
                     } catch (e) {
                         fail(info, e);
                     }
@@ -177,6 +203,7 @@ export class ProjectState implements vscode.Disposable {
                     info.sha = sha;
                     const cfg = await repo.readConfig(sha);
                     info.manifest = manifestOf(cfg, sourceKey(info), info.name);
+                    await versions(info, repo);
                     const sync = this.project?.sync ?? cfg?.sync;
                     if (sync) { info.componentCount = new Set((await repo.listFiles(sha)).filter(f => isManaged(f, sync)).map(f => componentOf(f).id)).size; }
                 } catch (e) {

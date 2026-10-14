@@ -188,9 +188,9 @@
       },
       {
         "command": "bcAlm.addTemplateSource",
-        "title": "Add Existing Template Source…",
+        "title": "Add Template Source…",
         "category": "BC ALM",
-        "icon": "$(add)"
+        "icon": "$(plug)"
       },
       {
         "command": "bcAlm.removeTemplateSource",
@@ -202,7 +202,7 @@
         "command": "bcAlm.useSourceInProject",
         "title": "Use in This Project",
         "category": "BC ALM",
-        "icon": "$(plug)"
+        "icon": "$(arrow-circle-right)"
       },
       {
         "command": "bcAlm.setPrimarySource",
@@ -262,13 +262,13 @@
         "command": "bcAlm.createNewTemplate",
         "title": "Create New Template…",
         "category": "BC ALM",
-        "icon": "$(repo-create)"
+        "icon": "$(new-folder)"
       },
       {
         "command": "bcAlm.changeSourceRef",
-        "title": "Change Branch/Tag…",
+        "title": "Change Version / Branch…",
         "category": "BC ALM",
-        "icon": "$(git-branch)"
+        "icon": "$(versions)"
       },
       {
         "command": "bcAlm.openSourceOnGitHub",
@@ -336,6 +336,42 @@
         "command": "bcAlm.openFinding",
         "title": "Open Finding",
         "category": "BC ALM"
+      },
+      {
+        "command": "bcAlm.browseTemplates",
+        "title": "Browse Templates…",
+        "category": "BC ALM",
+        "icon": "$(library)"
+      },
+      {
+        "command": "bcAlm.createCatalogTemplate",
+        "title": "Add New Template to This Repository…",
+        "category": "BC ALM",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "bcAlm.createVariant",
+        "title": "Create Variant…",
+        "category": "BC ALM",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "bcAlm.compareWithBase",
+        "title": "Compare with Base Template",
+        "category": "BC ALM",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "bcAlm.releaseTemplateVersion",
+        "title": "Release Version…",
+        "category": "BC ALM",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "bcAlm.upgradeSourceVersion",
+        "title": "Upgrade to Newest Version",
+        "category": "BC ALM",
+        "icon": "$(arrow-circle-up)"
       }
     ],
     "menus": {
@@ -455,6 +491,18 @@
         {
           "command": "bcAlm.groupByKind",
           "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.compareWithBase",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.upgradeSourceVersion",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.releaseTemplateVersion",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -522,6 +570,11 @@
           "command": "bcAlm.createNewTemplate",
           "when": "view == bcAlm.sources",
           "group": "navigation@2"
+        },
+        {
+          "command": "bcAlm.browseTemplates",
+          "when": "view == bcAlm.sources",
+          "group": "navigation@3"
         },
         {
           "command": "bcAlm.createTemplateRepo",
@@ -749,6 +802,66 @@
           "command": "bcAlm.removeTemplateSource",
           "when": "viewItem =~ /^source:/ && !(viewItem =~ /upstreamDefault/)",
           "group": "1_source@9"
+        },
+        {
+          "command": "bcAlm.browseTemplates",
+          "when": "view == bcAlm.sources && viewItem =~ /^repo/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.createCatalogTemplate",
+          "when": "view == bcAlm.sources && viewItem =~ /^repo/",
+          "group": "inline@2"
+        },
+        {
+          "command": "bcAlm.browseTemplates",
+          "when": "view == bcAlm.sources && viewItem =~ /^repo/",
+          "group": "1_repo@1"
+        },
+        {
+          "command": "bcAlm.createCatalogTemplate",
+          "when": "view == bcAlm.sources && viewItem =~ /^repo/",
+          "group": "1_repo@2"
+        },
+        {
+          "command": "bcAlm.createVariant",
+          "when": "view == bcAlm.sources && viewItem =~ /^repo/",
+          "group": "1_repo@3"
+        },
+        {
+          "command": "bcAlm.upgradeSourceVersion",
+          "when": "viewItem =~ /^source:.*upgrade/",
+          "group": "inline@0"
+        },
+        {
+          "command": "bcAlm.upgradeSourceVersion",
+          "when": "viewItem =~ /^source:.*upgrade/",
+          "group": "1_source@0"
+        },
+        {
+          "command": "bcAlm.browseTemplates",
+          "when": "viewItem =~ /^source:/",
+          "group": "2_author@1"
+        },
+        {
+          "command": "bcAlm.createVariant",
+          "when": "viewItem =~ /^source:/",
+          "group": "2_author@2"
+        },
+        {
+          "command": "bcAlm.releaseTemplateVersion",
+          "when": "viewItem =~ /^source:/",
+          "group": "2_author@3"
+        },
+        {
+          "command": "bcAlm.compareWithBase",
+          "when": "viewItem =~ /^component:.*override/",
+          "group": "3_publish@3"
+        },
+        {
+          "command": "bcAlm.compareWithBase",
+          "when": "viewItem =~ /^component:.*override/",
+          "group": "inline@5"
         }
       ],
       "editor/title": [

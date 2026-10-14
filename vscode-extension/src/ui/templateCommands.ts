@@ -230,6 +230,12 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
     // ------------------------------------------------------------ create a new template
 
     reg('bcAlm.createNewTemplate', async () => {
+        const where = await vscode.window.showQuickPick([
+            { label: '$(library) In a template repository (pull request)', detail: 'Add it as .templates/<id>/ to a repository your team already uses - e.g. this BC ALM repository. Best for sharing and variants.', v: 'catalog' },
+            { label: '$(repo-create) In a new GitHub repository', detail: 'A repository of its own, owned by you or your organization.', v: 'repo' }
+        ], { placeHolder: 'Where should the new template live?' });
+        if (!where) { return; }
+        if (where.v === 'catalog') { await vscode.commands.executeCommand('bcAlm.createCatalogTemplate'); return; }
         type Start = vscode.QuickPickItem & { v: 'blank' | 'seed' | 'copy' };
         const starts: Start[] = [
             { label: '$(new-file) Blank template', detail: 'Empty agents/skills/prompts/instructions folders, a README and template.config.json.', v: 'blank' }
@@ -330,26 +336,6 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
     };
 
     // ------------------------------------------------------------ source actions
-
-    reg('bcAlm.changeSourceRef', async (s: SourceInfo) => {
-        if (!s) { return; }
-        const ref = (await vscode.window.showInputBox({ prompt: `Branch or tag of ${s.name ?? s.url} to follow`, value: s.ref, validateInput: v => v.trim() ? undefined : 'Enter a branch or tag' }))?.trim();
-        if (!ref || ref === s.ref) { return; }
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Checking ${ref}…` }, async () => {
-            const repo = state.repo({ ...s, ref });
-            await repo.ensure(0);
-            await repo.resolve();
-        });
-        const list = settingsSources();
-        if (list.some(x => sameSource(x, s))) { await saveSettingsSources(list.map(x => sameSource(x, s) ? { ...x, ref } : x)); }
-        if (s.inProject && state.root) {
-            const lock = readLock(state.root) ?? emptyLock();
-            const ls = lock.sources.find(x => sameSource(x, s));
-            if (ls) { ls.ref = ref; writeLock(state.root, lock); }
-        }
-        await state.refresh(true);
-        vscode.window.showInformationMessage(`${s.name ?? s.url} now follows ${ref}.${s.inProject ? ' Commit .bc-alm/template.lock.json so your team follows it too.' : ''}`);
-    });
 
     reg('bcAlm.openSourceOnGitHub', async (s: SourceInfo) => {
         if (!s) { return; }

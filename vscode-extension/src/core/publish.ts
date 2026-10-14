@@ -256,6 +256,7 @@ export async function pushTag(repo: TemplateRepo, sha: string, tag: string): Pro
     if (r.code !== 0) { throw new Error(`Could not push tag ${tag} to ${repo.spec.url}. Releasing needs push access.\n${r.stderr.trim()}`); }
     await repo.ensure(0);
 }
+
 export type CreateTemplateHow = 'fork' | 'duplicate' | 'template';
 
 export interface CreatedTemplate {

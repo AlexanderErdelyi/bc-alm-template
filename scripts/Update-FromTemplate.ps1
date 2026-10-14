@@ -75,6 +75,10 @@
     replaces every component it ships its own files for, and drops the component ids
     listed in "template.remove".
 
+    -Branch (or the lock source's "ref") can be a branch, a release tag such as
+    bc-upgrade/v1.2.0, or "latest" - the newest released version (highest <id>/v<semver>
+    tag) of the selected template.
+
 .EXAMPLE
     pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf
 
@@ -458,8 +462,30 @@ function Get-SlugId([string] $s) {
 }
 $repoClone = "$temp-repo"
 Write-Host "Fetching template $TemplateUrl ($Branch)$(if ($TemplatePath) { " [$TemplatePath]" })..." -ForegroundColor White
-& git clone --depth 1 --branch $Branch --quiet $TemplateUrl $repoClone 2>$null
-if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
+$cloneRef = $Branch
+if ($Branch -eq 'latest') {
+    # "latest" = newest <id>/v<semver> tag of the selected template (mirrors TemplateRepo.resolve('latest')).
+    $latestId = if ($TemplatePath) { Get-SlugId (Split-Path $TemplatePath -Leaf) } else { '' }
+    if (-not $latestId) {
+        $probe = "$temp-probe"
+        & git clone --depth 1 --quiet $TemplateUrl $probe 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl." }
+        $probeCfg = $null
+        try { $probeCfg = Read-Text (Join-Path $probe 'template.config.json') | ConvertFrom-Json } catch { $probeCfg = $null }
+        $latestId = if ($probeCfg -and $probeCfg.template -and $probeCfg.template.id) { Get-SlugId ([string]$probeCfg.template.id) } else { Get-SlugId ((($TemplateUrl.Trim() -replace '[\\/]+$', '') -split '[\\/:]')[-1]) }
+        Remove-Item -LiteralPath $probe -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $tagRx = '^' + [regex]::Escape($latestId) + '/v(\d+)\.(\d+)\.(\d+)$'
+    $cloneRef = @(& git ls-remote --tags --refs $TemplateUrl "refs/tags/$latestId/v*" 2>$null) |
+        ForEach-Object { (($_ -split "`t")[-1]) -replace '^refs/tags/', '' } |
+        Where-Object { $_ -match $tagRx } |
+        Sort-Object { [version](($_ -split '/v')[-1]) } -Descending |
+        Select-Object -First 1
+    if (-not $cloneRef) { throw "$TemplateUrl follows 'latest', but template '$latestId' has no released versions yet (tags '$latestId/v<version>')." }
+    Write-Host "  latest = $cloneRef" -ForegroundColor DarkGray
+}
+& git clone --depth 1 --branch $cloneRef --quiet $TemplateUrl $repoClone 2>$null
+if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($cloneRef)." }
 $commit = ([string](& git -C $repoClone rev-parse HEAD)).Trim()
 
 # --- Template view (mirrors TemplateRepo.layout() in the extension) ----------------------
