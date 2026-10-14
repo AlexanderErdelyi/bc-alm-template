@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ProjectConfig } from './config';
+import { ProjectConfig, TEMPLATE_TOGGLE_KINDS, templateIdFromUrl } from './config';
 import { Catalog, CatalogFile } from './catalog';
 import { LockEntry, LockFile } from './lock';
 import { ComponentKind, ComponentRef, componentOf, customScanRoots, implicitlyKeptLocal, KIND_ORDER, srcFromDest } from './paths';
@@ -28,6 +28,8 @@ export interface FileState {
     status: FileStatus;
     /** Source URL this file is tracked from / would be installed from. */
     source?: string;
+    /** Template id of that source. */
+    templateId?: string;
     template?: CatalogFile;
     lock?: LockEntry;
     /** Baseline inferred from template history when there is no lock entry. */
@@ -46,6 +48,14 @@ export interface ComponentState {
     /** keepLocal comes from a legacy sync toggle (updateInstructions/updateExtensions). */
     implicitKeep: boolean;
     source?: string;
+    /** Template id the component belongs to (undefined = your own, local-only component). */
+    templateId?: string;
+    /** Switched off because its whole template is disabled (sync.templates.disabled). */
+    templateDisabled: boolean;
+    /** Not installed and deliberately left out via "Manage Components". */
+    excluded: boolean;
+    /** Not installed, and the template gained it after you last chose its components. */
+    newInTemplate: boolean;
     /** Other sources that also offer this component. */
     alsoIn: string[];
     installed: boolean;
@@ -140,6 +150,14 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
     const policy = project.sync.components;
     const disabledIds = new Set(policy.disabled);
     const keepIds = new Set(policy.keepLocal);
+    const disabledTemplates = new Set(project.sync.templates?.disabled ?? []);
+    const templateOf = (url: string | undefined, entry?: LockEntry): string | undefined => {
+        if (!url) { return undefined; }
+        const cat = catalogs.find(c => sameUrl(c.repo.spec.url, url));
+        if (cat) { return cat.manifest.id; }
+        return entry?.template ?? lock?.sources.find(s => sameUrl(s.url, url))?.id ?? templateIdFromUrl(url);
+    };
+    const offByTemplate = (ref: ComponentRef, tpl: string | undefined) => !!tpl && disabledTemplates.has(tpl) && TEMPLATE_TOGGLE_KINDS.includes(ref.kind);
 
     // Which catalog file each destination is tracked from.
     const tracked = new Map<string, { cat: Catalog; file: CatalogFile }>();
@@ -178,16 +196,17 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
         }
     }
     for (const id of disabledIds) { installedComponents.add(id); }
+    const isOff = (ref: ComponentRef, tpl: string | undefined) => disabledIds.has(ref.id) || (offByTemplate(ref, tpl) && installedComponents.has(ref.id));
 
     const states: FileState[] = [];
     for (const [dest, { cat, file }] of tracked) {
         const ref = file.component;
         const le = lock?.files[dest] && sameUrl(lock.files[dest].source, cat.repo.spec.url) ? lock.files[dest] : undefined;
-        const st: FileState = { destRel: dest, srcRel: file.srcRel, component: ref, status: 'current', source: cat.repo.spec.url, template: file, lock: le };
+        const st: FileState = { destRel: dest, srcRel: file.srcRel, component: ref, status: 'current', source: cat.repo.spec.url, templateId: cat.manifest.id, template: file, lock: le };
         const local = localText.get(dest);
         if (local !== undefined) { st.localHash = hashText(local); }
 
-        if (disabledIds.has(ref.id)) {
+        if (isOff(ref, cat.manifest.id)) {
             st.status = 'disabled';
         } else if (local === undefined) {
             if (le) { st.status = 'missing'; }
@@ -218,9 +237,10 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
         const ref = componentOf(le.path);
         const exists = localText.has(dest) || fs.existsSync(disabledPath(root, dest));
         if (!exists) { continue; }
+        const tpl = templateOf(le.source, le);
         states.push({
-            destRel: dest, srcRel: le.path, component: ref, lock: le, source: le.source,
-            status: disabledIds.has(ref.id) ? 'disabled' : 'removed',
+            destRel: dest, srcRel: le.path, component: ref, lock: le, source: le.source, templateId: tpl,
+            status: isOff(ref, tpl) ? 'disabled' : 'removed',
             localHash: localText.has(dest) ? hashText(localText.get(dest)!) : undefined
         });
     }
@@ -245,8 +265,10 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
         if (known.has(rel)) { continue; }
         const srcRel = srcFromDest(rel, project.sync);
         const ref = componentOf(srcRel);
-        if (!disabledIds.has(ref.id)) { continue; }
-        states.push({ destRel: rel, srcRel, component: ref, status: 'disabled' });
+        const le = lock?.files[rel];
+        const tpl = le ? templateOf(le.source, le) : undefined;
+        if (!isOff(ref, tpl)) { continue; }
+        states.push({ destRel: rel, srcRel, component: ref, status: 'disabled', source: le?.source, templateId: tpl, lock: le });
         known.add(rel);
     }
 
@@ -264,16 +286,27 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
         const srcCounts = new Map<string, number>();
         for (const f of files) { if (f.source) { srcCounts.set(f.source, (srcCounts.get(f.source) ?? 0) + 1); } }
         const source = [...srcCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        const ref = files[0].component;
+        const templateId = files.find(f => f.source && sameUrl(f.source, source))?.templateId ?? templateOf(source);
+        const installed = installedComponents.has(id) || files.some(f => f.status === 'custom');
+        const templateDisabled = !disabledIds.has(id) && installed && offByTemplate(ref, templateId);
+        const status = aggregateStatus(files);
+        const exclude = status === 'available' ? lock?.sources.find(s => sameUrl(s.url, source))?.exclude : undefined;
+        const excluded = !!exclude?.includes(id);
         components.push({
-            ref: files[0].component,
+            ref,
             files,
-            status: aggregateStatus(files),
-            disabled: disabledIds.has(id),
+            status,
+            disabled: disabledIds.has(id) || templateDisabled,
             keepLocal: keepIds.has(id) || implicitKeep,
             implicitKeep,
             source,
+            templateId,
+            templateDisabled,
+            excluded,
+            newInTemplate: !!exclude && !excluded,
             alsoIn: [...(alsoIn.get(id) ?? [])].filter(u => !sameUrl(u, source)),
-            installed: installedComponents.has(id) || files.some(f => f.status === 'custom')
+            installed
         });
     }
     components.sort((a, b) => KIND_ORDER.indexOf(a.ref.kind) - KIND_ORDER.indexOf(b.ref.kind) || a.ref.name.localeCompare(b.ref.name));

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ComponentPolicy, ProjectConfig, writeComponentPolicy } from './config';
+import { ComponentPolicy, ProjectConfig, TEMPLATE_TOGGLE_KINDS, TemplatePolicy, writeComponentPolicy, writeTemplatePolicy } from './config';
 import { Catalog, transformedAt } from './catalog';
 import { run } from './exec';
 import { emptyLock, ensureSource, LockFile, writeLock } from './lock';
@@ -21,7 +21,7 @@ export class ProjectOps {
     constructor(readonly root: string, public project: ProjectConfig, lock: LockFile | undefined, readonly catalogs: Catalog[]) {
         this.lock = lock ?? emptyLock();
         if (!lock) {
-            catalogs.forEach((c, i) => ensureSource(this.lock, { name: c.repo.spec.name, url: c.repo.spec.url, ref: c.repo.spec.ref }, i === 0));
+            catalogs.forEach((c, i) => ensureSource(this.lock, { name: c.repo.spec.name, id: c.manifest.id, url: c.repo.spec.url, ref: c.repo.spec.ref }, i === 0));
         }
     }
 
@@ -34,9 +34,10 @@ export class ProjectOps {
     }
 
     private record(st: FileState, cat: Catalog, installedText: string, commit = cat.sha, templateHash = st.template!.rawHash): void {
-        ensureSource(this.lock, { name: cat.repo.spec.name, url: cat.repo.spec.url, ref: cat.repo.spec.ref });
+        ensureSource(this.lock, { name: cat.repo.spec.name, id: cat.manifest.id, url: cat.repo.spec.url, ref: cat.repo.spec.ref });
         this.lock.files[st.destRel] = {
             source: cat.repo.spec.url,
+            template: cat.manifest.id,
             path: st.srcRel,
             commit,
             templateHash,
@@ -165,14 +166,7 @@ export class ProjectOps {
 
     /** Turn a component off: its files move to .bc-alm/disabled so they are kept but not discovered. */
     disable(comp: ComponentState): void {
-        for (const f of comp.files) {
-            const src = this.abs(f.destRel);
-            if (!fs.existsSync(src)) { continue; }
-            const dst = disabledPath(this.root, f.destRel);
-            fs.mkdirSync(path.dirname(dst), { recursive: true });
-            fs.renameSync(src, dst);
-            removeEmptyParents(src, this.root);
-        }
+        this.stash(comp.files);
         const p = this.policy();
         p.disabled = [...new Set([...p.disabled, comp.ref.id])];
         this.savePolicy(p);
@@ -183,7 +177,28 @@ export class ProjectOps {
         const p = this.policy();
         p.disabled = p.disabled.filter(x => x !== comp.ref.id);
         this.savePolicy(p);
-        for (const f of comp.files) {
+        if (!this.offByTemplate(comp)) { this.unstash(comp.files); }
+    }
+
+    /** True when the component's template is switched off (it then stays stored until the template is enabled). */
+    offByTemplate(comp: ComponentState): boolean {
+        return !!comp.templateId && this.project.sync.templates.disabled.includes(comp.templateId) && TEMPLATE_TOGGLE_KINDS.includes(comp.ref.kind);
+    }
+
+    private stash(files: FileState[]): void {
+        for (const f of files) {
+            const src = this.abs(f.destRel);
+            if (!fs.existsSync(src)) { continue; }
+            const dst = disabledPath(this.root, f.destRel);
+            fs.mkdirSync(path.dirname(dst), { recursive: true });
+            if (fs.existsSync(dst)) { fs.rmSync(dst, { force: true }); }
+            fs.renameSync(src, dst);
+            removeEmptyParents(src, this.root);
+        }
+    }
+
+    private unstash(files: FileState[]): void {
+        for (const f of files) {
             const stored = disabledPath(this.root, f.destRel);
             const dst = this.abs(f.destRel);
             if (fs.existsSync(stored)) {
@@ -194,6 +209,47 @@ export class ProjectOps {
                 this.take(f);
             }
         }
+    }
+
+    /**
+     * Switch a whole template off: the installed agents, skills, prompts and instructions it provides
+     * move to .bc-alm/disabled (docs, workflows and scripts stay). Recorded in sync.templates.disabled.
+     */
+    disableTemplate(templateId: string, components: ComponentState[]): ComponentState[] {
+        const individuallyOff = new Set(this.project.sync.components.disabled);
+        const affected = components.filter(c => c.templateId === templateId && c.installed && !individuallyOff.has(c.ref.id) && TEMPLATE_TOGGLE_KINDS.includes(c.ref.kind));
+        for (const c of affected) { this.stash(c.files); }
+        const t = this.project.sync.templates;
+        this.saveTemplatePolicy({ disabled: [...new Set([...t.disabled, templateId])] });
+        return affected;
+    }
+
+    /** Switch a template back on; components you disabled one by one stay off. */
+    enableTemplate(templateId: string, components: ComponentState[]): ComponentState[] {
+        this.saveTemplatePolicy({ disabled: this.project.sync.templates.disabled.filter(x => x !== templateId) });
+        const restore = components.filter(c => c.templateId === templateId && c.templateDisabled && !this.project.sync.components.disabled.includes(c.ref.id));
+        for (const c of restore) { this.unstash(c.files); }
+        return restore;
+    }
+
+    private saveTemplatePolicy(p: TemplatePolicy): void {
+        writeTemplatePolicy(this.root, p);
+        this.project.sync.templates = { disabled: [...new Set(p.disabled)].sort() };
+    }
+
+    /** Record which components of a source you deliberately do not take (undefined = no selection made). */
+    setExclude(url: string, exclude: string[] | undefined): void {
+        const s = this.lock.sources.find(x => sameUrl(x.url, url));
+        const cat = this.catalogs.find(c => sameUrl(c.repo.spec.url, url));
+        if (!s) {
+            if (!cat) { throw new Error(`${url} is not a template source of this project.`); }
+            ensureSource(this.lock, { name: cat.repo.spec.name, id: cat.manifest.id, url, ref: cat.repo.spec.ref, exclude });
+        } else {
+            s.exclude = exclude;
+            if (!exclude) { delete s.exclude; }
+            if (cat && !s.id) { s.id = cat.manifest.id; }
+        }
+        this.dirty = true;
     }
 
     /** Re-point a component to another template source (next update takes that source's version). */

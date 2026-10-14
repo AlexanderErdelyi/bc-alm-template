@@ -39,6 +39,11 @@ export class TemplateRepo {
         return this.spec.name || this.spec.url;
     }
 
+    /** True when a local mirror exists (it can be read without the network). */
+    isCached(): boolean {
+        return fs.existsSync(path.join(this.gitDir, 'HEAD'));
+    }
+
     /** Clone (first time) or fetch. `maxAgeMs` skips the fetch when the mirror is fresh enough. */
     async ensure(maxAgeMs = 0): Promise<void> {
         if (!fs.existsSync(path.join(this.gitDir, 'HEAD'))) {

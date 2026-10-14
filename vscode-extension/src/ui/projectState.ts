@@ -1,9 +1,11 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
-import { ProjectConfig, readProjectConfig } from '../core/config';
+import { classifySourceError } from '../core/access';
+import { manifestOf, ProjectConfig, readProjectConfig, TemplateManifest, templateIdFromUrl } from '../core/config';
 import { resolveProjectRoot } from '../core/layout';
 import { LockFile, LockSource, readLock } from '../core/lock';
+import { componentOf, isManaged } from '../core/paths';
 import { ComponentState, computeStatus, FileState, ProjectStatus } from '../core/status';
 import { TemplateRepo, TemplateRepoRegistry, TemplateSourceSpec } from '../core/templateRepo';
 import { ProjectOps } from '../core/operations';
@@ -16,8 +18,28 @@ export interface SourceInfo extends TemplateSourceSpec {
     primary: boolean;
     upstreamDefault: boolean;
     inSettings: boolean;
+    /** Actionable load problem (no usable copy). */
     error?: string;
+    /** Loaded from the cached copy because the fetch failed. */
+    warning?: string;
     sha?: string;
+    /** Template identity (manifest block or repository name); known once the source was read. */
+    manifest?: TemplateManifest;
+    /** Number of components the template offers. */
+    componentCount?: number;
+    /** Template switched off in this project (sync.templates.disabled). */
+    disabled?: boolean;
+    /** Another loaded source uses the same template id. */
+    duplicateOf?: string;
+}
+
+export interface TemplateGroup {
+    id: string;
+    manifest: TemplateManifest;
+    source?: SourceInfo;
+    primary: boolean;
+    disabled: boolean;
+    components: ComponentState[];
 }
 
 export function settingsSources(): TemplateSourceSpec[] {
@@ -107,25 +129,71 @@ export class ProjectState implements vscode.Disposable {
             settingsSources().forEach(s => push(s, true));
 
             this.catalogs = [];
+            const problems: string[] = [];
+            const load = async (info: SourceInfo, p: TemplateSourceSpec, age: number) => {
+                const repo = this.repo({ name: p.name, url: p.url, ref: p.ref });
+                try {
+                    await repo.ensure(age);
+                } catch (e) {
+                    const prob = classifySourceError((e as Error).message, p.url, p.ref);
+                    if (!repo.isCached()) { throw Object.assign(new Error(prob.message), { detail: prob.detail }); }
+                    info.warning = prob.message;
+                }
+                return repo;
+            };
+            const fail = (info: SourceInfo, e: unknown) => {
+                const err = e as Error & { detail?: string };
+                info.error = err.detail ? err.message : classifySourceError(err.message, info.url, info.ref).message;
+            };
             if (this.root && this.project) {
                 for (const p of projectSrc) {
                     const info = all.find(x => sameUrl(x.url, p.url))!;
                     try {
-                        const repo = this.repo({ name: p.name, url: p.url, ref: p.ref });
-                        await repo.ensure(maxAge);
+                        const repo = await load(info, p, maxAge);
                         const sha = await repo.resolve();
                         info.sha = sha;
-                        this.catalogs.push(await buildCatalog(repo, sha, this.project));
+                        const cat = await buildCatalog(repo, sha, this.project);
+                        this.catalogs.push(cat);
+                        info.manifest = cat.manifest;
+                        info.componentCount = new Set([...cat.files.values()].map(f => f.component.id)).size;
                     } catch (e) {
-                        info.error = (e as Error).message;
+                        fail(info, e);
                     }
                 }
                 this.status = await computeStatus({ root: this.root, project: this.project, lock: this.lock, catalogs: this.catalogs });
                 const failed = all.filter(s => s.inProject && s.error);
-                if (failed.length) { this.lastError = `Could not load ${failed.map(f => f.name ?? f.url).join(', ')}: ${failed[0].error}`; }
+                if (failed.length) { problems.push(`Could not load ${failed.map(f => f.name ?? f.url).join(', ')}: ${failed[0].error}`); }
             } else {
                 this.status = undefined;
             }
+            // Settings-only sources: read the identity from the cached copy (no network unless asked to refresh).
+            for (const info of all.filter(s => !s.sha && !s.error)) {
+                try {
+                    const spec = { name: info.name, url: info.url, ref: info.ref };
+                    const repo = this.repo(spec);
+                    if (!repo.isCached() && !fetch) { continue; }
+                    await load(info, spec, fetch ? 0 : Number.POSITIVE_INFINITY);
+                    const sha = await repo.resolve();
+                    info.sha = sha;
+                    const cfg = await repo.readConfig(sha);
+                    info.manifest = manifestOf(cfg, info.url, info.name);
+                    const sync = this.project?.sync ?? cfg?.sync;
+                    if (sync) { info.componentCount = new Set((await repo.listFiles(sha)).filter(f => isManaged(f, sync)).map(f => componentOf(f).id)).size; }
+                } catch (e) {
+                    fail(info, e);
+                }
+            }
+            const disabled = new Set(this.project?.sync.templates.disabled ?? []);
+            for (const info of all) {
+                if (!info.manifest) { continue; }
+                info.disabled = info.inProject && disabled.has(info.manifest.id);
+                const twin = all.find(o => o !== info && o.manifest?.id === info.manifest!.id && (o.inProject || !info.inProject));
+                if (twin && all.indexOf(twin) < all.indexOf(info)) {
+                    info.duplicateOf = twin.name ?? twin.url;
+                    if (info.inProject && twin.inProject) { problems.push(`Two template sources use the template id "${info.manifest.id}" (${twin.name ?? twin.url} and ${info.name ?? info.url}). Give each template a unique "template.id" in its template.config.json.`); }
+                }
+            }
+            this.lastError = problems.length ? problems.join(' ') : undefined;
             this.sources = all;
         } catch (e) {
             this.lastError = (e as Error).message;
@@ -143,6 +211,37 @@ export class ProjectState implements vscode.Disposable {
 
     component(id: string): ComponentState | undefined {
         return this.status?.components.find(c => c.ref.id === id);
+    }
+
+    /** The project's templates (primary first) with the components each one provides. */
+    templateGroups(): TemplateGroup[] {
+        const disabled = new Set(this.project?.sync.templates.disabled ?? []);
+        const groups = new Map<string, TemplateGroup>();
+        const add = (id: string, manifest: TemplateManifest, source?: SourceInfo) => {
+            let g = groups.get(id);
+            if (!g) {
+                g = { id, manifest, source, primary: !!source?.primary, disabled: disabled.has(id), components: [] };
+                groups.set(id, g);
+            }
+            return g;
+        };
+        for (const s of this.sources.filter(x => x.inProject)) {
+            const id = s.manifest?.id ?? templateIdFromUrl(s.url);
+            add(id, s.manifest ?? { id, name: s.name ?? id }, s);
+        }
+        for (const c of this.status?.components ?? []) {
+            if (c.templateId) { add(c.templateId, { id: c.templateId, name: c.templateId }).components.push(c); }
+        }
+        return [...groups.values()];
+    }
+
+    /** Your own components that come from no template. */
+    localComponents(): ComponentState[] {
+        return (this.status?.components ?? []).filter(c => !c.templateId);
+    }
+
+    templateGroup(id: string): TemplateGroup | undefined {
+        return this.templateGroups().find(g => g.id === id);
     }
 
     file(destRel: string): FileState | undefined {
