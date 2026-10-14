@@ -336,6 +336,9 @@ wraps everything below in VS Code:
 - **Save to My Template…** pushes your customizations to your own template repository
   (overwrite or save as new; direct commit or PR). **Contribute to Source Template** opens a PR
   upstream.
+- **Several templates**: this repository is a template catalog — the root `bc-alm` template plus
+  [`.templates/<id>/`](.templates/README.md) templates and variants (e.g. `bc-alm-lite`). Browse
+  and pick templates, add your own via pull request, create variants and follow released versions.
 - A **Guidance & What's New** view shows best practices, template changes and Copilot updates.
   Live validation flags outdated agent/skill/prompt frontmatter.
 
@@ -773,6 +776,7 @@ bc-alm-template/
 ├── app/                                    ← Sample production app (app.json + src/)
 ├── test/                                   ← Sample test app (app.json + src/, depends on app/)
 ├── bc-alm-template.code-workspace          ← Multi-root workspace (app/ + test/); enables parent-repo customization discovery
+├── .templates/                             ← Template catalog: more templates/variants, one folder per id (template repo only)
 ├── template.config.json                    ← Project tokens (prefix, range, org…) + sync/component policy
 ├── template.lock.json                      ← (in projects) Sync baseline: template commit + hash per file
 ├── .templatesyncignore                     ← Project-owned paths never overwritten by template updates
@@ -895,7 +899,7 @@ BC/AL-Go branching model informed by [microsoft/AL-Go](https://github.com/micros
 
 ## Contributing
 
-This is a public template — PRs welcome. If you've adapted this for your team and have improvements to the agents, spec templates, or documentation, please contribute back. See [CONTRIBUTING.md](CONTRIBUTING.md).
+This is a public template — PRs welcome. If you've adapted this for your team and have improvements to the agents, spec templates, or documentation, please contribute back. See [CONTRIBUTING.md](CONTRIBUTING.md). New templates and variants (for example a BC upgrade template) go into [`.templates/`](.templates/README.md) (see *Contributing templates* in CONTRIBUTING.md).
 
 ---
 

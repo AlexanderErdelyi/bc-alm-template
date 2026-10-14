@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.4.0 — Template catalogs, variants and versions
+
+- **Template catalogs**: a repository can hold several templates, the root template plus one
+  `.templates/<id>/` folder each. Every template is its own source (`path` in
+  `bcAlm.templateSources` and in the lock). `Update-FromTemplate.ps1` takes `-TemplatePath`. (#67)
+- **Catalog sources**:
+  - The Template Sources view groups sources by repository.
+  - **Add Template Source…** lists the repository's templates and adds the ones you pick.
+  - **Browse Templates…** offers Use in This Project, Add to My Sources, Preview Components and
+    Open README. (#68)
+- **Add New Template to This Repository…**: blank, seeded from your project, or a variant.
+  - It is delivered as a direct commit or as a pull request, through a fork if needed.
+  - After a pull request you can **Try It Now** from the PR branch.
+  - **Create New Template…** first asks for the location: a catalog or a new repository. (#69)
+- **Contributing to a catalog**:
+  - **Contribute…** and **Save to My Template…** offer catalog templates you haven't added.
+  - They propose a version bump with a changelog entry and request the template's maintainers
+    as reviewers.
+  - They offer to copy or move a component between templates of the same repository. (#70)
+- **Variants**: `extends` and `remove` in the template block.
+  - Files in the variant folder replace whole components; values are inherited from the base.
+  - The Components view marks **variant override** and **base changed**.
+  - New commands: **Compare with Base Template** and **Create Variant…**. (#71)
+- **Versions**: per-template tags `<id>/vX.Y.Z`.
+  - **Release Version…** suggests the bump from conventional commits, updates the version and
+    changelog, and creates the tag.
+  - Sources can follow `latest`, a pinned version, or a branch; **Change Version / Branch…**
+    switches between them.
+  - Pinned sources show "vX.Y.Z available", with **Upgrade to Newest Version**.
+  - `Update-FromTemplate.ps1 -Branch latest` works too. (#72)
+- **This repository is a catalog**:
+  - `.templates/README.md`;
+  - the `bc-alm-lite` example variant;
+  - `.github/CODEOWNERS` and a template contribution PR template;
+  - the `template-validate` workflow, backed by the new `out/src/cli/validate.js` CLI
+    (manifests, `extends`/`remove`, customization files, version bump and changelog). (#73)
+- **Distinct icons**:
+  - Add Template Source: plug
+  - Create New Template: new folder
+  - Use in This Project: arrow
+  - Browse Templates: library
+  - Create Variant: branch
+  - Release Version: tag
+  - Upgrade to Newest Version: arrow up
+  - Change Version / Branch: versions (#74)
+
 ## 0.3.0 — Multi-template management
 
 - **Template manifests**: a template repository can describe itself in a top-level `template`

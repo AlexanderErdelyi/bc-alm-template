@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "alexandererdelyi",
   "license": "MIT",
   "repository": {
@@ -894,7 +894,7 @@
       "properties": {
         "bcAlm.templateSources": {
           "type": "array",
-          "markdownDescription": "Template repositories you can create projects from and pull agents/skills/prompts/instructions from. The first entry is the default for new projects. Add your own fork or organization template here (or use **BC ALM: Create My Own Template Repository**).",
+          "markdownDescription": "Template repositories you can create projects from and pull agents/skills/prompts/instructions from. The first entry is the default for new projects. A catalog repository holds several templates (root + `.templates/<id>/`); add one entry per template with `path`, or use **Add Template Source…** / **Browse Templates…**.",
           "default": [
             {
               "name": "BC ALM Template (upstream)",
@@ -916,10 +916,14 @@
                 "type": "string",
                 "description": "Git URL (https or ssh) or local path of the template repository."
               },
+              "path": {
+                "type": "string",
+                "description": "Folder of the template inside a catalog repository, e.g. .templates/bc-upgrade (empty = the root template)."
+              },
               "ref": {
                 "type": "string",
                 "default": "main",
-                "description": "Branch or tag to track."
+                "description": "Branch, tag (e.g. bc-upgrade/v1.2.0) or \"latest\" (newest released version of the template)."
               },
               "upstream": {
                 "type": "string",

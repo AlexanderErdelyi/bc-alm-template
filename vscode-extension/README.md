@@ -22,6 +22,13 @@ Business Central projects: its Copilot agents, skills, prompts, instructions and
   - **Choose Components…** per source;
   - **Create New Template…**: blank, seeded from your project, or copied;
   - **Share Template Sources** with your team.
+- **Template catalogs**: one repository holds many templates (`.templates/<id>/`).
+  - **Browse Templates…** and pick which ones to add.
+  - **Add New Template to This Repository…** delivers a commit or a pull request.
+  - **Create Variant…** builds a template that extends another one, removes some components and
+    overrides others.
+  - **Release Version…** creates per-template version tags. Sources follow `latest`, a pinned
+    version, or a branch, and **Upgrade to Newest Version** moves a pinned source forward.
 - **Your own template**: create a company template, add more template sources, **save** a
   customized component to it (overwrite or save as new; commit or PR), sync it from upstream,
   or **contribute** improvements back upstream. Create Template offers:
@@ -57,7 +64,7 @@ Full guide: [docs/vscode-extension.md](https://github.com/AlexanderErdelyi/bc-al
 
 | Setting | Purpose |
 | --- | --- |
-| `bcAlm.templateSources` | Template repositories (URL or local path), refs and optional `upstream` to sync from. |
+| `bcAlm.templateSources` | Template repositories (URL or local path), `path` of a catalog template, ref (branch, tag or `latest`) and optional `upstream` to sync from. |
 | `bcAlm.components.groupBy` | Group the Components view by template, kind, or automatically. |
 | `bcAlm.checkForUpdatesOnStartup` | Check for template updates when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | Minimum minutes between automatic fetches. |
