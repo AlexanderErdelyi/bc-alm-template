@@ -31,7 +31,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Ensure labels exist
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const labels = [
@@ -64,7 +64,7 @@ jobs:
 
       - name: Triage issue quality
         id: triage
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const issue = context.payload.issue;
@@ -252,7 +252,7 @@ jobs:
         # issue-planning.yml workflow still handles the case where a maintainer
         # manually adds the stage:planning label.
         if: steps.triage.outputs.planning_needed == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const issue = context.payload.issue;
