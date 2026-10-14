@@ -16,12 +16,13 @@ company template, and installs them into your AL projects:
   edits.
 - **Sharing back:** you can contribute improvements back as pull requests.
 
-<!-- Screenshots: uncomment once the PNGs exist in media/screenshots/ (see media/screenshots/README.md).
 ![Components view with update statuses](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/components.png)
-![New project from a template](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/new-project.png)
+
+![Template Sources view with sharing actions](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/new-project.png)
+
 ![Browse templates in a catalog](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/browse-templates.png)
-![Contribute a change back as a pull request](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/contribute.png)
--->
+
+![Create a new template in a catalog or its own repository](https://raw.githubusercontent.com/AlexanderErdelyi/bc-alm-template/main/vscode-extension/media/screenshots/contribute.png)
 
 > **Preview.** BC ALM is new. Please report anything odd in
 > [GitHub issues](https://github.com/AlexanderErdelyi/bc-alm-template/issues).

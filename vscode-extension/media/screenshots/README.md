@@ -20,5 +20,5 @@ These PNGs are used by the Marketplace page (`vscode-extension/README.md`) throu
 | `browse-templates.png` | **Browse Templates…** on a catalog with several templates, showing the actions (Use in This Project / Add to My Sources / Preview Components / Open README). |
 | `contribute.png` | **Contribute to Source Template (Pull Request)…**: the pick of changed components, or the resulting pull request. |
 
-When the files are on `main`, uncomment the screenshot block at the top of
-`vscode-extension/README.md`.
+The images are referenced near the top of `vscode-extension/README.md`. When you replace a file,
+keep its name, or update the link and caption there.
