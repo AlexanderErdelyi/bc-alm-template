@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "publisher": "AlexanderErdelyi",
   "license": "MIT",
   "icon": "media/icon.png",
