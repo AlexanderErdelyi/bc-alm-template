@@ -790,7 +790,10 @@ if ($CleanupTemplateFiles) {
         Write-Host "`nCleaning up template-only files" -ForegroundColor Cyan
         $removeList = @('CONTRIBUTING.md', 'scripts/Install-IntoExistingRepo.ps1', '.bc-alm/scripts/Install-IntoExistingRepo.ps1',
             'bootstrap.ps1', 'vscode-extension', '.github/workflows/vscode-extension.yml',
-            '.templates', '.github/workflows/template-validate.yml', '.github/CODEOWNERS', '.github/PULL_REQUEST_TEMPLATE')
+            '.templates', '.github/workflows/template-validate.yml', '.github/CODEOWNERS', '.github/PULL_REQUEST_TEMPLATE',
+            # Template-repo governance (maintainer contacts, sponsor link, repo-specific automation).
+            'SECURITY.md', 'CODE_OF_CONDUCT.md', '.github/FUNDING.yml', '.github/dependabot.yml',
+            '.github/workflows/scorecard.yml')
         foreach ($rel in $removeList) {
             $p = Join-Path $RepoRoot $rel
             if (Test-Path $p) {

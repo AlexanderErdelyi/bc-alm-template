@@ -14,10 +14,8 @@ on:
       - ".github/workflows/vscode-extension.yml"
     tags:
       - "ext-v*"
+  # Every PR runs the build so "build" can be a required status check on main.
   pull_request:
-    paths:
-      - "vscode-extension/**"
-      - ".github/workflows/vscode-extension.yml"
   workflow_dispatch:
 
 permissions:

@@ -7,17 +7,8 @@ name: Template validate
 # Template-repo only: projects created from the template drop this workflow.
 
 on:
+  # Every PR runs the validation so "validate" can be a required status check on main.
   pull_request:
-    paths:
-      - ".templates/**"
-      - ".github/agents/**"
-      - ".github/skills/**"
-      - ".github/prompts/**"
-      - ".github/instructions/**"
-      - "template.config.json"
-      - "vscode-extension/src/core/**"
-      - "vscode-extension/src/cli/**"
-      - ".github/workflows/template-validate.yml"
   push:
     branches: [main]
     paths:

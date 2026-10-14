@@ -4,6 +4,8 @@ Thanks for your interest in improving this template! This is a public, opinionat
 BC ALM template — contributions to the agents, instructions, spec templates, workflows,
 and documentation are welcome.
 
+By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## How to contribute
 
 1. **Open an issue first** for anything non-trivial. This repo runs an automated
