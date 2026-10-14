@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "publisher": "AlexanderErdelyi",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -15,6 +15,9 @@
   "homepage": "https://github.com/AlexanderErdelyi/bc-alm-template/tree/main/vscode-extension#readme",
   "bugs": {
     "url": "https://github.com/AlexanderErdelyi/bc-alm-template/issues"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/AlexanderErdelyi"
   },
   "repository": {
     "type": "git",

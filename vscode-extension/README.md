@@ -149,3 +149,6 @@ All commands are in the Command Palette under **BC ALM:** and in the BC ALM view
   [CONTRIBUTING.md](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/CONTRIBUTING.md).
 - **Release notes:** [CHANGELOG](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/vscode-extension/CHANGELOG.md).
 - **License:** [MIT](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/LICENSE).
+- **Like BC ALM?** You can support its development through
+  [GitHub Sponsors](https://github.com/sponsors/AlexanderErdelyi), or with a ⭐ on the
+  [repository](https://github.com/AlexanderErdelyi/bc-alm-template).
