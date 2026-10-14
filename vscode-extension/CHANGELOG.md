@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.2 — Pre-publish hardening
+
+- **Friendly errors when tools are missing:** git, the GitHub CLI or PowerShell now gives a
+  message with an install link instead of `spawn … ENOENT`. (#81)
+- **Credentials are masked:** tokens and `user:password@` URL parts no longer reach the output
+  channel, notifications or error messages. (#81)
+- **Writes are confined:** file writes that would land outside the project folder are refused.
+  (#81)
+- **`bcAlm.powershellPath` is now machine-scoped:** it can only be set in user settings, so a
+  repository's workspace settings can't change which executable runs. (#81)
+- New **Privacy and security** section in the README and a pre-release smoke-test checklist.
+  (#81)
+
 ## 0.4.1 — Marketplace preparation
 
 - New extension icon and Marketplace metadata (keywords, links, banner). The extension is

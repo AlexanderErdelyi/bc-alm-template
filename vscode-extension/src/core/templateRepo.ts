@@ -6,7 +6,7 @@ import { CATALOG_DIR, LATEST_REF, templateVersionTags, VersionTag } from './cata
 import { catFileBatch, git } from './exec';
 import { parseConfig, ProjectConfig, slugId, TemplateManifest, templateIdFromUrl } from './config';
 import { componentOf } from './paths';
-import { normalizeUrl, safeRemove, sourceKey, templatePath } from './util';
+import { insideRoot, normalizeUrl, safeRemove, sourceKey, templatePath } from './util';
 
 export interface TemplateSourceSpec {
     name?: string;
@@ -519,7 +519,7 @@ export class TemplateRepo {
         try {
             await this.mirror.checkout(sha, tmp);
             for (const [rel, repoPath] of layout.files) {
-                const to = path.join(dest, ...rel.split('/'));
+                const to = insideRoot(dest, rel);
                 fs.mkdirSync(path.dirname(to), { recursive: true });
                 fs.copyFileSync(path.join(tmp, ...repoPath.split('/')), to);
             }

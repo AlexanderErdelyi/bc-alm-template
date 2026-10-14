@@ -338,7 +338,7 @@ The **Guidance & What's New** view combines:
 | `bcAlm.components.groupBy` | `auto` | Group components by `template`, by `kind`, or `auto` (by template when more than one is in use). |
 | `bcAlm.checkForUpdatesOnStartup` | `true` | Fetch sources and compute status when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | `60` | Minimum time between automatic fetches. |
-| `bcAlm.powershellPath` | auto | PowerShell used for project creation. |
+| `bcAlm.powershellPath` | auto | PowerShell used for project creation. Machine-scoped: user settings only, never from a repo's workspace settings. |
 | `bcAlm.validation.enabled` | `true` | Live diagnostics for customization files. |
 | `bcAlm.whatsNew.feedUrl` / `keywords` | GitHub Changelog (Copilot) | What's New feed and filter. |
 
@@ -371,3 +371,76 @@ Node. The UI (tree views, commands, wizards, diagnostics) is in `src/ui/`. CI is
 [`.github/workflows/vscode-extension.yml`](../.github/workflows/vscode-extension.yml). It
 builds and tests every change, and attaches the VSIX to a GitHub release when you push an
 `ext-v*` tag.
+
+### Pre-release smoke test
+
+Run this before every Marketplace release. Use a clean profile, so that no settings, other
+extensions or cached template mirrors hide first-run problems.
+
+```powershell
+cd vscode-extension
+npm run package                                   # or download bc-alm.vsix from the CI run
+code --profile "BC ALM Smoke" --install-extension .\bc-alm-<version>.vsix
+code --profile "BC ALM Smoke" C:\temp\bc-alm-smoke  # an empty folder
+```
+
+Record the OS, VS Code version and extension version, then tick each item:
+
+- [ ] **Install:**
+  - [ ] The BC ALM view appears in the Activity Bar.
+  - [ ] The icon and preview badge show on the extension page.
+  - [ ] The BC ALM output channel shows no errors.
+- [ ] **Restricted Mode:** open the folder untrusted. BC ALM is disabled and explains why.
+  Trusting the folder enables it.
+- [ ] **No folder open:** run commands from a window with no folder. You get a readable "open a
+  project first" message, not a stack trace.
+- [ ] **Missing tools:**
+  - [ ] With `gh` removed from PATH, run **Contribute to Source Template**. You get a message
+    with the https://cli.github.com link.
+  - [ ] Do the same with `git` missing: the message links https://git-scm.com.
+- [ ] **New Project from Template…** with the default source, signed in as a GitHub user with
+  **no write access** to the template. The project is created and initialized.
+- [ ] **Components view:**
+  - [ ] Check for Template Updates.
+  - [ ] Compare with Template.
+  - [ ] Update from Template.
+  - [ ] Skip This Update.
+  - [ ] Reset to Template Version.
+  - [ ] Merge Template Changes (3-way).
+  - [ ] Disable Component, then Enable Component.
+  - [ ] Always Keep My Version, then Resume Template Sync.
+  - [ ] Choose Components…
+  - [ ] Group by Kind / Template.
+- [ ] **Sources view:**
+  - [ ] Add Template Source… and Browse Templates…
+  - [ ] Change Version / Branch…
+  - [ ] Set as Primary Source.
+  - [ ] Remove Template Source.
+  - [ ] Share Template Sources with My Team…
+  - [ ] Add This Project's Sources to My Settings.
+- [ ] **Authoring:**
+  - [ ] New Agent / Skill / Prompt / Instruction…
+  - [ ] Validate Copilot Customizations: findings appear in Problems.
+  - [ ] Review This Customization with Copilot.
+- [ ] **Contribute and own templates** (as a user without write access):
+  - [ ] Contribute to Source Template offers a **fork-based** pull request.
+  - [ ] Copy a Template into My Own Repository…
+  - [ ] Save to My Template…
+  - [ ] Pull Upstream Updates into My Template.
+- [ ] **Catalogs:**
+  - [ ] Create New Template… and Create Variant…
+  - [ ] Release Version…
+  - [ ] Upgrade to Newest Version.
+  - [ ] Switch Active Templates…
+- [ ] **Existing repo:**
+  - [ ] Add BC ALM to This Repository…
+  - [ ] Record Template Baseline.
+  - [ ] Move BC ALM Files into .bc-alm/
+- [ ] **Guidance:**
+  - [ ] Open Best-Practices Guide.
+  - [ ] Refresh What's New.
+  - [ ] Open Link.
+- [ ] **Output channel:** no tokens or `user:password@` URLs anywhere in the BC ALM log.
+
+Repeat on Linux or in a Codespace when possible (PowerShell 7 required for project creation).
+Post the results on the release issue.
