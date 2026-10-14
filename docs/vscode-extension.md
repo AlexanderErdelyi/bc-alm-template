@@ -1,5 +1,8 @@
 # BC ALM VS Code extension
 
+[![VS Code Marketplace](https://vsmarketplacebadges.dev/version-short/AlexanderErdelyi.bc-alm.svg?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/AlexanderErdelyi.bc-alm.svg)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+
 The **BC ALM** extension (source in [`vscode-extension/`](../vscode-extension/)) is the
 point-and-click front end for this template. It lets you:
 

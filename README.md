@@ -1,5 +1,8 @@
 # BC ALM Template
 
+[![VS Code Marketplace](https://vsmarketplacebadges.dev/version-short/AlexanderErdelyi.bc-alm.svg?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/AlexanderErdelyi.bc-alm.svg)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+
 > **A complete, opinionated Application Lifecycle Management template for Microsoft Dynamics 365 Business Central AL development teams.**
 
 Combines spec-driven development, GitHub Copilot custom agents for every workflow stage, a documented branching strategy, and AL coding standards — all version-controlled in one place and ready to fork.

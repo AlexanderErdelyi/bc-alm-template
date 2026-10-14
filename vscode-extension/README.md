@@ -1,7 +1,7 @@
 # BC ALM — Business Central Copilot Template Manager
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/AlexanderErdelyi.bc-alm?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/AlexanderErdelyi.bc-alm)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+[![Version](https://vsmarketplacebadges.dev/version-short/AlexanderErdelyi.bc-alm.svg?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/AlexanderErdelyi.bc-alm.svg)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/LICENSE)
 
 Give your **Microsoft Dynamics 365 Business Central** team a ready-made set of **GitHub
