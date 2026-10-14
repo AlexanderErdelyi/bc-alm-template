@@ -23,17 +23,19 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   template-sync:
     runs-on: ubuntu-latest
     # Don't sync the template against itself.
     if: github.repository != 'AlexanderErdelyi/bc-alm-template'
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -44,7 +46,7 @@ jobs:
           else { ./scripts/Update-FromTemplate.ps1 }
 
       - name: Open pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           branch: chore/template-sync
           delete-branch: true

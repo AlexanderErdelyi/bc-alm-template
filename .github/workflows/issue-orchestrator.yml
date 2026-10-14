@@ -5,7 +5,7 @@ on:
     types: [opened, edited, unlabeled, reopened]
 
 permissions:
-  issues: write
+  contents: read
 
 jobs:
   intake:
@@ -21,6 +21,8 @@ jobs:
        (github.event.label.name == 'needs-info' ||
         startsWith(github.event.label.name, 'stage:')))
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     # Queue concurrent runs for the same issue rather than letting them race.
     # This prevents duplicate comments and label-flip races when title and
     # description are saved in quick succession (two 'edited' events).
@@ -29,7 +31,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Ensure labels exist
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const labels = [
@@ -62,7 +64,7 @@ jobs:
 
       - name: Triage issue quality
         id: triage
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const issue = context.payload.issue;
@@ -250,7 +252,7 @@ jobs:
         # issue-planning.yml workflow still handles the case where a maintainer
         # manually adds the stage:planning label.
         if: steps.triage.outputs.planning_needed == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const issue = context.payload.issue;

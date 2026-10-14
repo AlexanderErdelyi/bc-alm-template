@@ -37,6 +37,13 @@ either way:
    or build it yourself: `cd vscode-extension && npm ci && npm run package`.
 2. In VS Code, open **Extensions** → **…** → **Install from VSIX…**.
 
+Optionally verify the download first. Every released VSIX has a signed build-provenance
+attestation that proves it was built by this repository's release workflow:
+
+```powershell
+gh attestation verify .\bc-alm-<version>.vsix --repo AlexanderErdelyi/bc-alm-template
+```
+
 You need `git` on PATH. Creating or adding a project also needs PowerShell (`pwsh` 7
 preferred; Windows PowerShell 5.1 works), because those steps run the template's own scripts.
 
@@ -409,6 +416,9 @@ What the workflow guarantees:
   tag shape) fails in the build job, before anything is released or published.
 - **Exactly the tested VSIX is published.** The publish job reuses the build artifact; it does
   not rebuild.
+- **Signed provenance:** the release job attests the VSIX with Sigstore
+  (`actions/attest-build-provenance`) and attaches the bundle (`*.vsix.sigstore.json`) to the
+  GitHub release. Verify with `gh attestation verify <file> --repo AlexanderErdelyi/bc-alm-template`.
 - **Pre-releases:** tag `ext-vX.Y.Z-pre`.
   - The VSIX is packaged and published with `--pre-release`, and the GitHub release is
     marked as a pre-release.
