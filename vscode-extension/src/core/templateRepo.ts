@@ -8,6 +8,8 @@ export interface TemplateSourceSpec {
     name?: string;
     url: string;
     ref: string;
+    /** Template this one was created from (duplicate/fork); used by "Sync from upstream". */
+    upstream?: string;
 }
 
 export interface CommitInfo {
@@ -35,6 +37,11 @@ export class TemplateRepo {
 
     get label(): string {
         return this.spec.name || this.spec.url;
+    }
+
+    /** True when a local mirror exists (it can be read without the network). */
+    isCached(): boolean {
+        return fs.existsSync(path.join(this.gitDir, 'HEAD'));
     }
 
     /** Clone (first time) or fetch. `maxAgeMs` skips the fetch when the mirror is fresh enough. */

@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { LOCK_FILE } from './core/lock';
 import { needsMigration } from './core/layout';
@@ -5,6 +6,7 @@ import { registerCommands } from './ui/commands';
 import { CustomizationDiagnostics, TEMPLATE_SCHEME, TemplateContentProvider } from './ui/diagnostics';
 import { ProjectState } from './ui/projectState';
 import { ComponentsTree, GuidanceTree, SourcesTree } from './ui/trees';
+import { sweepStale } from './core/util';
 
 const BASELINE_PROMPT_KEY = 'bcAlm.baselinePromptDismissed';
 const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
@@ -12,6 +14,8 @@ const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
 export async function activate(ext: vscode.ExtensionContext): Promise<void> {
     const log = vscode.window.createOutputChannel('BC ALM');
     const state = new ProjectState(ext.globalStorageUri.fsPath);
+    // Leftovers from runs whose cleanup was blocked (Windows file locks).
+    sweepStale(path.join(ext.globalStorageUri.fsPath, 'work'), '', 24 * 60 * 60_000);
     const content = new TemplateContentProvider();
     const diagnostics = new CustomizationDiagnostics(state);
     const bestPractices = vscode.Uri.joinPath(ext.extensionUri, 'guidance', 'best-practices.md');
@@ -39,6 +43,7 @@ export async function activate(ext: vscode.ExtensionContext): Promise<void> {
         vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('bcAlm.validation')) { diagnostics.validateAll(); }
             if (e.affectsConfiguration('bcAlm.templateSources')) { void state.refresh(false); }
+            if (e.affectsConfiguration('bcAlm.components.groupBy')) { components.refresh(); }
             if (e.affectsConfiguration('bcAlm.whatsNew')) { void guidance.loadNews(); }
         })
     );
@@ -64,10 +69,24 @@ export async function activate(ext: vscode.ExtensionContext): Promise<void> {
         bar.show();
     };
 
+    // Status bar: active templates (only when the project uses more than one).
+    const tplBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 49);
+    tplBar.command = 'bcAlm.switchTemplates';
+    ext.subscriptions.push(tplBar);
+    const updateTemplateBar = () => {
+        const groups = state.root ? state.templateGroups() : [];
+        if (groups.length < 2) { tplBar.hide(); return; }
+        const on = groups.filter(g => !g.disabled);
+        tplBar.text = `$(layers) ${on.length === 1 ? on[0].manifest.name : `${on.length}/${groups.length} templates`}`;
+        tplBar.tooltip = `Active templates: ${on.map(g => g.manifest.name).join(', ') || 'none'}${groups.length > on.length ? `\nOff: ${groups.filter(g => g.disabled).map(g => g.manifest.name).join(', ')}` : ''}\nClick to switch.`;
+        tplBar.show();
+    };
+
     let baselineAsked = false;
     let migrationAsked = false;
     ext.subscriptions.push(state.onDidChange(async () => {
         updateBar();
+        updateTemplateBar();
         if (!state.loading && !migrationAsked && state.root && needsMigration(state.root) && !ext.workspaceState.get<boolean>(MIGRATE_PROMPT_KEY)) {
             migrationAsked = true;
             const a = await vscode.window.showInformationMessage(

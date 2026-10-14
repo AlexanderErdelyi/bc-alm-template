@@ -13,7 +13,7 @@ import { ProjectOps } from '../core/operations';
 import { KIND_LABELS } from '../core/paths';
 import { ComponentState, computeStatus, STATUS_LABEL } from '../core/status';
 import { TemplateRepo, TemplateSourceSpec } from '../core/templateRepo';
-import { removeEmptyParents } from '../core/util';
+import { removeEmptyParents, safeRemove } from '../core/util';
 import { ProjectState, settingsSources } from './projectState';
 
 class Cancelled extends Error { constructor() { super('cancelled'); } }
@@ -358,7 +358,7 @@ export async function addToExistingRepoWizard(state: ProjectState, log: vscode.O
         vscode.window.showInformationMessage(msg);
         await state.refresh(false, true);
     } finally {
-        fs.rmSync(tmp, { recursive: true, force: true });
+        safeRemove(tmp, l => log.appendLine(l));
     }
 }
 

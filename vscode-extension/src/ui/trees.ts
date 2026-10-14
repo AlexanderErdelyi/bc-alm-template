@@ -1,13 +1,14 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { fetchFeed, NewsItem } from '../core/changelog';
+import { TEMPLATE_TOGGLE_KINDS } from '../core/config';
 import { KIND_LABELS, KIND_ORDER } from '../core/paths';
 import { ComponentState, FileState, FileStatus, STATUS_LABEL } from '../core/status';
 import { CommitInfo } from '../core/templateRepo';
 import { DOCS, Finding } from '../core/validator';
 import { githubSlug } from '../core/publish';
 import { sameUrl } from '../core/util';
-import { ProjectState, SourceInfo } from './projectState';
+import { ProjectState, SourceInfo, TemplateGroup } from './projectState';
 
 const ICONS: Record<FileStatus, [string, string | undefined]> = {
     current: ['pass', 'testing.iconPassed'],
@@ -30,22 +31,68 @@ export function statusIcon(s: FileStatus): vscode.ThemeIcon {
 // ---------------------------------------------------------------- Components
 
 export type ComponentsNode =
-    | { type: 'group'; id: string; label: string; components: ComponentState[] }
+    | { type: 'template'; group: TemplateGroup }
+    | { type: 'local'; components: ComponentState[] }
+    | { type: 'group'; id: string; scope?: string; label: string; components: ComponentState[] }
     | { type: 'component'; comp: ComponentState }
     | { type: 'file'; comp: ComponentState; file: FileState }
     | { type: 'message'; label: string; icon?: string; command?: vscode.Command };
+
+export type GroupMode = 'template' | 'kind';
+
+/** Effective grouping: bcAlm.components.groupBy, where "auto" groups by template once the project uses more than one. */
+export function groupMode(state: ProjectState): GroupMode {
+    const setting = vscode.workspace.getConfiguration('bcAlm').get<string>('components.groupBy', 'auto');
+    if (setting === 'template' || setting === 'kind') { return setting; }
+    const groups = state.templateGroups().filter(g => g.components.length || g.source);
+    return groups.length > 1 ? 'template' : 'kind';
+}
+
+/** True when the component's template is switched off in this project (it cannot be installed or enabled on its own). */
+export function offByTemplate(state: ProjectState, c: ComponentState): boolean {
+    return c.templateDisabled || (!!c.templateId && TEMPLATE_TOGGLE_KINDS.includes(c.ref.kind) && !!state.project?.sync.templates.disabled.includes(c.templateId));
+}
 
 export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
     private readonly emitter = new vscode.EventEmitter<ComponentsNode | undefined>();
     readonly onDidChangeTreeData = this.emitter.event;
 
     constructor(private readonly state: ProjectState) {
-        state.onDidChange(() => this.emitter.fire(undefined));
+        state.onDidChange(() => this.refresh());
+    }
+
+    refresh(): void {
+        void vscode.commands.executeCommand('setContext', 'bcAlm.groupMode', groupMode(this.state));
+        void vscode.commands.executeCommand('setContext', 'bcAlm.multiTemplate', this.state.templateGroups().length > 1);
+        this.emitter.fire(undefined);
     }
 
     private sourceName(url?: string): string | undefined {
         if (!url) { return undefined; }
         return this.state.sources.find(s => sameUrl(s.url, url))?.name ?? url;
+    }
+
+    private templateName(id?: string): string | undefined {
+        if (!id) { return undefined; }
+        return this.state.sources.find(s => s.manifest?.id === id)?.manifest?.name ?? id;
+    }
+
+    /** Installed components by kind, then "Available" (and "Excluded" when a selection was made). */
+    private kindGroups(comps: ComponentState[], scope?: string): ComponentsNode[] {
+        const out: ComponentsNode[] = [];
+        const installed = comps.filter(c => c.status !== 'available');
+        for (const k of KIND_ORDER) {
+            const list = installed.filter(c => c.ref.kind === k);
+            if (list.length) { out.push({ type: 'group', id: k, scope, label: KIND_LABELS[k], components: list }); }
+        }
+        const available = comps.filter(c => c.status === 'available' && !c.excluded);
+        if (available.length) {
+            const fresh = available.filter(c => c.newInTemplate).length;
+            out.push({ type: 'group', id: 'available', scope, label: fresh ? `Available to install (${fresh} new)` : 'Available to install', components: available });
+        }
+        const excluded = comps.filter(c => c.status === 'available' && c.excluded);
+        if (excluded.length) { out.push({ type: 'group', id: 'excluded', scope, label: 'Not selected', components: excluded }); }
+        return out;
     }
 
     getChildren(node?: ComponentsNode): ComponentsNode[] {
@@ -60,20 +107,32 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 out.push({ type: 'message', label: 'No template.lock.json yet - statuses are inferred. Click to record a baseline.', icon: 'info',
                     command: { command: 'bcAlm.adoptBaseline', title: 'Record baseline' } });
             }
-            const installed = st.components.filter(c => c.status !== 'available');
-            for (const k of KIND_ORDER) {
-                const comps = installed.filter(c => c.ref.kind === k);
-                if (comps.length) { out.push({ type: 'group', id: k, label: KIND_LABELS[k], components: comps }); }
+            if (groupMode(this.state) === 'template') {
+                const groups = this.state.templateGroups().sort((a, b) => Number(b.primary) - Number(a.primary) || a.manifest.name.localeCompare(b.manifest.name));
+                for (const group of groups) { out.push({ type: 'template', group }); }
+                const local = this.state.localComponents();
+                if (local.length) { out.push({ type: 'local', components: local }); }
+                return out;
             }
-            const available = st.components.filter(c => c.status === 'available');
-            if (available.length) { out.push({ type: 'group', id: 'available', label: 'Available to install', components: available }); }
-            return out;
+            return [...out, ...this.kindGroups(st.components)];
         }
+        if (node.type === 'template') { return this.kindGroups(node.group.components, node.group.id); }
+        if (node.type === 'local') { return this.kindGroups(node.components, '_local'); }
         if (node.type === 'group') { return node.components.map(comp => ({ type: 'component', comp })); }
         if (node.type === 'component' && node.comp.files.length > 1) {
             return node.comp.files.map(file => ({ type: 'file', comp: node.comp, file }));
         }
         return [];
+    }
+
+    private rollup(comps: ComponentState[]): string[] {
+        const n = (s: FileStatus[]) => comps.filter(c => s.includes(c.status) && !c.keepLocal && !c.disabled).length;
+        const parts: string[] = [];
+        const up = n(['update', 'new', 'missing']);
+        const cf = n(['conflict']);
+        if (up) { parts.push(`${up} update${up > 1 ? 's' : ''}`); }
+        if (cf) { parts.push(`${cf} conflict${cf > 1 ? 's' : ''}`); }
+        return parts;
     }
 
     getTreeItem(node: ComponentsNode): vscode.TreeItem {
@@ -85,17 +144,51 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 t.tooltip = node.label;
                 return t;
             }
+            case 'template': {
+                const g = node.group;
+                const m = g.manifest;
+                const t = new vscode.TreeItem(m.name, g.disabled ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded);
+                const installed = g.components.filter(c => c.installed).length;
+                const available = g.components.filter(c => c.status === 'available' && !c.excluded).length;
+                const d: string[] = [];
+                if (g.primary) { d.push('★ primary'); }
+                if (g.disabled) { d.push('disabled'); }
+                d.push(`${installed} installed`);
+                if (available) { d.push(`${available} available`); }
+                if (!g.disabled) { d.push(...this.rollup(g.components)); }
+                if (g.source?.warning) { d.push('offline copy'); }
+                t.description = d.join(' · ');
+                t.iconPath = g.disabled ? new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'))
+                    : g.source?.error ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'))
+                    : new vscode.ThemeIcon(m.icon || 'package');
+                const md = new vscode.MarkdownString(`**${m.name}**${m.version ? ` v${m.version}` : ''} \`${g.id}\``);
+                if (m.description) { md.appendMarkdown(`\n\n${m.description}`); }
+                if (g.source) { md.appendMarkdown(`\n\n${g.source.url} (${g.source.ref})`); }
+                if (g.disabled) { md.appendMarkdown('\n\nSwitched off in this project: its agents, skills, prompts and instructions are stored in `.bc-alm/disabled/` and skipped by syncs.'); }
+                if (g.source?.error) { md.appendMarkdown(`\n\n$(warning) ${g.source.error}`); }
+                else if (g.source?.warning) { md.appendMarkdown(`\n\n$(warning) ${g.source.warning}`); }
+                md.supportThemeIcons = true;
+                t.tooltip = md;
+                t.id = `template:${g.id}`;
+                const flags = [g.disabled ? 'disabled' : 'enabled', g.primary && 'primary', g.source && 'hasSource'].filter(Boolean);
+                t.contextValue = `template:${flags.join(':')}`;
+                return t;
+            }
+            case 'local': {
+                const t = new vscode.TreeItem('Local only', vscode.TreeItemCollapsibleState.Collapsed);
+                t.description = `${node.components.length} · your own, from no template`;
+                t.iconPath = new vscode.ThemeIcon('person');
+                t.id = 'template:_local';
+                t.contextValue = 'localGroup';
+                return t;
+            }
             case 'group': {
-                const t = new vscode.TreeItem(node.label, node.id === 'available' ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded);
-                const n = (s: FileStatus[]) => node.components.filter(c => s.includes(c.status) && !c.keepLocal).length;
-                const parts = [`${node.components.length}`];
-                const up = n(['update', 'new', 'missing']);
-                const cf = n(['conflict']);
-                if (up) { parts.push(`${up} update${up > 1 ? 's' : ''}`); }
-                if (cf) { parts.push(`${cf} conflict${cf > 1 ? 's' : ''}`); }
-                t.description = parts.join(' · ');
+                const collapsed = node.id === 'available' || node.id === 'excluded';
+                const t = new vscode.TreeItem(node.label, collapsed ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded);
+                t.description = [`${node.components.length}`, ...this.rollup(node.components)].join(' · ');
+                if (node.id === 'excluded') { t.tooltip = 'Components you chose not to take from this template (Manage Components…).'; }
                 t.contextValue = `group:${node.id}`;
-                t.id = `group:${node.id}`;
+                t.id = `group:${node.scope ? node.scope + ':' : ''}${node.id}`;
                 return t;
             }
             case 'component': {
@@ -103,16 +196,24 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 const multi = c.files.length > 1;
                 const label = c.status === 'available' && c.ref.kind !== 'file' ? `${c.ref.kind} · ${c.ref.name}` : c.ref.name;
                 const t = new vscode.TreeItem(label, multi ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-                const desc = [STATUS_LABEL[c.status]];
+                const tplOff = offByTemplate(this.state, c);
+                const desc = [c.templateDisabled ? 'Disabled (template off)' : STATUS_LABEL[c.status]];
+                if (c.newInTemplate) { desc.push('new in template'); }
+                if (tplOff && !c.templateDisabled) { desc.push('template off'); }
                 if (c.keepLocal) { desc.push(c.implicitKeep ? 'kept local (sync setting)' : 'kept local'); }
-                const primary = this.state.catalogs[0]?.repo.spec.url;
-                if (c.source && primary && !sameUrl(c.source, primary)) { desc.push(`from ${this.sourceName(c.source)}`); }
+                if (groupMode(this.state) === 'kind') {
+                    const primary = this.state.catalogs[0]?.repo.spec.url;
+                    if (this.state.templateGroups().length > 1) { if (c.templateId) { desc.push(this.templateName(c.templateId)!); } }
+                    else if (c.source && primary && !sameUrl(c.source, primary)) { desc.push(`from ${this.sourceName(c.source)}`); }
+                }
                 t.description = desc.join(' · ');
-                t.iconPath = statusIcon(c.status);
+                t.iconPath = c.newInTemplate ? new vscode.ThemeIcon('sparkle', new vscode.ThemeColor('charts.green')) : statusIcon(c.status);
                 t.id = `component:${c.ref.id}`;
-                t.contextValue = `component:${c.status}${c.keepLocal ? ':keepLocal' : ''}${c.alsoIn.length ? ':multiSource' : ''}`;
+                t.contextValue = `component:${c.status}${c.keepLocal ? ':keepLocal' : ''}${c.alsoIn.length ? ':multiSource' : ''}${tplOff ? ':templateOff' : ''}`;
                 const md = new vscode.MarkdownString(`**${c.ref.name}** (${c.ref.kind})\n\n${STATUS_LABEL[c.status]}`);
+                if (c.templateId) { md.appendMarkdown(`\n\nTemplate: ${this.templateName(c.templateId)}${tplOff ? ' (switched off in this project)' : ''}`); }
                 if (c.source) { md.appendMarkdown(`\n\nSource: ${this.sourceName(c.source)}`); }
+                if (c.newInTemplate) { md.appendMarkdown('\n\nAdded to the template after you chose its components.'); }
                 if (c.alsoIn.length) { md.appendMarkdown(`\n\nAlso offered by: ${c.alsoIn.map(u => this.sourceName(u)).join(', ')}`); }
                 md.appendMarkdown('\n\n' + c.files.map(f => `- \`${f.destRel}\` - ${STATUS_LABEL[f.status]}`).join('\n'));
                 t.tooltip = md;
@@ -156,15 +257,45 @@ export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
         return node ? [] : this.state.sources;
     }
     getTreeItem(s: SourceInfo): vscode.TreeItem {
-        const t = new vscode.TreeItem(s.name ?? s.url);
+        const t = new vscode.TreeItem(s.name ?? s.manifest?.name ?? s.url);
         const d = [s.ref + (s.sha ? ` @ ${s.sha.slice(0, 7)}` : '')];
-        if (s.primary) { d.push('primary'); } else if (s.inProject) { d.push('in project'); }
+        if (s.manifest?.version) { d.push(`v${s.manifest.version}`); }
+        if (s.primary) { d.push('★ primary'); } else if (s.inProject) { d.push('in project'); }
+        if (s.disabled) { d.push('disabled'); }
+        if (s.inProject && !s.inSettings) { d.push('from project'); }
+        if (s.componentCount !== undefined) {
+            const g = s.inProject && s.manifest ? this.state.templateGroup(s.manifest.id) : undefined;
+            const inst = g?.components.filter(c => c.installed && !c.disabled && c.source && sameUrl(c.source, s.url)).length;
+            d.push(`${s.componentCount} components${inst !== undefined ? ` · ${inst} installed` : ''}`);
+        }
         if (s.upstreamDefault) { d.push('upstream'); }
+        if (s.duplicateOf) { d.push(`same id as ${s.duplicateOf}`); }
         t.description = d.join(' · ');
-        t.tooltip = `${s.url}\n${s.error ? 'Error: ' + s.error : ''}`.trim();
-        t.iconPath = new vscode.ThemeIcon(s.error ? 'warning' : s.primary ? 'star-full' : 'repo');
-        const flags = [s.inProject && 'inProject', s.primary && 'primary', s.upstreamDefault && 'upstreamDefault', githubSlug(s.url) && 'github'].filter(Boolean);
+
+        const md = new vscode.MarkdownString(`**${s.name ?? s.url}**`);
+        md.supportThemeIcons = true;
+        if (s.manifest) { md.appendMarkdown(`\n\nTemplate: ${s.manifest.name}${s.manifest.version ? ` v${s.manifest.version}` : ''} \`${s.manifest.id}\``); }
+        if (s.manifest?.description) { md.appendMarkdown(`\n\n${s.manifest.description}`); }
+        md.appendMarkdown(`\n\n${s.url}\n\nBranch/tag: \`${s.ref}\`${s.sha ? ` @ \`${s.sha.slice(0, 7)}\`` : ''}`);
+        if (s.inProject && !s.inSettings) { md.appendMarkdown('\n\nUsed by this project (template.lock.json) but not in your bcAlm.templateSources setting.'); }
+        if (s.disabled) { md.appendMarkdown('\n\nSwitched off in this project.'); }
+        if (s.duplicateOf) { md.appendMarkdown(`\n\n$(warning) Uses the same template id as ${s.duplicateOf}.`); }
+        if (s.error) { md.appendMarkdown(`\n\n$(error) ${s.error}`); }
+        else if (s.warning) { md.appendMarkdown(`\n\n$(warning) Showing the cached copy. ${s.warning}`); }
+        if (!s.sha && !s.error) { md.appendMarkdown('\n\nNot downloaded yet - refresh to read it.'); }
+        t.tooltip = md;
+
+        t.iconPath = s.error ? new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'))
+            : s.warning ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'))
+            : s.disabled ? new vscode.ThemeIcon('circle-slash', new vscode.ThemeColor('disabledForeground'))
+            : s.primary ? new vscode.ThemeIcon('star-full')
+            : new vscode.ThemeIcon(s.manifest?.icon || 'repo');
+        const flags = [
+            s.inProject && 'inProject', s.primary && 'primary', s.upstreamDefault && 'upstreamDefault', githubSlug(s.url) && 'github',
+            s.inSettings && 'inSettings', s.inProject && (s.disabled ? 'tplDisabled' : 'tplEnabled'), s.manifest && 'loaded'
+        ].filter(Boolean);
         t.contextValue = `source:${flags.join(':')}`;
+        t.id = `source:${s.url}`;
         return t;
     }
 }

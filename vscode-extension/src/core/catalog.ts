@@ -1,4 +1,4 @@
-import { ProjectConfig } from './config';
+import { manifestOf, ProjectConfig, TemplateManifest } from './config';
 import { ComponentRef, componentOf, isManaged, resolveDest } from './paths';
 import { TemplateRepo } from './templateRepo';
 import { transformTemplateFile } from './transform';
@@ -18,6 +18,8 @@ export interface Catalog {
     repo: TemplateRepo;
     sha: string;
     files: Map<string, CatalogFile>; // keyed by destRel
+    /** Identity of the template (manifest block or repository name). */
+    manifest: TemplateManifest;
 }
 
 /** Everything a template source would manage in this project at a given commit. */
@@ -25,6 +27,7 @@ export async function buildCatalog(repo: TemplateRepo, sha: string, project: Pro
     const all = await repo.listFiles(sha);
     const managed = all.filter(p => isManaged(p, project.sync));
     const tplCfg = await repo.readConfig(sha);
+    const manifest = manifestOf(tplCfg, repo.spec.url, repo.spec.name);
     const from = tplCfg?.values ?? project.values;
     const blobs = await repo.readFiles(sha, managed);
     const files = new Map<string, CatalogFile>();
@@ -41,7 +44,7 @@ export async function buildCatalog(repo: TemplateRepo, sha: string, project: Pro
             transformed: transformTemplateFile(srcRel, raw, { from, project })
         });
     }
-    return { repo, sha, files };
+    return { repo, sha, files, manifest };
 }
 
 /** Transformed content of a template file at an arbitrary commit (used as merge base). */

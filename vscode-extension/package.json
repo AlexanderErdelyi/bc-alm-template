@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "alexandererdelyi",
   "license": "MIT",
   "repository": {
@@ -64,6 +64,10 @@
         "view": "bcAlm.components",
         "contents": "No BC ALM project found in this workspace (no template.config.json).\n[Create New Project from Template](command:bcAlm.newProject)\n[Add BC ALM to This Repository](command:bcAlm.addToExistingRepo)\nLearn more in the [extension guide](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/docs/vscode-extension.md).",
         "when": "!bcAlm.hasProject"
+      },
+      {
+        "view": "bcAlm.sources",
+        "contents": "No template sources yet.\n[Add the BC ALM Template](command:bcAlm.addTemplateSource)\n[Create New Template](command:bcAlm.createNewTemplate)\nA template source is a git repository with Copilot agents, skills, prompts and instructions. Use several at once - e.g. BC ALM plus your team's BC Upgrade template."
       }
     ],
     "commands": [
@@ -178,13 +182,13 @@
       },
       {
         "command": "bcAlm.createTemplateRepo",
-        "title": "Create My Own Template Repository…",
+        "title": "Copy a Template into My Own Repository…",
         "category": "BC ALM",
-        "icon": "$(repo-create)"
+        "icon": "$(repo-forked)"
       },
       {
         "command": "bcAlm.addTemplateSource",
-        "title": "Add Template Source…",
+        "title": "Add Existing Template Source…",
         "category": "BC ALM",
         "icon": "$(add)"
       },
@@ -211,6 +215,78 @@
         "title": "Pull Upstream Updates into My Template (fork sync)",
         "category": "BC ALM",
         "icon": "$(repo-sync)"
+      },
+      {
+        "command": "bcAlm.disableTemplate",
+        "title": "Disable Template",
+        "category": "BC ALM",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "bcAlm.enableTemplate",
+        "title": "Enable Template",
+        "category": "BC ALM",
+        "icon": "$(check)"
+      },
+      {
+        "command": "bcAlm.activateOnlyTemplate",
+        "title": "Activate Only This Template",
+        "category": "BC ALM",
+        "icon": "$(target)"
+      },
+      {
+        "command": "bcAlm.switchTemplates",
+        "title": "Switch Active Templates…",
+        "category": "BC ALM",
+        "icon": "$(layers)"
+      },
+      {
+        "command": "bcAlm.groupByTemplate",
+        "title": "Group Components by Template",
+        "category": "BC ALM",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "bcAlm.groupByKind",
+        "title": "Group Components by Kind",
+        "category": "BC ALM",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "bcAlm.manageComponents",
+        "title": "Choose Components…",
+        "category": "BC ALM",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "bcAlm.createNewTemplate",
+        "title": "Create New Template…",
+        "category": "BC ALM",
+        "icon": "$(repo-create)"
+      },
+      {
+        "command": "bcAlm.changeSourceRef",
+        "title": "Change Branch/Tag…",
+        "category": "BC ALM",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "bcAlm.openSourceOnGitHub",
+        "title": "Open Template Repository",
+        "category": "BC ALM",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "bcAlm.shareTemplateSources",
+        "title": "Share Template Sources with My Team…",
+        "category": "BC ALM",
+        "icon": "$(live-share)"
+      },
+      {
+        "command": "bcAlm.addProjectSourcesToSettings",
+        "title": "Add This Project's Sources to My Settings",
+        "category": "BC ALM",
+        "icon": "$(add)"
       },
       {
         "command": "bcAlm.validate",
@@ -339,6 +415,46 @@
         {
           "command": "bcAlm.migrateLayout",
           "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.manageComponents",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.changeSourceRef",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.openSourceOnGitHub",
+          "when": "false"
+        },
+        {
+          "command": "bcAlm.disableTemplate",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.activateOnlyTemplate",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.switchTemplates",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.addProjectSourcesToSettings",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.groupByTemplate",
+          "when": "bcAlm.hasProject"
+        },
+        {
+          "command": "bcAlm.groupByKind",
+          "when": "bcAlm.hasProject"
         }
       ],
       "view/title": [
@@ -378,14 +494,49 @@
           "group": "1_project@3"
         },
         {
+          "command": "bcAlm.groupByTemplate",
+          "when": "view == bcAlm.components && bcAlm.hasProject && bcAlm.groupMode == kind",
+          "group": "navigation@5"
+        },
+        {
+          "command": "bcAlm.groupByKind",
+          "when": "view == bcAlm.components && bcAlm.hasProject && bcAlm.groupMode == template",
+          "group": "navigation@5"
+        },
+        {
+          "command": "bcAlm.switchTemplates",
+          "when": "view == bcAlm.components && bcAlm.hasProject",
+          "group": "2_templates@1"
+        },
+        {
+          "command": "bcAlm.createNewTemplate",
+          "when": "view == bcAlm.components",
+          "group": "2_templates@2"
+        },
+        {
           "command": "bcAlm.addTemplateSource",
           "when": "view == bcAlm.sources",
           "group": "navigation@1"
         },
         {
-          "command": "bcAlm.createTemplateRepo",
+          "command": "bcAlm.createNewTemplate",
           "when": "view == bcAlm.sources",
           "group": "navigation@2"
+        },
+        {
+          "command": "bcAlm.createTemplateRepo",
+          "when": "view == bcAlm.sources",
+          "group": "1_create@1"
+        },
+        {
+          "command": "bcAlm.shareTemplateSources",
+          "when": "view == bcAlm.sources",
+          "group": "2_team@1"
+        },
+        {
+          "command": "bcAlm.addProjectSourcesToSettings",
+          "when": "view == bcAlm.sources && bcAlm.hasProject",
+          "group": "2_team@2"
         },
         {
           "command": "bcAlm.refreshGuidance",
@@ -411,12 +562,12 @@
         },
         {
           "command": "bcAlm.installComponent",
-          "when": "viewItem =~ /^component:(available|missing)/",
+          "when": "viewItem =~ /^component:(available|missing)/ && !(viewItem =~ /templateOff/)",
           "group": "inline@1"
         },
         {
           "command": "bcAlm.enableComponent",
-          "when": "viewItem =~ /^component:disabled/",
+          "when": "viewItem =~ /^component:disabled/ && !(viewItem =~ /templateOff/)",
           "group": "inline@1"
         },
         {
@@ -451,7 +602,7 @@
         },
         {
           "command": "bcAlm.installComponent",
-          "when": "viewItem =~ /^component:(available|missing)/",
+          "when": "viewItem =~ /^component:(available|missing)/ && !(viewItem =~ /templateOff/)",
           "group": "1_sync@6"
         },
         {
@@ -471,7 +622,7 @@
         },
         {
           "command": "bcAlm.enableComponent",
-          "when": "viewItem =~ /^component:disabled/",
+          "when": "viewItem =~ /^component:disabled/ && !(viewItem =~ /templateOff/)",
           "group": "2_policy@2"
         },
         {
@@ -493,6 +644,91 @@
           "command": "bcAlm.reviewWithCopilot",
           "when": "viewItem =~ /^component:(current|update|conflict|modified|custom|removed)/",
           "group": "4_guidance@1"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "viewItem =~ /^component:.*templateOff/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "viewItem =~ /^component:.*templateOff/",
+          "group": "2_policy@4"
+        },
+        {
+          "command": "bcAlm.manageComponents",
+          "when": "viewItem =~ /^template:enabled.*hasSource/",
+          "group": "inline@1"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "viewItem =~ /^template:disabled/",
+          "group": "inline@2"
+        },
+        {
+          "command": "bcAlm.manageComponents",
+          "when": "viewItem =~ /^template:enabled.*hasSource/",
+          "group": "1_template@1"
+        },
+        {
+          "command": "bcAlm.disableTemplate",
+          "when": "viewItem =~ /^template:enabled/",
+          "group": "1_template@2"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "viewItem =~ /^template:disabled/",
+          "group": "1_template@2"
+        },
+        {
+          "command": "bcAlm.activateOnlyTemplate",
+          "when": "viewItem =~ /^template:/ && bcAlm.multiTemplate",
+          "group": "1_template@3"
+        },
+        {
+          "command": "bcAlm.manageComponents",
+          "when": "viewItem =~ /^source:.*inProject/ && viewItem =~ /tplEnabled/",
+          "group": "inline@2"
+        },
+        {
+          "command": "bcAlm.manageComponents",
+          "when": "viewItem =~ /^source:.*inProject/",
+          "group": "0_project@1"
+        },
+        {
+          "command": "bcAlm.disableTemplate",
+          "when": "viewItem =~ /^source:.*tplEnabled/",
+          "group": "0_project@2"
+        },
+        {
+          "command": "bcAlm.enableTemplate",
+          "when": "viewItem =~ /^source:.*tplDisabled/",
+          "group": "0_project@2"
+        },
+        {
+          "command": "bcAlm.activateOnlyTemplate",
+          "when": "viewItem =~ /^source:.*inProject/ && bcAlm.multiTemplate",
+          "group": "0_project@3"
+        },
+        {
+          "command": "bcAlm.useSourceInProject",
+          "when": "viewItem =~ /^source:/ && !(viewItem =~ /inProject/) && bcAlm.hasProject",
+          "group": "0_project@4"
+        },
+        {
+          "command": "bcAlm.setPrimarySource",
+          "when": "viewItem =~ /inProject/ && !(viewItem =~ /primary/)",
+          "group": "0_project@5"
+        },
+        {
+          "command": "bcAlm.changeSourceRef",
+          "when": "viewItem =~ /^source:/",
+          "group": "1_source@2"
+        },
+        {
+          "command": "bcAlm.openSourceOnGitHub",
+          "when": "viewItem =~ /^source:/",
+          "group": "1_source@3"
         },
         {
           "command": "bcAlm.useSourceInProject",
@@ -571,9 +807,28 @@
                 "type": "string",
                 "default": "main",
                 "description": "Branch or tag to track."
+              },
+              "upstream": {
+                "type": "string",
+                "description": "Git URL of the template this one was created from. \"Sync from Upstream\" merges its changes in."
               }
             }
           }
+        },
+        "bcAlm.components.groupBy": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "template",
+            "kind"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Group by template when the project uses more than one, otherwise by kind.",
+            "Always group by template (BC ALM, BC Upgrade, Local only).",
+            "Always group by kind (Agents, Skills, Prompts, …)."
+          ],
+          "markdownDescription": "How the **Components** view is grouped."
         },
         "bcAlm.checkForUpdatesOnStartup": {
           "type": "boolean",

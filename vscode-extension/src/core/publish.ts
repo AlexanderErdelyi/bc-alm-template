@@ -3,11 +3,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { ProjectConfig, TemplateValues } from './config';
 import { commandExists, git, run } from './exec';
+import { findFork, forkBlocker, ghLogin, ghRepoInfo, requireGh } from './github';
 import { componentOf, srcFromDest } from './paths';
 import { setFrontmatterScalar } from './frontmatter';
 import { TemplateRepo } from './templateRepo';
 import { generalize } from './transform';
-import { normalizeText, readTextIfExists, timestamp } from './util';
+import { normalizeText, readTextIfExists, safeRemove, timestamp } from './util';
 
 export type PublishMode = 'overwrite' | 'saveAs';
 export type DeliveryMode = 'direct' | 'pullRequest';
@@ -156,10 +157,19 @@ export async function executePublish(plan: PublishPlan, opts: {
             if (!slug || !(await commandExists('gh'))) {
                 throw new Error(`Push was rejected and no fork could be created (GitHub CLI "gh" required).\n${p.err}`);
             }
-            log('No push access - forking the template with gh…');
-            await run('gh', ['repo', 'fork', `${slug.owner}/${slug.repo}`, '--clone=false'], { cwd: dir, allowFailure: true });
-            const login = (await run('gh', ['api', 'user', '--jq', '.login'], { cwd: dir })).stdout.trim();
-            const forkUrl = `https://github.com/${login}/${slug.repo}.git`;
+            const login = await ghLogin();
+            if (login.toLowerCase() === slug.owner.toLowerCase()) {
+                throw new Error(`Push to ${slug.owner}/${slug.repo} was rejected although you own it, so there is no fork to fall back to. Check your git credentials ("gh auth setup-git") and branch rules.\n${p.err}`);
+            }
+            let fork = await findFork(slug, login);
+            if (fork) {
+                log(`No push access - using your fork ${fork}…`);
+            } else {
+                log('No push access - forking the template with gh…');
+                await run('gh', ['repo', 'fork', `${slug.owner}/${slug.repo}`, '--clone=false', '--default-branch-only'], { cwd: dir });
+                fork = (await findFork(slug, login)) ?? `${login}/${slug.repo}`;
+            }
+            const forkUrl = `https://github.com/${fork}.git`;
             await git(['remote', 'add', 'fork', forkUrl], dir);
             // A freshly created fork can take a moment to become pushable.
             for (let i = 0; i < 5; i++) {
@@ -168,7 +178,7 @@ export async function executePublish(plan: PublishPlan, opts: {
                 await new Promise(r => setTimeout(r, 3000));
             }
             if (!p.ok) { throw new Error(`Could not push to fork ${forkUrl}.\n${p.err}`); }
-            headRef = `${login}:${branch}`;
+            headRef = `${fork.split('/')[0]}:${branch}`;
             forked = true;
         }
 
@@ -184,38 +194,171 @@ export async function executePublish(plan: PublishPlan, opts: {
         }
         return result;
     } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        safeRemove(dir, log);
     }
 }
 
-/** Create the team's own template repo from the upstream template (fork keeps the upstream link for syncing). */
+export type CreateTemplateHow = 'fork' | 'duplicate' | 'template';
+
+export interface CreatedTemplate {
+    /** Browser URL of the new repository. */
+    url: string;
+    /** Git URL of the template it was created from, when it should keep receiving its updates. */
+    upstream?: string;
+}
+
+/**
+ * Create a team's own template repository from an existing GitHub template.
+ * - fork: GitHub fork (not possible into the account that owns the upstream or already has a fork)
+ * - duplicate: new repository with the upstream's full history, so later upstream changes merge cleanly
+ * - template: independent copy ("Use this template"); falls back to a duplicate when the upstream is not a template repository
+ */
 export async function createOwnTemplate(opts: {
     upstreamUrl: string;
-    newRepo: string;          // owner/name or name
-    how: 'fork' | 'template';
+    upstreamRef: string;
+    owner: string;
+    name: string;
+    how: CreateTemplateHow;
     visibility: 'private' | 'public' | 'internal';
-}): Promise<string> {
+    workRoot: string;
+    log?: (line: string) => void;
+}): Promise<CreatedTemplate> {
+    const log = opts.log ?? (() => undefined);
     const up = githubSlug(opts.upstreamUrl);
-    if (!up) { throw new Error('Creating a template repo requires a GitHub upstream URL.'); }
-    if (!(await commandExists('gh'))) { throw new Error('The GitHub CLI (gh) is required. Install it and run "gh auth login".'); }
+    if (!up) { throw new Error('Creating a template repository requires a GitHub upstream URL.'); }
+    await requireGh();
+    const info = await ghRepoInfo(up);
+    if (!info) { throw new Error(`Cannot read ${up.owner}/${up.repo} with the GitHub CLI. Check the URL and that you have access ("gh auth status").`); }
+    const login = await ghLogin();
+    const full = `${opts.owner}/${opts.name}`;
+    const url = `https://github.com/${full}`;
     const cwd = os.tmpdir();
-    let out: string;
+
     if (opts.how === 'fork') {
-        const [owner, name] = opts.newRepo.includes('/') ? opts.newRepo.split('/') : [undefined, opts.newRepo];
-        const args = ['repo', 'fork', `${up.owner}/${up.repo}`, '--clone=false', '--fork-name', name, '--default-branch-only'];
-        if (owner) { args.push('--org', owner); }
-        out = (await run('gh', args, { cwd })).stdout + '';
-        const login = owner ?? (await run('gh', ['api', 'user', '--jq', '.login'], { cwd })).stdout.trim();
-        return /https:\/\/github\.com\/\S+/.exec(out)?.[0] ?? `https://github.com/${login}/${name}`;
+        const blocker = forkBlocker(info.fullName, info.owner, opts.owner, await findFork(up, opts.owner));
+        if (blocker) { throw new Error(`${blocker.message} Choose "Duplicate" instead.`); }
+        const args = ['repo', 'fork', info.fullName, '--clone=false', '--fork-name', opts.name, '--default-branch-only'];
+        if (opts.owner.toLowerCase() !== login.toLowerCase()) { args.push('--org', opts.owner); }
+        log(`gh ${args.join(' ')}`);
+        await run('gh', args, { cwd });
+        return { url, upstream: opts.upstreamUrl };
     }
-    out = (await run('gh', ['repo', 'create', opts.newRepo, `--${opts.visibility}`, '--template', `${up.owner}/${up.repo}`], { cwd })).stdout;
-    const url = /https:\/\/github\.com\/\S+/.exec(out)?.[0];
-    if (url) { return url; }
-    const login = opts.newRepo.includes('/') ? '' : (await run('gh', ['api', 'user', '--jq', '.login'], { cwd })).stdout.trim() + '/';
-    return `https://github.com/${login}${opts.newRepo}`;
+
+    if (opts.how === 'template' && info.isTemplate) {
+        log(`gh repo create ${full} --${opts.visibility} --template ${info.fullName}`);
+        await run('gh', ['repo', 'create', full, `--${opts.visibility}`, '--template', info.fullName], { cwd });
+        return { url };
+    }
+
+    if (opts.how === 'template') { log(`${info.fullName} is not marked as a template repository - copying it with its history instead.`); }
+    log(`gh repo create ${full} --${opts.visibility}`);
+    await run('gh', ['repo', 'create', full, `--${opts.visibility}`, '--description', `Copilot template (from ${info.fullName})`], { cwd });
+    await pushHistory(opts.upstreamUrl, opts.upstreamRef, `${url}.git`, opts.workRoot, log);
+    return { url, upstream: opts.how === 'duplicate' ? opts.upstreamUrl : undefined };
 }
 
-/** Bring a forked team template up to date with its upstream (gh repo sync). */
+/** Push branch `ref` of `fromUrl` (with full history) to the empty repository `toUrl`. */
+export async function pushHistory(fromUrl: string, ref: string, toUrl: string, workRoot: string, log: (line: string) => void = () => undefined): Promise<void> {
+    fs.mkdirSync(workRoot, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(workRoot, 'dup-'));
+    try {
+        log(`Copying ${ref} of ${fromUrl} with its history…`);
+        await git(['clone', '--quiet', '--single-branch', '--branch', ref, fromUrl, dir]);
+        // A freshly created GitHub repository can take a moment to accept pushes.
+        let p = await tryPush(dir, toUrl, `HEAD:refs/heads/${ref}`);
+        for (let i = 0; !p.ok && i < 4; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            p = await tryPush(dir, toUrl, `HEAD:refs/heads/${ref}`);
+        }
+        if (!p.ok) { throw new Error(`The repository was created but pushing the template content to ${toUrl} failed. Check your git credentials ("gh auth setup-git").\n${p.err}`); }
+    } finally {
+        safeRemove(dir, log);
+    }
+}
+
+export interface SyncResult {
+    status: 'upToDate' | 'fastForward' | 'merged' | 'branch';
+    message: string;
+    branch?: string;
+    prUrl?: string;
+    compareUrl?: string;
+}
+
+/**
+ * Bring a template copy up to date with the template it was created from, using plain git
+ * (works for duplicates and for forks that `gh repo sync` cannot fast-forward).
+ * Clean results are pushed to `ref`; conflicts or protected branches end up as a branch / pull request.
+ */
+export async function syncFromUpstream(opts: {
+    url: string;
+    ref: string;
+    upstream: string;
+    upstreamRef?: string;
+    workRoot: string;
+    log?: (line: string) => void;
+}): Promise<SyncResult> {
+    const log = opts.log ?? (() => undefined);
+    fs.mkdirSync(opts.workRoot, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(opts.workRoot, 'sync-'));
+    try {
+        await git(['clone', '--quiet', '--single-branch', '--branch', opts.ref, opts.url, dir]);
+        const upRef = opts.upstreamRef ?? opts.ref;
+        log(`Fetching ${opts.upstream} (${upRef})…`);
+        const f = await git(['fetch', '--quiet', opts.upstream, upRef], dir, { allowFailure: true });
+        if (f.code !== 0) { throw new Error(`Could not fetch ${upRef} from ${opts.upstream}.\n${f.stderr.trim()}`); }
+        const up = (await git(['rev-parse', 'FETCH_HEAD'], dir)).stdout.trim();
+        const head = (await git(['rev-parse', 'HEAD'], dir)).stdout.trim();
+        const mb = await git(['merge-base', 'HEAD', up], dir, { allowFailure: true });
+        if (mb.code !== 0) {
+            throw new Error(`${opts.url} shares no history with ${opts.upstream} (it was probably created with "Use this template"), so upstream changes cannot be merged automatically. Pull individual components instead, or recreate it with "Duplicate".`);
+        }
+        const base = mb.stdout.trim();
+        if (base === up) { return { status: 'upToDate', message: `Already up to date with ${opts.upstream}.` }; }
+
+        let candidate = up;
+        let status: SyncResult['status'] = 'fastForward';
+        if (base !== head) {
+            const ident = await git(['config', 'user.email'], dir, { allowFailure: true });
+            const idArgs = ident.stdout.trim() ? [] : ['-c', 'user.name=BC ALM', '-c', 'user.email=bc-alm@users.noreply.github.com'];
+            const m = await git([...idArgs, 'merge', '--no-edit', '-m', `Merge upstream ${upRef} from ${opts.upstream}`, up], dir, { allowFailure: true });
+            if (m.code === 0) {
+                candidate = (await git(['rev-parse', 'HEAD'], dir)).stdout.trim();
+                status = 'merged';
+            } else {
+                await git(['merge', '--abort'], dir, { allowFailure: true });
+                log('Upstream changes conflict with changes in your template - opening a pull request to resolve them.');
+                return await pushSyncBranch(dir, opts, up, 'Upstream changes conflict with your template; resolve them in the pull request.');
+            }
+        }
+        const p = await tryPush(dir, 'origin', `${candidate}:refs/heads/${opts.ref}`);
+        if (p.ok) {
+            return { status, message: status === 'merged' ? `Merged upstream changes into ${opts.ref}.` : `Fast-forwarded ${opts.ref} to ${up.slice(0, 7)}.` };
+        }
+        log(`Direct push to ${opts.ref} was rejected (${p.err.split('\n')[0]}) - opening a pull request instead.`);
+        return await pushSyncBranch(dir, opts, candidate, `Direct push to ${opts.ref} was rejected.`);
+    } finally {
+        safeRemove(dir, log);
+    }
+}
+
+async function pushSyncBranch(dir: string, opts: { url: string; ref: string; upstream: string }, sha: string, reason: string): Promise<SyncResult> {
+    const branch = `bc-alm/upstream-sync-${timestamp()}`;
+    const p = await tryPush(dir, 'origin', `${sha}:refs/heads/${branch}`);
+    if (!p.ok) { throw new Error(`${reason} Pushing branch ${branch} failed too.\n${p.err}`); }
+    const res: SyncResult = { status: 'branch', branch, message: `${reason} Pushed ${branch}.` };
+    const slug = githubSlug(opts.url);
+    if (slug) {
+        res.compareUrl = `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(opts.ref)}...${encodeURIComponent(branch)}?expand=1`;
+        if (await commandExists('gh')) {
+            const pr = await run('gh', ['pr', 'create', '--repo', `${slug.owner}/${slug.repo}`, '--base', opts.ref, '--head', branch,
+                '--title', `Sync with upstream template`, '--body', `Brings in the latest changes from ${opts.upstream}.\n\n${reason}`], { cwd: dir, allowFailure: true });
+            res.prUrl = /https:\/\/\S+\/pull\/\d+/.exec(pr.stdout + pr.stderr)?.[0];
+        }
+    }
+    return res;
+}
+
+/** Bring a GitHub fork up to date with its parent (gh repo sync). Throws when the branches diverged. */
 export async function syncForkFromUpstream(forkUrl: string, branch?: string): Promise<string> {
     const s = githubSlug(forkUrl);
     if (!s) { throw new Error('Only GitHub forks can be synced.'); }

@@ -134,15 +134,88 @@ template-sync Action share the same state.
 The **Template Sources** view lists the repositories you pull from. The default is this
 template; configure more in `bcAlm.templateSources`. Typical setups:
 
-- **Company template**: **Create My Own Template Repository…** forks or copies the upstream into
-  your organization. Projects then use it as their primary source, and **Pull Upstream Updates
-  into My Template** keeps the fork current.
+- **Company template**: **Copy a Template into My Own Repository…** creates your own copy of a GitHub
+  template source under your account or one of your organizations:
+  - **Fork**: GitHub doesn't allow it in the account that owns the upstream, or when the account
+    already has a fork. In that case the existing fork is offered.
+  - **Duplicate**: a new repository with the full history, with the original recorded as
+    `upstream` in `bcAlm.templateSources`. Use this when you own the upstream.
+  - **Independent copy**: GitHub's "Use this template". It shares no history and can't be synced.
+
+  Projects then use it as their primary source. **Pull Upstream Updates into My Template** keeps
+  it current:
+  - For forks, it tries `gh repo sync` first.
+  - Otherwise it merges with git.
+  - On conflicts it pushes a `bc-alm/upstream-sync-*` branch and offers a pull request.
 - **Multiple sources**: add a second source (e.g. a team's extra skills). **Track Component from
   Another Template Source…** switches a single component to a different source.
 
 The lock records the source per file. Its first source is the default for
 `Update-FromTemplate.ps1` and the Action, so a project created from your company template keeps
 syncing from it.
+
+## Working with several templates
+
+A project can take components from more than one template, for example the BC ALM lifecycle
+agents and a colleague's BC upgrade agents and skills.
+
+**Template identity.** Each template repository describes itself in `template.config.json`:
+
+```jsonc
+"template": {
+  "id": "bc-upgrade",            // stable id used in policies and the lock
+  "name": "BC Upgrade",
+  "description": "Agents and skills for BC upgrade projects.",
+  "version": "1.0.0",
+  "icon": "arrow-up"
+}
+```
+
+If a source has no `template` block, the repository name is used as its id.
+
+**Grouped Components view.** When more than one template is in use, components are grouped by
+template, and project-only files go in a **Local** group. Use the title bar to switch between
+**Group Components by Template** and **Group Components by Kind**.
+
+**Turn templates on and off.** On a template node:
+- **Disable Template**: moves all of its components to `.bc-alm/disabled/`, keeping your edits.
+- **Enable Template**: restores them.
+- **Activate Only This Template**: for example, only the upgrade agents during an upgrade
+  project.
+
+**Switch Active Templates…** (also in the status bar) toggles several templates at once. The
+choice is stored in `values.sync.templates.disabled` and honored by `Update-FromTemplate.ps1`
+and the template-sync Action.
+
+**Choose what you take from each source.** **Choose Components…** on a source lists everything
+it offers:
+- Dependencies of the components you pick are added automatically.
+- Components you deselect are disabled.
+- Components you leave out are recorded as `exclude` on the source in the lock, so they don't
+  keep showing up as new.
+
+**Create a new template.** **Create New Template…** in the Template Sources view offers three
+starting points:
+- **Blank**: the folder structure, a README and a `template.config.json` with your identity.
+- **Seed from this project**: pick components from your project. Your project values are turned
+  back into placeholders.
+- **Copy an existing template**: copies the repository with its history under a new identity.
+  This never forks, so it also works when you own the original.
+
+The repository is created on GitHub with `gh`, pushed, and added as a template source.
+
+**Share with your team.**
+- Commit `.bc-alm/template.lock.json`. It records every source (URL, ref, id, exclusions), so
+  colleagues get the same templates.
+- **Add This Project's Sources to My Settings** adds those sources to a colleague's
+  `bcAlm.templateSources`.
+- **Share Template Sources with My Team…** copies a `bcAlm.templateSources` snippet, or writes it
+  to the workspace settings (`.vscode/settings.json`).
+
+**Source actions.**
+- **Change Branch/Tag…**: pins a source to another ref.
+- **Open Template Repository**: opens the repository on GitHub.
+- Error badges explain whether a source failed because of access, a bad ref or the network.
 
 ## Build and share your own customizations
 
@@ -162,7 +235,8 @@ syncing from it.
     template prefix and project-only tools are removed. You get a diff to confirm first.
   - Delivery is either a **direct commit** or a **pull request** on the template repository.
 - **Contribute to Source Template (Pull Request)…** does the same against the upstream template
-  so improvements can flow back.
+  so improvements can flow back. If you can't push to it, your existing fork is used, or one is
+  created. If you own the upstream, the branch is pushed there directly.
 
 ## Guidance and what's new
 
@@ -178,7 +252,8 @@ The **Guidance & What's New** view combines:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `bcAlm.templateSources` | upstream template @ `main` | Template repositories (git URL or local path) and refs. |
+| `bcAlm.templateSources` | upstream template @ `main` | Template repositories (git URL or local path), refs and optional `upstream` to sync from. |
+| `bcAlm.components.groupBy` | `auto` | Group components by `template`, by `kind`, or `auto` (by template when more than one is in use). |
 | `bcAlm.checkForUpdatesOnStartup` | `true` | Fetch sources and compute status when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | `60` | Minimum time between automatic fetches. |
 | `bcAlm.powershellPath` | auto | PowerShell used for project creation. |

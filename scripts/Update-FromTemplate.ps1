@@ -262,7 +262,7 @@ $sync = [pscustomobject]@{
         prTemplate    = $true
     }
 }
-$policyDisabled = @(); $policyKeep = @()
+$policyDisabled = @(); $policyKeep = @(); $policyTplDisabled = @()
 $config = $null
 $configPath = Join-Path $stateRoot 'template.config.json'
 if (Test-Path $configPath) {
@@ -283,6 +283,9 @@ if (Test-Path $configPath) {
             $c = $s.components
             if ($c.PSObject.Properties['disabled'])  { $policyDisabled = @($c.disabled  | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
             if ($c.PSObject.Properties['keepLocal']) { $policyKeep     = @($c.keepLocal | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
+        }
+        if ($s.PSObject.Properties['templates'] -and $s.templates -and $s.templates.PSObject.Properties['disabled']) {
+            $policyTplDisabled = @($s.templates.disabled | Where-Object { $_ } | ForEach-Object { ([string]$_).Trim().ToLowerInvariant() })
         }
     }
 }
@@ -390,8 +393,10 @@ if ($hasLock) {
         if (-not ($s -and $s.url)) { continue }
         $o = [ordered]@{}
         if ($s.PSObject.Properties['name'] -and $s.name) { $o.name = [string]$s.name }
+        if ($s.PSObject.Properties['id'] -and $s.id) { $o.id = [string]$s.id }
         $o.url = [string]$s.url
         $o.ref = if ($s.PSObject.Properties['ref'] -and $s.ref) { [string]$s.ref } else { 'main' }
+        if ($s.PSObject.Properties['exclude'] -and $null -ne $s.exclude) { $o.exclude = @($s.exclude | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
         $lockSources.Add([pscustomobject]$o)
     }
     if ($lockJson.files) {
@@ -416,6 +421,27 @@ Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
 & git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp 2>$null
 if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
 $commit = ([string](& git -C $temp rev-parse HEAD)).Trim()
+
+# Template identity: "template.id" in the template's template.config.json, else the repository
+# name. Mirrors manifestOf() in the VS Code extension; sync.templates.disabled lists these ids.
+function Get-SlugId([string] $s) {
+    $id = ($s.Trim().ToLowerInvariant() -replace '\.git$', '' -replace '[^a-z0-9._-]+', '-').Trim('-')
+    if ($id) { return $id } else { return 'template' }
+}
+$templateId = $null
+$tplCfgPath = Join-Path $temp 'template.config.json'
+if (Test-Path -LiteralPath $tplCfgPath) {
+    try {
+        $tplMeta = (Read-Text $tplCfgPath | ConvertFrom-Json).template
+        if ($tplMeta) {
+            if ($tplMeta.PSObject.Properties['id'] -and $tplMeta.id) { $templateId = Get-SlugId ([string]$tplMeta.id) }
+            elseif ($tplMeta.PSObject.Properties['name'] -and $tplMeta.name) { $templateId = Get-SlugId ([string]$tplMeta.name) }
+        }
+    } catch { }
+}
+if (-not $templateId) { $templateId = Get-SlugId ((($TemplateUrl.Trim() -replace '[\\/]+$', '') -split '[\\/:]')[-1]) }
+$templateOff = $policyTplDisabled -contains $templateId
+Write-Host "Template id: $templateId$(if ($templateOff) { ' (disabled in this project: its agents, skills, prompts and instructions are skipped)' })" -ForegroundColor DarkGray
 
 $updated = 0; $added = 0; $unchanged = 0; $keptLocal = 0; $notInstalled = 0; $otherSource = 0
 $policySkipped = New-Object System.Collections.Generic.HashSet[string]
@@ -442,6 +468,7 @@ function Add-Staged([string] $rel) {
     if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { return }
     $comp = Get-ComponentId $rel
     if ($policyDisabled -contains $comp -or $policyKeep -contains $comp) { [void]$policySkipped.Add($comp); return }
+    if ($templateOff -and $comp -match '^(agent|skill|prompt|instruction):') { [void]$policySkipped.Add($comp); return }
     $destRel = Resolve-Dest $rel
     $stagePath = Join-Path $stage $destRel
     $dir = Split-Path $stagePath -Parent
@@ -623,6 +650,7 @@ function Reparameterize {
 function Set-LockEntry($entry, [string] $installedHash) {
     $lockFiles[$entry.Dest] = [pscustomobject][ordered]@{
         source        = $TemplateUrl
+        template      = $templateId
         path          = $entry.Src
         commit        = $commit
         templateHash  = $entry.Raw
@@ -645,7 +673,13 @@ function Write-Lock {
     else {
         $parts = foreach ($s in $lockSources) {
             $props = @()
-            foreach ($k in 'name', 'url', 'ref') { if ($s.PSObject.Properties[$k] -and $s.$k) { $props += ('      "{0}": {1}' -f $k, (& $J $s.$k)) } }
+            foreach ($k in 'name', 'id', 'url', 'ref') { if ($s.PSObject.Properties[$k] -and $s.$k) { $props += ('      "{0}": {1}' -f $k, (& $J $s.$k)) } }
+            if ($s.PSObject.Properties['exclude'] -and $null -ne $s.exclude) {
+                [string[]]$ex = @($s.exclude | Where-Object { $_ } | ForEach-Object { [string]$_ } | Select-Object -Unique)
+                [System.Array]::Sort($ex, [System.StringComparer]::Ordinal)
+                if ($ex.Count -eq 0) { $props += '      "exclude": []' }
+                else { $props += ('      "exclude": [' + $nl + (($ex | ForEach-Object { '        ' + (& $J $_) }) -join (',' + $nl)) + $nl + '      ]') }
+            }
             '    {' + $nl + ($props -join (',' + $nl)) + $nl + '    }'
         }
         [void]$sb.Append('  "sources": [' + $nl + ($parts -join (',' + $nl)) + $nl + '  ],' + $nl)
@@ -656,7 +690,10 @@ function Write-Lock {
     else {
         $parts = foreach ($k in $keys) {
             $e = $lockFiles[$k]
-            $props = foreach ($f in 'source', 'path', 'commit', 'templateHash', 'installedHash') { '      "{0}": {1}' -f $f, (& $J $e.$f) }
+            $props = foreach ($f in 'source', 'template', 'path', 'commit', 'templateHash', 'installedHash') {
+                if ($f -eq 'template' -and -not ($e.PSObject.Properties['template'] -and $e.template)) { continue }
+                '      "{0}": {1}' -f $f, (& $J $e.$f)
+            }
             '    ' + (& $J $k) + ': {' + $nl + ($props -join (',' + $nl)) + $nl + '    }'
         }
         [void]$sb.Append('  "files": {' + $nl + ($parts -join (',' + $nl)) + $nl + '  }' + $nl)
@@ -735,10 +772,14 @@ try {
     }
 
     if (-not ($lockSources | Where-Object { (Get-NormUrl $_.url) -eq $templateKey })) {
-        $lockSources.Add([pscustomobject][ordered]@{ url = $TemplateUrl; ref = $Branch }); $lockChanged = $true
+        $lockSources.Add([pscustomobject][ordered]@{ id = $templateId; url = $TemplateUrl; ref = $Branch }); $lockChanged = $true
     }
     else {
-        foreach ($s in $lockSources) { if ((Get-NormUrl $s.url) -eq $templateKey -and $s.ref -ne $Branch) { $s.ref = $Branch; $lockChanged = $true } }
+        foreach ($s in $lockSources) {
+            if ((Get-NormUrl $s.url) -ne $templateKey) { continue }
+            if ($s.ref -ne $Branch) { $s.ref = $Branch; $lockChanged = $true }
+            if (-not ($s.PSObject.Properties['id'] -and $s.id)) { $s | Add-Member -NotePropertyName id -NotePropertyValue $templateId -Force; $lockChanged = $true }
+        }
     }
     if ($lockChanged -and $PSCmdlet.ShouldProcess($lockPath, 'Record synced template versions')) { Write-Lock }
 }
