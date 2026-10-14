@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CONFIG_FILE, custRoot } from '../core/config';
+import { CONFIG_FILE, custRoot, TemplateManifest } from '../core/config';
 import { DependencyGraph, referencedComponents } from '../core/deps';
 import { migrateToBcAlm, needsMigration, rewriteTrackedForLayout, STATE_DIR, statePath } from '../core/layout';
 import { emptyLock, ensureSource, readLock, writeLock } from '../core/lock';
@@ -16,7 +16,9 @@ import { Finding } from '../core/validator';
 import { readTextIfExists, sameUrl, toPosix } from '../core/util';
 import { CustomizationDiagnostics, TemplateContentProvider } from './diagnostics';
 import { ProjectState, saveSettingsSources, settingsSources, SourceInfo, UPSTREAM_URL } from './projectState';
-import { ComponentsNode, GuidanceTree } from './trees';
+import { ComponentsNode, GuidanceTree, offByTemplate } from './trees';
+import { registerTemplateCommands } from './templateCommands';
+import { setTemplateIdentity } from '../core/newTemplate';
 import { addToExistingRepoWizard, isCancelled, newProjectWizard, updateAllPicker } from './wizards';
 
 export interface CommandContext {
@@ -97,6 +99,17 @@ export function registerCommands(cx: CommandContext): void {
     const openConflicts = async (files: string[]) => {
         for (const f of files) { await vscode.window.showTextDocument(vscode.Uri.file(absOf(f)), { preview: false }); }
     };
+
+    /** A component of a disabled template cannot be turned on alone; offer to enable the template. */
+    const blockedByTemplate = async (c: ComponentState): Promise<boolean> => {
+        if (!offByTemplate(state, c)) { return false; }
+        const name = state.templateGroup(c.templateId!)?.manifest.name ?? c.templateId;
+        const a = await vscode.window.showInformationMessage(`"${c.ref.name}" belongs to template "${name}", which is disabled in this project.`, 'Enable Template');
+        if (a) { await vscode.commands.executeCommand('bcAlm.enableTemplate', { type: 'template', group: state.templateGroup(c.templateId!) }); }
+        return true;
+    };
+
+    registerTemplateCommands({ state, log, reg, graph, done });
 
     // ------------------------------------------------------------ projects
 
@@ -269,6 +282,7 @@ export function registerCommands(cx: CommandContext): void {
 
     reg('bcAlm.enableComponent', async (arg: unknown) => {
         const c = needComponent(arg);
+        if (await blockedByTemplate(c)) { return; }
         const ops = state.ops();
         ops.enable(c);
         ops.save();
@@ -277,6 +291,7 @@ export function registerCommands(cx: CommandContext): void {
 
     reg('bcAlm.installComponent', async (arg: unknown) => {
         const c = needComponent(arg);
+        if (await blockedByTemplate(c)) { return; }
         const ops = state.ops();
         const deps = graph().closure(c.ref.id).map(id => state.component(id)).filter((x): x is ComponentState => !!x && x.status === 'available');
         let withDeps: ComponentState[] = [];
@@ -497,7 +512,8 @@ export function registerCommands(cx: CommandContext): void {
     reg('bcAlm.saveToTemplate', (arg: unknown) => publish(arg, false));
     reg('bcAlm.contributeUpstream', (arg: unknown) => publish(arg, true));
 
-    reg('bcAlm.createTemplateRepo', async () => {
+    reg('bcAlm.createTemplateRepo', async (opts?: { identity?: TemplateManifest }) => {
+        const identity = opts && typeof opts === 'object' && 'identity' in opts ? opts.identity : undefined;
         await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Checking GitHub CLI…' }, () => requireGh());
         const ghSources = [...settingsSources(), ...state.sources].filter((s, i, all) => githubSlug(s.url) && all.findIndex(x => sameUrl(x.url, s.url)) === i);
         if (!ghSources.some(s => sameUrl(s.url, UPSTREAM_URL))) { ghSources.push({ name: 'BC ALM Template (upstream)', url: UPSTREAM_URL, ref: 'main' }); }
@@ -520,7 +536,7 @@ export function registerCommands(cx: CommandContext): void {
         if (!ownerPick) { return; }
         const owner = ownerPick.owner;
         const name = (await vscode.window.showInputBox({
-            prompt: `Repository name (created as ${owner}/<name>)`, value: owner.toLowerCase() === info.owner.toLowerCase() ? `${up.repo}-team` : up.repo,
+            prompt: `Repository name (created as ${owner}/<name>)`, value: identity ? `${identity.id}-template` : owner.toLowerCase() === info.owner.toLowerCase() ? `${up.repo}-team` : up.repo,
             validateInput: v => /^[\w.-]+$/.test(v.trim()) ? undefined : 'Letters, digits, ".", "-" and "_" only'
         }))?.trim();
         if (!name) { return; }
@@ -528,9 +544,9 @@ export function registerCommands(cx: CommandContext): void {
         const blocker = forkBlocker(info.fullName, info.owner, owner, await findFork(up, owner));
         type HowPick = vscode.QuickPickItem & { v: CreateTemplateHow | 'existing' };
         const hows: HowPick[] = [];
-        if (!blocker) {
+        if (!blocker && !identity) {
             hows.push({ label: 'Fork', detail: 'GitHub fork - pull upstream improvements with one click, contribute back via pull request.', v: 'fork' });
-        } else if (blocker.kind === 'existing') {
+        } else if (blocker?.kind === 'existing' && !identity) {
             hows.push({ label: `Use my existing fork ${blocker.fork}`, detail: 'Add the fork you already have as a template source.', v: 'existing' });
         }
         hows.push({
@@ -554,13 +570,18 @@ export function registerCommands(cx: CommandContext): void {
             log.appendLine(`\n=== Create template ${owner}/${name} (${how.v}) from ${info.fullName} ===`);
             created = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Creating ${owner}/${name}…` },
                 () => createOwnTemplate({ upstreamUrl: base.url, upstreamRef: base.ref, owner, name, how: how.v as CreateTemplateHow, visibility, workRoot: path.join(state.storageRoot, 'work'), log: l => log.appendLine(l) }));
+            if (identity) {
+                const id = identity;
+                await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Setting template identity "${id.name}"…` },
+                    () => setTemplateIdentity(`${created.url}.git`, base.ref, id, path.join(state.storageRoot, 'work'), l => log.appendLine(l)));
+            }
         }
         const url = created.url;
         const gitUrl = url.endsWith('.git') ? url : `${url}.git`;
         const list = settingsSources();
         if (!list.some(s => sameUrl(s.url, gitUrl))) {
             const asDefault = await vscode.window.showQuickPick(['Yes - use it for new projects by default', 'No - just add it to the list'], { placeHolder: `Created ${url}. Make it the default template?` });
-            const entry: TemplateSourceSpec = { name: `${owner}/${name}`, url: gitUrl, ref: base.ref, ...(created.upstream ? { upstream: created.upstream } : {}) };
+            const entry: TemplateSourceSpec = { name: identity?.name ?? `${owner}/${name}`, url: gitUrl, ref: base.ref, ...(created.upstream ? { upstream: created.upstream } : {}) };
             await saveSettingsSources(asDefault?.startsWith('Yes') ? [entry, ...list] : [...list, entry]);
         }
         await state.refresh(false, true);
@@ -628,16 +649,21 @@ export function registerCommands(cx: CommandContext): void {
         if (!s || !state.root) { return; }
         const lock = readLock(state.root) ?? emptyLock();
         if (!lock.sources.length) { state.projectSources().forEach((p, i) => ensureSource(lock, p, i === 0)); }
-        ensureSource(lock, { name: s.name, url: s.url, ref: s.ref });
+        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref });
         writeLock(state.root, lock);
-        await done(`"${s.name ?? s.url}" is now a source for this project. Its extra components appear under "Available to install"; use "Track Component from Another Template Source" to switch existing ones.`);
+        await state.refresh(false, true);
+        const a = await vscode.window.showInformationMessage(`"${s.name ?? s.url}" is now a source for this project. Choose the components you want from it now, or later from its context menu.`, 'Choose Components…');
+        if (a) {
+            const info = state.sources.find(x => sameUrl(x.url, s.url));
+            if (info) { await vscode.commands.executeCommand('bcAlm.manageComponents', info); }
+        }
     });
 
     reg('bcAlm.setPrimarySource', async (s: SourceInfo) => {
         if (!s || !state.root) { return; }
         const lock = readLock(state.root) ?? emptyLock();
         if (!lock.sources.length) { state.projectSources().forEach((p, i) => ensureSource(lock, p, i === 0)); }
-        ensureSource(lock, { name: s.name, url: s.url, ref: s.ref }, true);
+        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref }, true);
         writeLock(state.root, lock);
         await done(`"${s.name ?? s.url}" is now the primary source (new components and the template-sync workflow use it).`);
     });

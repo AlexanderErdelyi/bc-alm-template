@@ -148,6 +148,20 @@ export class ProjectOps {
         return n;
     }
 
+    /** Install a component from a specific source (when several sources offer it). */
+    installFrom(comp: ComponentState, cat: Catalog): number {
+        if (comp.source && sameUrl(comp.source, cat.repo.spec.url)) { return this.install(comp); }
+        let n = 0;
+        for (const f of comp.files) {
+            if (f.status !== 'available' && f.status !== 'new' && f.status !== 'missing') { continue; }
+            const tf = cat.files.get(f.destRel);
+            if (!tf) { continue; }
+            this.take({ ...f, source: cat.repo.spec.url, templateId: cat.manifest.id, template: tf, srcRel: tf.srcRel, lock: undefined });
+            n++;
+        }
+        return n;
+    }
+
     private policy(): ComponentPolicy {
         const c = this.project.sync.components;
         return { disabled: [...c.disabled], keepLocal: [...c.keepLocal] };
