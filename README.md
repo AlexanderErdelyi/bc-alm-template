@@ -342,8 +342,11 @@ wraps everything below in VS Code:
 - A **Guidance & What's New** view shows best practices, template changes and Copilot updates.
   Live validation flags outdated agent/skill/prompt frontmatter.
 
-Install the VSIX from the [Releases](https://github.com/AlexanderErdelyi/bc-alm-template/releases)
-page (`ext-v*` tags). Full guide: [docs/vscode-extension.md](docs/vscode-extension.md).
+Install **BC ALM** from the
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm),
+or run `code --install-extension AlexanderErdelyi.bc-alm`. The VSIX is also attached to each
+[release](https://github.com/AlexanderErdelyi/bc-alm-template/releases) (`ext-v*` tags). Full
+guide: [docs/vscode-extension.md](docs/vscode-extension.md).
 
 ### 1b. Or: add the template to an existing repo
 

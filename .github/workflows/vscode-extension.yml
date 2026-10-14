@@ -88,8 +88,9 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # Matches "## [X.Y.Z] - date" (Keep a Changelog) and "## X.Y.Z ...".
           awk -v v="$VERSION" '
-            /^## / { if (found) exit; if ($2 == v) { found = 1; next } }
+            /^## / { if (found) exit; h = $2; gsub(/[][]/, "", h); if (h == v) { found = 1; next } }
             found { print }
           ' CHANGELOG.md > release-notes.md
           if [ ! -s release-notes.md ]; then
