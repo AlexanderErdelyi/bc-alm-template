@@ -19,6 +19,7 @@ test('spawnError gives install hints for missing tools', () => {
     assert.match(spawnError('git', enoent('git')).message, /git-scm\.com/);
     assert.match(spawnError('gh', enoent('gh')).message, /cli\.github\.com.*gh auth login/);
     assert.match(spawnError('C:\\Tools\\PWSH.EXE', enoent('pwsh')).message, /bcAlm\.powershellPath/);
+    assert.match(spawnError('/usr/local/bin/gh', enoent('gh')).message, /cli\.github\.com/);
     assert.match(spawnError('foo', enoent('foo')).message, /"foo" was not found/);
     const other = Object.assign(new Error('EACCES https://u:p@h/x'), { code: 'EACCES' });
     assert.equal(spawnError('git', other).message, 'EACCES https://***@h/x');

@@ -1,5 +1,4 @@
 import { execFile, spawn } from 'child_process';
-import * as path from 'path';
 
 /**
  * Mask credentials before text reaches a log, notification or error: user-info in http(s) URLs
@@ -21,7 +20,7 @@ const INSTALL_HINTS: Record<string, string> = {
 /** Turn a spawn failure into an actionable message (missing executables get an install hint). */
 export function spawnError(cmd: string, e: NodeJS.ErrnoException): Error {
     if (e.code !== 'ENOENT') { return new Error(redactSecrets(e.message)); }
-    const name = path.basename(cmd).toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
+    const name = (cmd.split(/[\\/]/).pop() ?? cmd).toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
     return new Error(INSTALL_HINTS[name] ?? `"${cmd}" was not found. Check that it is installed and on your PATH.`);
 }
 
