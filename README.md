@@ -2,6 +2,7 @@
 
 [![VS Code Marketplace](https://vsmarketplacebadges.dev/version-short/AlexanderErdelyi.bc-alm.svg?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
 [![Installs](https://vsmarketplacebadges.dev/installs-short/AlexanderErdelyi.bc-alm.svg)](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/AlexanderErdelyi/bc-alm-template/badge)](https://scorecard.dev/viewer/?uri=github.com/AlexanderErdelyi/bc-alm-template)
 
 > **A complete, opinionated Application Lifecycle Management template for Microsoft Dynamics 365 Business Central AL development teams.**
 
@@ -449,7 +450,8 @@ first feature.
 > **Cleanup & content pruning:** when you ran the guided wizard from a repo **created via "Use this
 > template"**, the initializer replaces this template's `README.md` with a short project README,
 > removes template-only files (`CONTRIBUTING.md`, `bootstrap.ps1`,
-> `scripts/Install-IntoExistingRepo.ps1`), and — with the **Content profile** set to *Lean*
+> `scripts/Install-IntoExistingRepo.ps1`, plus this repository's governance files such as
+> `SECURITY.md`, `CODE_OF_CONDUCT.md`, `FUNDING.yml` and `dependabot.yml`), and — with the **Content profile** set to *Lean*
 > (default) — **prunes content a working project doesn't need**. GitHub's "Use this template" copies
 > the *whole* tree, so this is where a new repo gets slimmed down. Lean drops the agent authoring
 > meta-docs (`AGENT-ARCHITECTURE.md`, `WHEN-TO-USE.md`, `SKILLS.md`) and keeps the `docs/` library,

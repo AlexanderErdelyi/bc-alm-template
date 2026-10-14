@@ -1,0 +1,32 @@
+# Dependabot version updates for this repository (template-repo only: removed by
+# Initialize-Template.ps1 -CleanupTemplateFiles). Security updates are enabled in the repo settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /vscode-extension
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # Must not get ahead of engines.vscode (vsce rejects that); bump both together by hand.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # VS Code 1.95 runs on Node 20.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
