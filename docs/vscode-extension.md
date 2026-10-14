@@ -369,8 +369,53 @@ Press **F5** with the `vscode-extension` folder open to launch an Extension Deve
 The engine lives in `src/core/` and has no `vscode` imports, so it can be tested with plain
 Node. The UI (tree views, commands, wizards, diagnostics) is in `src/ui/`. CI is
 [`.github/workflows/vscode-extension.yml`](../.github/workflows/vscode-extension.yml). It
-builds and tests every change, and attaches the VSIX to a GitHub release when you push an
-`ext-v*` tag.
+builds and tests every change. On an `ext-v*` tag it creates a GitHub release and publishes
+to the Marketplace (see [Releasing](#releasing-to-the-marketplace)).
+
+### Releasing to the Marketplace
+
+1. **Bump the version** in `vscode-extension/package.json`:
+   - `npm version X.Y.Z --no-git-tag-version` in `vscode-extension/`;
+   - this also updates the lockfile.
+2. **Add a `## X.Y.Z — Title` section** to `vscode-extension/CHANGELOG.md`. It becomes the
+   GitHub release notes.
+3. **Run the [smoke test](#pre-release-smoke-test)** on the PR's VSIX, then merge the PR.
+4. **Tag `main` and push the tag:**
+
+   ```powershell
+   git checkout main; git pull
+   git tag ext-vX.Y.Z; git push origin ext-vX.Y.Z
+   ```
+
+5. **Approve the deployment.**
+   - The run waits at the `publish` job.
+   - Open **Actions → the run → Review deployments**, tick `marketplace` and approve.
+   - The Marketplace listing updates within a few minutes.
+
+What the workflow guarantees:
+
+- **Version guard:** the tag must be `ext-v<package.json version>`. A mismatch (or any other
+  tag shape) fails in the build job, before anything is released or published.
+- **Exactly the tested VSIX is published.** The publish job reuses the build artifact; it does
+  not rebuild.
+- **Pre-releases:** tag `ext-vX.Y.Z-pre`.
+  - The VSIX is packaged and published with `--pre-release`, and the GitHub release is
+    marked as a pre-release.
+  - Keep `package.json` at `X.Y.Z`: the Marketplace doesn't accept semver suffixes.
+  - A version can't be published twice. The usual convention is odd minor versions for
+    pre-releases (`0.5.x`) and even ones for stable (`0.6.x`).
+- **Open VSX:**
+  - Published too when the `marketplace` environment has an `OVSX_PAT` secret.
+  - Otherwise the step is skipped with a warning.
+- **Secrets:**
+  - `VSCE_PAT` / `OVSX_PAT` live only in the `marketplace` environment.
+  - That environment requires a reviewer and only accepts `ext-v*` tags.
+  - The tokens are passed as environment variables, never on a command line.
+
+**If publishing fails after the GitHub release was created:**
+- Fix the cause, for example an expired PAT (renew it and update the secret).
+- Then **Re-run failed jobs** on the same run.
+- Don't push a new tag for the same version.
 
 ### Pre-release smoke test
 
