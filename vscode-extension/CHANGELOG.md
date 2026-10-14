@@ -6,6 +6,11 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- The version and installs badges on the Marketplace page work again. shields.io retired its
+  Marketplace badges, so they now come from vsmarketplacebadges.dev. (#79)
+
 ## [0.4.3] - 2026-10-15
 
 ### Added
