@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "AlexanderErdelyi",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -993,7 +993,8 @@
         "bcAlm.powershellPath": {
           "type": "string",
           "default": "",
-          "description": "Path to PowerShell 7 (pwsh). Leave empty to auto-detect pwsh, then Windows PowerShell."
+          "scope": "machine",
+          "description": "Path to PowerShell 7 (pwsh). Leave empty to auto-detect pwsh, then Windows PowerShell. User/machine setting only: a repository's workspace settings cannot change which executable runs."
         },
         "bcAlm.validation.enabled": {
           "type": "boolean",

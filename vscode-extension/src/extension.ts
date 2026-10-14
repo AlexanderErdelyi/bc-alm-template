@@ -7,6 +7,7 @@ import { CustomizationDiagnostics, TEMPLATE_SCHEME, TemplateContentProvider } fr
 import { ProjectState } from './ui/projectState';
 import { ComponentsTree, GuidanceTree, SourcesTree } from './ui/trees';
 import { sweepStale } from './core/util';
+import { redactSecrets } from './core/exec';
 
 const BASELINE_PROMPT_KEY = 'bcAlm.baselinePromptDismissed';
 const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
@@ -135,7 +136,7 @@ export async function activate(ext: vscode.ExtensionContext): Promise<void> {
     const fetchOnStart = vscode.workspace.getConfiguration('bcAlm').get<boolean>('checkForUpdatesOnStartup', true);
     await vscode.commands.executeCommand('setContext', 'bcAlm.hasProject', false);
     void state.refresh(false, !fetchOnStart).then(() => {
-        if (state.lastError) { log.appendLine(`[refresh] ${state.lastError}`); }
+        if (state.lastError) { log.appendLine(`[refresh] ${redactSecrets(state.lastError)}`); }
         diagnostics.validateAll();
     });
     vscode.workspace.textDocuments.forEach(d => diagnostics.validateDocument(d));

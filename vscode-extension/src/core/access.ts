@@ -1,3 +1,5 @@
+import { redactSecrets } from './exec';
+
 export type SourceErrorKind = 'access' | 'network' | 'ref' | 'other';
 
 export interface SourceProblem {
@@ -10,7 +12,7 @@ export interface SourceProblem {
 
 function repoLabel(url: string): string {
     const m = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(url.trim());
-    return m ? `${m[1]}/${m[2]}` : url;
+    return m ? `${m[1]}/${m[2]}` : redactSecrets(url);
 }
 
 /**
@@ -18,7 +20,7 @@ function repoLabel(url: string): string {
  * have no access to looks like "not found" on GitHub, so both are reported as an access problem.
  */
 export function classifySourceError(error: string, url: string, ref?: string): SourceProblem {
-    const detail = error.trim();
+    const detail = redactSecrets(error.trim());
     // Ignore the echoed command line ("git ... failed (128): <stderr>") - match git's own output only.
     const e = detail.replace(/^[\s\S]*?failed \(-?\d+\):\s*/, '').toLowerCase();
     const label = repoLabel(url);

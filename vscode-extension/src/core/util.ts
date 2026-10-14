@@ -21,6 +21,20 @@ export function joinRel(...parts: string[]): string {
     return parts.filter(p => p && p !== '.').join('/').replace(/\/+/g, '/');
 }
 
+/**
+ * Absolute path of a posix project-relative path, refusing anything that resolves outside root
+ * (e.g. "../x" from a crafted customizationsPath or lock entry).
+ */
+export function insideRoot(root: string, rel: string): string {
+    const base = path.resolve(root);
+    const abs = path.resolve(base, ...rel.split('/'));
+    const r = path.relative(base, abs);
+    if (!r || r === '..' || r.startsWith('..' + path.sep) || path.isAbsolute(r)) {
+        throw new Error(`Refusing to use "${rel}": it resolves outside the project folder.`);
+    }
+    return abs;
+}
+
 export function readTextIfExists(file: string): string | undefined {
     try {
         return fs.readFileSync(file, 'utf8');

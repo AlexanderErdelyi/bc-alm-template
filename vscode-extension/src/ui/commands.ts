@@ -6,7 +6,7 @@ import { DependencyGraph, referencedComponents } from '../core/deps';
 import { migrateToBcAlm, needsMigration, rewriteTrackedForLayout, STATE_DIR, statePath } from '../core/layout';
 import { emptyLock, ensureSource, readLock, writeLock } from '../core/lock';
 import { componentOf, isReparamTarget, resolveDest, srcFromDest } from '../core/paths';
-import { commandExists } from '../core/exec';
+import { commandExists, redactSecrets } from '../core/exec';
 import { findFork, forkBlocker, ghOwners, ghRepoInfo, requireGh } from '../core/github';
 import { createOwnTemplate, CreateTemplateHow, DeliveryMode, executePublish, githubSlug, isLocalPath, preparePublish, PublishPlan, RepoChange, syncForkFromUpstream, syncFromUpstream } from '../core/publish';
 import { addChangelogEntry, Bump, bumpVersion, withTemplateVersion } from '../core/catalogAuthoring';
@@ -42,8 +42,8 @@ export function registerCommands(cx: CommandContext): void {
             await fn(...args);
         } catch (e) {
             if (isCancelled(e)) { return; }
-            const msg = (e as Error).message ?? String(e);
-            log.appendLine(`[${id}] ${(e as Error).stack ?? msg}`);
+            const msg = redactSecrets((e as Error).message ?? String(e));
+            log.appendLine(`[${id}] ${redactSecrets((e as Error).stack ?? msg)}`);
             const a = await vscode.window.showErrorMessage(`BC ALM: ${msg.split('\n')[0]}`, 'Show Log');
             if (a) { log.show(); }
         }

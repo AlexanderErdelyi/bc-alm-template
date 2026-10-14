@@ -52,6 +52,25 @@ Business Central projects: its Copilot agents, skills, prompts, instructions and
 - A trusted workspace. BC ALM runs git and PowerShell, so it is disabled in Restricted Mode and
   in virtual workspaces.
 
+## Privacy and security
+
+- **No telemetry.** BC ALM does not collect or send usage data.
+- **Network access:**
+  - It contacts only the template repositories you configure, using your own git and `gh`
+    credentials.
+  - It also reads the What's New feed (`bcAlm.whatsNew.feedUrl`, GitHub Changelog by default).
+- **It runs local tools:** `git`, the GitHub CLI and PowerShell. When you create or add a
+  project, it runs the template's own setup scripts (`scripts/*.ps1`), so only use templates
+  you trust.
+- **Credentials:** tokens and `user:password@` parts of URLs are masked before anything is
+  written to the BC ALM output channel or shown in a message.
+- **Writes stay inside the project folder.** Writes to the project are refused if a path
+  resolves outside it.
+- **`bcAlm.powershellPath` is a machine-level setting**, so a repository's workspace settings
+  cannot change which executable runs.
+- **Reporting a vulnerability:** see
+  [SECURITY.md](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/SECURITY.md).
+
 ## Getting started
 
 1. Open the **BC ALM** view in the Activity Bar.

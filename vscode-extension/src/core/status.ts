@@ -5,7 +5,7 @@ import { Catalog, CatalogFile } from './catalog';
 import { LockEntry, LockFile } from './lock';
 import { ComponentKind, ComponentRef, componentOf, customScanRoots, implicitlyKeptLocal, KIND_ORDER, srcFromDest } from './paths';
 import { transformTemplateFile } from './transform';
-import { hashText, listFilesRecursive, normalizeText, readTextIfExists, sameUrl, sourceKey, joinRel } from './util';
+import { hashText, insideRoot, listFilesRecursive, normalizeText, readTextIfExists, sameUrl, sourceKey, joinRel } from './util';
 
 export const DISABLED_DIR = '.bc-alm/disabled';
 
@@ -96,7 +96,7 @@ function localPath(root: string, destRel: string): string {
 }
 
 export function disabledPath(root: string, destRel: string): string {
-    return path.join(root, ...DISABLED_DIR.split('/'), ...destRel.split('/'));
+    return insideRoot(root, `${DISABLED_DIR}/${destRel}`);
 }
 
 /**

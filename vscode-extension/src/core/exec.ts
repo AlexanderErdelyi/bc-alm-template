@@ -1,4 +1,29 @@
 import { execFile, spawn } from 'child_process';
+import * as path from 'path';
+
+/**
+ * Mask credentials before text reaches a log, notification or error: user-info in http(s) URLs
+ * (https://user:token@host) and GitHub token shapes (ghp_, gho_, ghu_, ghs_, ghr_, github_pat_).
+ */
+export function redactSecrets(text: string): string {
+    return text
+        .replace(/\b(https?:\/\/)[^/@\s'"]+@/gi, '$1***@')
+        .replace(/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '***');
+}
+
+const INSTALL_HINTS: Record<string, string> = {
+    git: 'Git was not found. Install it from https://git-scm.com/downloads and reload VS Code.',
+    gh: 'The GitHub CLI (gh) was not found. Install it from https://cli.github.com, run "gh auth login", and reload VS Code.',
+    pwsh: 'PowerShell was not found. Install PowerShell 7 (https://aka.ms/powershell) or set "bcAlm.powershellPath" in your user settings.',
+    powershell: 'PowerShell was not found. Install PowerShell 7 (https://aka.ms/powershell) or set "bcAlm.powershellPath" in your user settings.'
+};
+
+/** Turn a spawn failure into an actionable message (missing executables get an install hint). */
+export function spawnError(cmd: string, e: NodeJS.ErrnoException): Error {
+    if (e.code !== 'ENOENT') { return new Error(redactSecrets(e.message)); }
+    const name = path.basename(cmd).toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
+    return new Error(INSTALL_HINTS[name] ?? `"${cmd}" was not found. Check that it is installed and on your PATH.`);
+}
 
 export interface ExecResult {
     stdout: string;
@@ -26,21 +51,25 @@ export function run(
         });
         const out: Buffer[] = [];
         const err: Buffer[] = [];
-        child.stdout.on('data', (d: Buffer) => { out.push(d); opts.onOutput?.(d.toString('utf8')); });
-        child.stderr.on('data', (d: Buffer) => { err.push(d); opts.onOutput?.(d.toString('utf8')); });
-        child.on('error', e => reject(e));
+        let failed = false;
+        child.stdout.on('data', (d: Buffer) => { out.push(d); opts.onOutput?.(redactSecrets(d.toString('utf8'))); });
+        child.stderr.on('data', (d: Buffer) => { err.push(d); opts.onOutput?.(redactSecrets(d.toString('utf8'))); });
+        child.on('error', e => { failed = true; reject(spawnError(cmd, e)); });
         child.on('close', code => {
+            if (failed) { return; }
+            // stdout stays verbatim (callers parse it); stderr is diagnostic only and may echo remote URLs.
             const result: ExecResult = {
                 stdout: Buffer.concat(out).toString('utf8'),
-                stderr: Buffer.concat(err).toString('utf8'),
+                stderr: redactSecrets(Buffer.concat(err).toString('utf8')),
                 code: code ?? -1
             };
             if (result.code !== 0 && !opts.allowFailure) {
-                reject(new CommandError(`${cmd} ${args.join(' ')} failed (${result.code}): ${result.stderr.trim() || result.stdout.trim()}`, result));
+                reject(new CommandError(redactSecrets(`${cmd} ${args.join(' ')} failed (${result.code}): ${result.stderr.trim() || result.stdout.trim()}`), result));
             } else {
                 resolve(result);
             }
         });
+        child.stdin.on('error', () => { /* process exited or never started; reported via 'error'/'close' */ });
         if (opts.input !== undefined) { child.stdin.write(opts.input); }
         child.stdin.end();
     });
@@ -69,10 +98,12 @@ export function catFileBatch(gitDir: string, specs: string[]): Promise<Map<strin
         const err: Buffer[] = [];
         child.stdout.on('data', (d: Buffer) => chunks.push(d));
         child.stderr.on('data', (d: Buffer) => err.push(d));
-        child.on('error', reject);
+        let failed = false;
+        child.on('error', e => { failed = true; reject(spawnError('git', e)); });
         child.on('close', code => {
+            if (failed) { return; }
             if (code !== 0) {
-                reject(new Error(`git cat-file failed: ${Buffer.concat(err).toString('utf8')}`));
+                reject(new Error(redactSecrets(`git cat-file failed: ${Buffer.concat(err).toString('utf8')}`)));
                 return;
             }
             const buf = Buffer.concat(chunks);
@@ -95,6 +126,7 @@ export function catFileBatch(gitDir: string, specs: string[]): Promise<Map<strin
             }
             resolve(result);
         });
+        child.stdin.on('error', () => { /* reported via 'error'/'close' */ });
         child.stdin.write(specs.join('\n') + '\n');
         child.stdin.end();
     });

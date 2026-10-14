@@ -6,7 +6,7 @@ import { Catalog, transformedAt } from './catalog';
 import { run } from './exec';
 import { emptyLock, ensureSource, LockFile, LockSource, writeLock } from './lock';
 import { ComponentState, disabledPath, FileState } from './status';
-import { hashText, normalizeText, readTextIfExists, removeEmptyParents, safeRemove, sameUrl, sourceKey, writeTextPreservingEol } from './util';
+import { hashText, insideRoot, normalizeText, readTextIfExists, removeEmptyParents, safeRemove, sameUrl, sourceKey, writeTextPreservingEol } from './util';
 
 /** The lock-file source record of a catalog. */
 export function lockSourceOf(cat: Catalog): LockSource {
@@ -33,7 +33,7 @@ export class ProjectOps {
     }
 
     abs(destRel: string): string {
-        return path.join(this.root, ...destRel.split('/'));
+        return insideRoot(this.root, destRel);
     }
 
     catalogFor(st: FileState): Catalog | undefined {
