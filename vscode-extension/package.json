@@ -16,6 +16,9 @@
   "bugs": {
     "url": "https://github.com/AlexanderErdelyi/bc-alm-template/issues"
   },
+  "sponsor": {
+    "url": "https://github.com/sponsors/AlexanderErdelyi"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/AlexanderErdelyi/bc-alm-template.git",

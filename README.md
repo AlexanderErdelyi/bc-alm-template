@@ -909,6 +909,14 @@ This is a public template — PRs welcome. If you've adapted this for your team 
 
 ---
 
+## Support this project
+
+BC ALM is free and MIT-licensed. If it saves you or your team time, you can support its
+development through [GitHub Sponsors](https://github.com/sponsors/AlexanderErdelyi). A ⭐ on
+the repository helps too.
+
+---
+
 ## License
 
 Released under the [MIT License](LICENSE).
