@@ -6,6 +6,12 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-15
+
+### Added
+
+- First public release on the Visual Studio Marketplace, as a **preview**. (#79)
+
 ### Changed
 
 - The Marketplace page has been rewritten:
