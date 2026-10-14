@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { statePath } from './layout';
-import { normalizeUrl } from './util';
+import { sameSource, templatePath } from './util';
 
 export const LOCK_FILE = 'template.lock.json';
 
@@ -11,12 +11,14 @@ export interface LockSource {
     id?: string;
     url: string;
     ref: string;
+    /** Template folder inside a catalog repository (e.g. ".templates/bc-upgrade"); omitted for the repository root. */
+    path?: string;
     /** Component ids deliberately not taken from this source ("Manage Components"). */
     exclude?: string[];
 }
 
 export interface LockEntry {
-    /** Template source URL the file is tracked from. */
+    /** Source key the file is tracked from: the template URL, plus "#<path>" for a template in a catalog folder. */
     source: string;
     /** Template id of that source (lets the sync script and the views group files by template). */
     template?: string;
@@ -45,6 +47,8 @@ export function emptyLock(): LockFile {
 function readSource(s: any): LockSource {
     const out: LockSource = { name: s.name, url: String(s.url), ref: String(s.ref || 'main') };
     if (s.id) { out.id = String(s.id); }
+    const p = templatePath(typeof s.path === 'string' ? s.path : '');
+    if (p) { out.path = p; }
     if (Array.isArray(s.exclude)) { out.exclude = s.exclude.map((x: unknown) => String(x)).filter((x: string) => x); }
     return out;
 }
@@ -54,6 +58,8 @@ function writeSource(s: LockSource): LockSource {
     if (s.name !== undefined) { out.name = s.name; }
     if (s.id) { out.id = s.id; }
     out.url = s.url;
+    const p = templatePath(s.path);
+    if (p) { out.path = p; }
     out.ref = s.ref;
     if (s.exclude) { out.exclude = [...new Set(s.exclude)].sort(); }
     return out;
@@ -90,7 +96,7 @@ export function writeLock(root: string, lock: LockFile): void {
 }
 
 export function ensureSource(lock: LockFile, src: LockSource, primary = false): void {
-    const i = lock.sources.findIndex(s => normalizeUrl(s.url) === normalizeUrl(src.url));
+    const i = lock.sources.findIndex(s => sameSource(s, src));
     if (i >= 0) {
         const merged = { ...lock.sources[i], ...src };
         // Keep the recorded selection unless the caller sets one explicitly.

@@ -31,6 +31,12 @@ export interface TemplateManifest {
     version?: string;
     /** Codicon id (without "$(...)"). */
     icon?: string;
+    /** Variant: id of the base template (in the same repository) this one extends. */
+    extends?: string;
+    /** Variant: component ids of the base that are left out. */
+    remove?: string[];
+    /** GitHub logins asked to review contributions to this template. */
+    maintainers?: string[];
 }
 
 /** Kinds that switch off with their template. Docs, workflows and scripts stay so the project keeps working. */
@@ -119,13 +125,20 @@ function parseManifestBlock(t: any): TemplateManifest | undefined {
     if (!t || typeof t !== 'object' || (!t.id && !t.name)) { return undefined; }
     const str = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : undefined;
     const name = str(t.name) ?? String(t.id);
-    return {
+    const m: TemplateManifest = {
         id: slugId(str(t.id) ?? name),
         name,
         description: str(t.description),
         version: str(t.version) ?? (typeof t.version === 'number' ? String(t.version) : undefined),
         icon: str(t.icon)?.replace(/^\$\(|\)$/g, '')
     };
+    const ext = str(t.extends);
+    if (ext) { m.extends = slugId(ext); }
+    const remove = asStringArray(t.remove);
+    if (remove.length) { m.remove = remove; }
+    const maintainers = asStringArray(t.maintainers).map(x => x.replace(/^@/, ''));
+    if (maintainers.length) { m.maintainers = maintainers; }
+    return m;
 }
 
 /** The manifest of a template source, falling back to the repository name when the config has no "template" block. */

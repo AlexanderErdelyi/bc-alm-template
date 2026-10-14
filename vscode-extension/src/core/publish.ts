@@ -126,11 +126,12 @@ export async function executePublish(plan: PublishPlan, opts: {
     const dir = await cloneWork(plan.repo, opts.workRoot);
     try {
         for (const f of plan.files) {
-            const abs = path.join(dir, ...f.srcRel.split('/'));
+            const repoRel = plan.repo.writePath(f.srcRel);
+            const abs = path.join(dir, ...repoRel.split('/'));
             fs.mkdirSync(path.dirname(abs), { recursive: true });
             const crlf = fs.existsSync(abs) && /\r\n/.test(fs.readFileSync(abs, 'utf8'));
             fs.writeFileSync(abs, crlf ? f.text.replace(/\n/g, '\r\n') : f.text, 'utf8');
-            await git(['add', '--', f.srcRel], dir);
+            await git(['add', '--', repoRel], dir);
         }
         const st = await git(['status', '--porcelain'], dir);
         if (!st.stdout.trim()) { throw new Error('Nothing to publish: the template already has this content.'); }

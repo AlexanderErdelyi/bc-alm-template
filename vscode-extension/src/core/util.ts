@@ -126,13 +126,47 @@ export function escapeRegExp(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Normalize a git URL / path for equality checks (case-insensitive, no trailing .git or slash). */
+/**
+ * Normalize a git URL / path for equality checks (case-insensitive, no trailing .git or slash).
+ * A source key ("url#path", see sourceKey) keeps its template path.
+ */
 export function normalizeUrl(url: string): string {
-    return toPosix(url.trim()).replace(/\/+$/, '').replace(/\.git$/i, '').toLowerCase();
+    const i = url.indexOf('#');
+    const base = toPosix((i >= 0 ? url.slice(0, i) : url).trim()).replace(/\/+$/, '').replace(/\.git$/i, '').toLowerCase();
+    const p = i >= 0 ? templatePath(url.slice(i + 1)).toLowerCase() : '';
+    return p ? `${base}#${p}` : base;
 }
 
+/** Folder of a template inside its repository ('' = repository root), posix, without leading ./ or slashes. */
+export function templatePath(p: string | undefined): string {
+    return toPosix((p ?? '').trim()).replace(/^(\.\/)+/, '').replace(/^\/+|\/+$/g, '').replace(/^\.$/, '');
+}
+
+/** Identity of a template source: its URL, plus "#<path>" for a template in a subfolder of a catalog repository. */
+export function sourceKey(s: { url: string; path?: string }): string {
+    const p = templatePath(s.path);
+    return p ? `${s.url}#${p}` : s.url;
+}
+
+/** Inverse of sourceKey. */
+export function splitSourceKey(key: string): { url: string; path: string } {
+    const i = key.indexOf('#');
+    return i >= 0 ? { url: key.slice(0, i), path: templatePath(key.slice(i + 1)) } : { url: key, path: '' };
+}
+
+/** Same URL or source key (a key with "#path" only equals the same key). */
 export function sameUrl(a: string | undefined, b: string | undefined): boolean {
     return !!a && !!b && normalizeUrl(a) === normalizeUrl(b);
+}
+
+/** Same template source (URL and template path). */
+export function sameSource(a: { url: string; path?: string } | undefined, b: { url: string; path?: string } | undefined): boolean {
+    return !!a && !!b && sameUrl(sourceKey(a), sourceKey(b));
+}
+
+/** Same repository, ignoring the template path. */
+export function sameRepo(a: string | undefined, b: string | undefined): boolean {
+    return !!a && !!b && sameUrl(splitSourceKey(a).url, splitSourceKey(b).url);
 }
 
 export function timestamp(): string {

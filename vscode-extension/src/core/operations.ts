@@ -4,9 +4,16 @@ import * as path from 'path';
 import { ComponentPolicy, ProjectConfig, TEMPLATE_TOGGLE_KINDS, TemplatePolicy, writeComponentPolicy, writeTemplatePolicy } from './config';
 import { Catalog, transformedAt } from './catalog';
 import { run } from './exec';
-import { emptyLock, ensureSource, LockFile, writeLock } from './lock';
+import { emptyLock, ensureSource, LockFile, LockSource, writeLock } from './lock';
 import { ComponentState, disabledPath, FileState } from './status';
-import { hashText, normalizeText, readTextIfExists, removeEmptyParents, safeRemove, sameUrl, writeTextPreservingEol } from './util';
+import { hashText, normalizeText, readTextIfExists, removeEmptyParents, safeRemove, sameUrl, sourceKey, writeTextPreservingEol } from './util';
+
+/** The lock-file source record of a catalog. */
+export function lockSourceOf(cat: Catalog): LockSource {
+    const s: LockSource = { name: cat.repo.spec.name, id: cat.manifest.id, url: cat.repo.spec.url, ref: cat.repo.spec.ref };
+    if (cat.repo.root) { s.path = cat.repo.root; }
+    return s;
+}
 
 /**
  * Mutating operations on a project. The lock semantics:
@@ -21,7 +28,7 @@ export class ProjectOps {
     constructor(readonly root: string, public project: ProjectConfig, lock: LockFile | undefined, readonly catalogs: Catalog[]) {
         this.lock = lock ?? emptyLock();
         if (!lock) {
-            catalogs.forEach((c, i) => ensureSource(this.lock, { name: c.repo.spec.name, id: c.manifest.id, url: c.repo.spec.url, ref: c.repo.spec.ref }, i === 0));
+            catalogs.forEach((c, i) => ensureSource(this.lock, lockSourceOf(c), i === 0));
         }
     }
 
@@ -30,13 +37,13 @@ export class ProjectOps {
     }
 
     catalogFor(st: FileState): Catalog | undefined {
-        return this.catalogs.find(c => sameUrl(c.repo.spec.url, st.source));
+        return this.catalogs.find(c => sameUrl(c.repo.key, st.source));
     }
 
     private record(st: FileState, cat: Catalog, installedText: string, commit = cat.sha, templateHash = st.template!.rawHash): void {
-        ensureSource(this.lock, { name: cat.repo.spec.name, id: cat.manifest.id, url: cat.repo.spec.url, ref: cat.repo.spec.ref });
+        ensureSource(this.lock, lockSourceOf(cat));
         this.lock.files[st.destRel] = {
-            source: cat.repo.spec.url,
+            source: cat.repo.key,
             template: cat.manifest.id,
             path: st.srcRel,
             commit,
@@ -150,13 +157,13 @@ export class ProjectOps {
 
     /** Install a component from a specific source (when several sources offer it). */
     installFrom(comp: ComponentState, cat: Catalog): number {
-        if (comp.source && sameUrl(comp.source, cat.repo.spec.url)) { return this.install(comp); }
+        if (comp.source && sameUrl(comp.source, cat.repo.key)) { return this.install(comp); }
         let n = 0;
         for (const f of comp.files) {
             if (f.status !== 'available' && f.status !== 'new' && f.status !== 'missing') { continue; }
             const tf = cat.files.get(f.destRel);
             if (!tf) { continue; }
-            this.take({ ...f, source: cat.repo.spec.url, templateId: cat.manifest.id, template: tf, srcRel: tf.srcRel, lock: undefined });
+            this.take({ ...f, source: cat.repo.key, templateId: cat.manifest.id, template: tf, srcRel: tf.srcRel, lock: undefined });
             n++;
         }
         return n;
@@ -251,13 +258,13 @@ export class ProjectOps {
         this.project.sync.templates = { disabled: [...new Set(p.disabled)].sort() };
     }
 
-    /** Record which components of a source you deliberately do not take (undefined = no selection made). */
+    /** Record which components of a source (by source key) you deliberately do not take (undefined = no selection made). */
     setExclude(url: string, exclude: string[] | undefined): void {
-        const s = this.lock.sources.find(x => sameUrl(x.url, url));
-        const cat = this.catalogs.find(c => sameUrl(c.repo.spec.url, url));
+        const s = this.lock.sources.find(x => sameUrl(sourceKey(x), url));
+        const cat = this.catalogs.find(c => sameUrl(c.repo.key, url));
         if (!s) {
             if (!cat) { throw new Error(`${url} is not a template source of this project.`); }
-            ensureSource(this.lock, { name: cat.repo.spec.name, id: cat.manifest.id, url, ref: cat.repo.spec.ref, exclude });
+            ensureSource(this.lock, { ...lockSourceOf(cat), exclude });
         } else {
             s.exclude = exclude;
             if (!exclude) { delete s.exclude; }
@@ -273,7 +280,7 @@ export class ProjectOps {
             const tf = target.files.get(f.destRel);
             if (!tf) { continue; }
             const local = readTextIfExists(this.abs(f.destRel));
-            const st: FileState = { ...f, source: target.repo.spec.url, template: tf, lock: undefined, srcRel: tf.srcRel };
+            const st: FileState = { ...f, source: target.repo.key, template: tf, lock: undefined, srcRel: tf.srcRel };
             if (local === undefined) {
                 this.take(st);
             } else if (normalizeText(local) === tf.transformed) {

@@ -13,7 +13,7 @@ import { isValidComponentName, scaffold, scaffoldPath, ScaffoldInput } from '../
 import { ComponentState, disabledPath, FileState, STATUS_LABEL } from '../core/status';
 import { TemplateSourceSpec } from '../core/templateRepo';
 import { Finding } from '../core/validator';
-import { readTextIfExists, sameUrl, toPosix } from '../core/util';
+import { readTextIfExists, sameSource, sameUrl, sourceKey, splitSourceKey, toPosix } from '../core/util';
 import { CustomizationDiagnostics, TemplateContentProvider } from './diagnostics';
 import { ProjectState, saveSettingsSources, settingsSources, SourceInfo, UPSTREAM_URL } from './projectState';
 import { ComponentsNode, GuidanceTree, offByTemplate } from './trees';
@@ -235,7 +235,7 @@ export function registerCommands(cx: CommandContext): void {
         const left = content.uri(f.template.transformed, name, 'template');
         const local = vscode.Uri.file(absOf(f.destRel));
         const right = fs.existsSync(local.fsPath) ? local : content.uri('', name, 'deleted');
-        const srcName = state.sources.find(s => sameUrl(s.url, f!.source))?.name ?? 'template';
+        const srcName = state.sources.find(s => sameUrl(sourceKey(s), f!.source))?.name ?? 'template';
         await vscode.commands.executeCommand('vscode.diff', left, right, `${name}: ${srcName} ↔ yours (${STATUS_LABEL[f.status]})`);
     });
 
@@ -310,7 +310,7 @@ export function registerCommands(cx: CommandContext): void {
 
     reg('bcAlm.switchSource', async (arg: unknown) => {
         const c = needComponent(arg);
-        const others = state.catalogs.filter(cat => !sameUrl(cat.repo.spec.url, c.source) && [...cat.files.values()].some(f => f.component.id === c.ref.id));
+        const others = state.catalogs.filter(cat => !sameUrl(cat.repo.key, c.source) && [...cat.files.values()].some(f => f.component.id === c.ref.id));
         if (!others.length) {
             vscode.window.showInformationMessage(`No other template source in this project offers "${c.ref.name}". Add one in Template Sources and choose "Use in This Project".`);
             return;
@@ -401,10 +401,10 @@ export function registerCommands(cx: CommandContext): void {
     const pickTarget = async (placeHolder: string, preferUrl?: string): Promise<TemplateSourceSpec | undefined> => {
         const list = state.sources.length ? state.sources : settingsSources().map(s => ({ ...s } as SourceInfo));
         const items: (vscode.QuickPickItem & { s?: TemplateSourceSpec; create?: boolean })[] = list.map(s => ({
-            label: (sameUrl(s.url, preferUrl) ? '$(star-full) ' : '') + (s.name ?? s.url),
-            description: `${s.ref}${sameUrl(s.url, UPSTREAM_URL) ? ' · upstream BC ALM template' : ''}`, detail: s.url, s
+            label: (sameUrl(sourceKey(s), preferUrl) ? '$(star-full) ' : '') + (s.name ?? s.url),
+            description: `${s.ref}${sameUrl(sourceKey(s), UPSTREAM_URL) ? ' · upstream BC ALM template' : ''}`, detail: s.path ? `${s.url} · ${s.path}` : s.url, s
         }));
-        items.sort((a, b) => Number(sameUrl(b.s?.url, preferUrl)) - Number(sameUrl(a.s?.url, preferUrl)));
+        items.sort((a, b) => Number(!!b.s && sameUrl(sourceKey(b.s), preferUrl)) - Number(!!a.s && sameUrl(sourceKey(a.s), preferUrl)));
         items.push({ label: '$(repo-create) Create my own template repository…', create: true });
         const p = await vscode.window.showQuickPick(items, { placeHolder });
         if (!p) { return undefined; }
@@ -437,12 +437,14 @@ export function registerCommands(cx: CommandContext): void {
         if (!local.length) { throw new Error(`"${c.ref.name}" has no local files to publish.`); }
         let target: TemplateSourceSpec | undefined;
         if (upstream) {
-            const src = c.source ?? state.catalogs[0]?.repo.spec.url ?? UPSTREAM_URL;
-            target = state.sources.find(s => sameUrl(s.url, src)) ?? { url: src, ref: 'main' };
+            const src = c.source ?? state.catalogs[0]?.repo.key ?? UPSTREAM_URL;
+            const k = splitSourceKey(src);
+            target = state.sources.find(s => sameUrl(sourceKey(s), src)) ?? { url: k.url, ref: 'main', ...(k.path ? { path: k.path } : {}) };
             const ok = await vscode.window.showInformationMessage(`Open a pull request with your version of "${c.ref.name}" against ${target.name ?? target.url}? Your project values are mapped back to the template's placeholders first; you will see a preview.`, { modal: true }, 'Continue');
             if (!ok) { return; }
         } else {
-            target = await pickTarget(`Save "${c.ref.name}" to which template?`, settingsSources().find(s => !sameUrl(s.url, UPSTREAM_URL))?.url);
+            const pref = settingsSources().find(s => !sameUrl(sourceKey(s), UPSTREAM_URL));
+            target = await pickTarget(`Save "${c.ref.name}" to which template?`, pref && sourceKey(pref));
         }
         if (!target) { return; }
         const repo = state.repo(target);
@@ -495,7 +497,7 @@ export function registerCommands(cx: CommandContext): void {
             () => executePublish(plan, { workRoot: path.join(state.storageRoot, 'work'), delivery, message, body, log: l => log.appendLine(l) }));
         log.appendLine(`Published ${res.commit.slice(0, 7)} → ${res.pushedTo} (${res.branch})${res.prUrl ? ` PR: ${res.prUrl}` : ''}`);
         await state.refresh(true);
-        if (delivery === 'direct' && mode.mode === 'overwrite' && state.lock?.sources.some(s => sameUrl(s.url, repo.spec.url))) {
+        if (delivery === 'direct' && mode.mode === 'overwrite' && state.lock?.sources.some(s => sameSource(s, repo.spec))) {
             const ops = state.ops();
             const cur = state.component(c.ref.id);
             cur?.files.filter(f => f.status === 'current' || f.status === 'modified' || f.status === 'conflict').forEach(f => ops.keepMine(f));
@@ -629,16 +631,16 @@ export function registerCommands(cx: CommandContext): void {
 
     reg('bcAlm.removeTemplateSource', async (s: SourceInfo) => {
         if (!s) { return; }
-        const tracked = Object.values(readLock(state.root ?? '')?.files ?? {}).filter(e => sameUrl(e.source, s.url)).length;
+        const tracked = Object.values(readLock(state.root ?? '')?.files ?? {}).filter(e => sameUrl(e.source, sourceKey(s))).length;
         const a = await vscode.window.showWarningMessage(
             `Remove "${s.name ?? s.url}" from your template sources?${s.inProject ? `\n\nThis project tracks ${tracked} file(s) from it; they stay as they are but no longer receive updates.` : ''}`, { modal: true }, 'Remove');
         if (a !== 'Remove') { return; }
-        await saveSettingsSources(settingsSources().filter(x => !sameUrl(x.url, s.url)));
+        await saveSettingsSources(settingsSources().filter(x => !sameSource(x, s)));
         if (s.inProject && state.root) {
             const lock = readLock(state.root);
             if (lock) {
-                lock.sources = lock.sources.filter(x => !sameUrl(x.url, s.url));
-                for (const [k, e] of Object.entries(lock.files)) { if (sameUrl(e.source, s.url)) { delete lock.files[k]; } }
+                lock.sources = lock.sources.filter(x => !sameSource(x, s));
+                for (const [k, e] of Object.entries(lock.files)) { if (sameUrl(e.source, sourceKey(s))) { delete lock.files[k]; } }
                 writeLock(state.root, lock);
             }
         }
@@ -649,12 +651,12 @@ export function registerCommands(cx: CommandContext): void {
         if (!s || !state.root) { return; }
         const lock = readLock(state.root) ?? emptyLock();
         if (!lock.sources.length) { state.projectSources().forEach((p, i) => ensureSource(lock, p, i === 0)); }
-        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref });
+        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref, ...(s.path ? { path: s.path } : {}) });
         writeLock(state.root, lock);
         await state.refresh(false, true);
         const a = await vscode.window.showInformationMessage(`"${s.name ?? s.url}" is now a source for this project. Choose the components you want from it now, or later from its context menu.`, 'Choose Components…');
         if (a) {
-            const info = state.sources.find(x => sameUrl(x.url, s.url));
+            const info = state.sources.find(x => sameSource(x, s));
             if (info) { await vscode.commands.executeCommand('bcAlm.manageComponents', info); }
         }
     });
@@ -663,7 +665,7 @@ export function registerCommands(cx: CommandContext): void {
         if (!s || !state.root) { return; }
         const lock = readLock(state.root) ?? emptyLock();
         if (!lock.sources.length) { state.projectSources().forEach((p, i) => ensureSource(lock, p, i === 0)); }
-        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref }, true);
+        ensureSource(lock, { name: s.name, id: s.manifest?.id, url: s.url, ref: s.ref, ...(s.path ? { path: s.path } : {}) }, true);
         writeLock(state.root, lock);
         await done(`"${s.name ?? s.url}" is now the primary source (new components and the template-sync workflow use it).`);
     });

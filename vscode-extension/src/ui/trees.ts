@@ -7,7 +7,7 @@ import { ComponentState, FileState, FileStatus, STATUS_LABEL } from '../core/sta
 import { CommitInfo } from '../core/templateRepo';
 import { DOCS, Finding } from '../core/validator';
 import { githubSlug } from '../core/publish';
-import { sameUrl } from '../core/util';
+import { sameUrl, sourceKey } from '../core/util';
 import { ProjectState, SourceInfo, TemplateGroup } from './projectState';
 
 const ICONS: Record<FileStatus, [string, string | undefined]> = {
@@ -69,7 +69,7 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
 
     private sourceName(url?: string): string | undefined {
         if (!url) { return undefined; }
-        return this.state.sources.find(s => sameUrl(s.url, url))?.name ?? url;
+        return this.state.sources.find(s => sameUrl(sourceKey(s), url))?.name ?? url;
     }
 
     private templateName(id?: string): string | undefined {
@@ -202,7 +202,7 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 if (tplOff && !c.templateDisabled) { desc.push('template off'); }
                 if (c.keepLocal) { desc.push(c.implicitKeep ? 'kept local (sync setting)' : 'kept local'); }
                 if (groupMode(this.state) === 'kind') {
-                    const primary = this.state.catalogs[0]?.repo.spec.url;
+                    const primary = this.state.catalogs[0]?.repo.key;
                     if (this.state.templateGroups().length > 1) { if (c.templateId) { desc.push(this.templateName(c.templateId)!); } }
                     else if (c.source && primary && !sameUrl(c.source, primary)) { desc.push(`from ${this.sourceName(c.source)}`); }
                 }
@@ -265,7 +265,7 @@ export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
         if (s.inProject && !s.inSettings) { d.push('from project'); }
         if (s.componentCount !== undefined) {
             const g = s.inProject && s.manifest ? this.state.templateGroup(s.manifest.id) : undefined;
-            const inst = g?.components.filter(c => c.installed && !c.disabled && c.source && sameUrl(c.source, s.url)).length;
+            const inst = g?.components.filter(c => c.installed && !c.disabled && c.source && sameUrl(c.source, sourceKey(s))).length;
             d.push(`${s.componentCount} components${inst !== undefined ? ` · ${inst} installed` : ''}`);
         }
         if (s.upstreamDefault) { d.push('upstream'); }
@@ -295,7 +295,7 @@ export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
             s.inSettings && 'inSettings', s.inProject && (s.disabled ? 'tplDisabled' : 'tplEnabled'), s.manifest && 'loaded'
         ].filter(Boolean);
         t.contextValue = `source:${flags.join(':')}`;
-        t.id = `source:${s.url}`;
+        t.id = `source:${sourceKey(s)}`;
         return t;
     }
 }
@@ -392,12 +392,12 @@ export class GuidanceTree implements vscode.TreeDataProvider<GuidanceNode> {
     }
 
     private async changesFor(s: SourceInfo): Promise<GuidanceNode[]> {
-        const cat = this.state.catalogs.find(c => sameUrl(c.repo.spec.url, s.url));
+        const cat = this.state.catalogs.find(c => sameUrl(c.repo.key, sourceKey(s)));
         if (!cat) { return []; }
         // "Since your last sync" = the commit most of your tracked files were taken from.
         const counts = new Map<string, number>();
         for (const e of Object.values(this.state.lock?.files ?? {})) {
-            if (sameUrl(e.source, s.url)) { counts.set(e.commit, (counts.get(e.commit) ?? 0) + 1); }
+            if (sameUrl(e.source, sourceKey(s))) { counts.set(e.commit, (counts.get(e.commit) ?? 0) + 1); }
         }
         let since: string | undefined = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
         if (since && !(await cat.repo.hasCommit(since))) { since = undefined; }

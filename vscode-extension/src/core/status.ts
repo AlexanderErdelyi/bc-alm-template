@@ -5,7 +5,7 @@ import { Catalog, CatalogFile } from './catalog';
 import { LockEntry, LockFile } from './lock';
 import { ComponentKind, ComponentRef, componentOf, customScanRoots, implicitlyKeptLocal, KIND_ORDER, srcFromDest } from './paths';
 import { transformTemplateFile } from './transform';
-import { hashText, listFilesRecursive, normalizeText, readTextIfExists, sameUrl, joinRel } from './util';
+import { hashText, listFilesRecursive, normalizeText, readTextIfExists, sameUrl, sourceKey, joinRel } from './util';
 
 export const DISABLED_DIR = '.bc-alm/disabled';
 
@@ -26,7 +26,7 @@ export interface FileState {
     srcRel: string;
     component: ComponentRef;
     status: FileStatus;
-    /** Source URL this file is tracked from / would be installed from. */
+    /** Source key (URL, plus #path for a catalog template) this file is tracked from / would be installed from. */
     source?: string;
     /** Template id of that source. */
     templateId?: string;
@@ -105,7 +105,7 @@ export function disabledPath(root: string, destRel: string): string {
  */
 async function inferBaselines(states: FileState[], catalogs: Catalog[], project: ProjectConfig, localText: Map<string, string>): Promise<void> {
     for (const cat of catalogs) {
-        const candidates = states.filter(s => !s.lock && s.template && sameUrl(s.source, cat.repo.spec.url) && s.unknownBase);
+        const candidates = states.filter(s => !s.lock && s.template && sameUrl(s.source, cat.repo.key) && s.unknownBase);
         if (candidates.length === 0) { continue; }
         const history = await cat.repo.fileHistory(cat.sha, new Set(candidates.map(c => c.srcRel)));
         const specs: { st: FileState; commit: string }[] = [];
@@ -153,9 +153,9 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
     const disabledTemplates = new Set(project.sync.templates?.disabled ?? []);
     const templateOf = (url: string | undefined, entry?: LockEntry): string | undefined => {
         if (!url) { return undefined; }
-        const cat = catalogs.find(c => sameUrl(c.repo.spec.url, url));
+        const cat = catalogs.find(c => sameUrl(c.repo.key, url));
         if (cat) { return cat.manifest.id; }
-        return entry?.template ?? lock?.sources.find(s => sameUrl(s.url, url))?.id ?? templateIdFromUrl(url);
+        return entry?.template ?? lock?.sources.find(s => sameUrl(sourceKey(s), url))?.id ?? templateIdFromUrl(url);
     };
     const offByTemplate = (ref: ComponentRef, tpl: string | undefined) => !!tpl && disabledTemplates.has(tpl) && TEMPLATE_TOGGLE_KINDS.includes(ref.kind);
 
@@ -165,13 +165,13 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
     for (const cat of catalogs) {
         for (const [dest, file] of cat.files) {
             const set = alsoIn.get(file.component.id) ?? new Set<string>();
-            set.add(cat.repo.spec.url);
+            set.add(cat.repo.key);
             alsoIn.set(file.component.id, set);
             const le = lock?.files[dest];
             const existing = tracked.get(dest);
             if (le) {
-                if (sameUrl(le.source, cat.repo.spec.url)) { tracked.set(dest, { cat, file }); }
-                else if (!existing && !catalogs.some(c => sameUrl(c.repo.spec.url, le.source))) { tracked.set(dest, { cat, file }); }
+                if (sameUrl(le.source, cat.repo.key)) { tracked.set(dest, { cat, file }); }
+                else if (!existing && !catalogs.some(c => sameUrl(c.repo.key, le.source))) { tracked.set(dest, { cat, file }); }
             } else if (!existing) {
                 tracked.set(dest, { cat, file });
             }
@@ -201,8 +201,8 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
     const states: FileState[] = [];
     for (const [dest, { cat, file }] of tracked) {
         const ref = file.component;
-        const le = lock?.files[dest] && sameUrl(lock.files[dest].source, cat.repo.spec.url) ? lock.files[dest] : undefined;
-        const st: FileState = { destRel: dest, srcRel: file.srcRel, component: ref, status: 'current', source: cat.repo.spec.url, templateId: cat.manifest.id, template: file, lock: le };
+        const le = lock?.files[dest] && sameUrl(lock.files[dest].source, cat.repo.key) ? lock.files[dest] : undefined;
+        const st: FileState = { destRel: dest, srcRel: file.srcRel, component: ref, status: 'current', source: cat.repo.key, templateId: cat.manifest.id, template: file, lock: le };
         const local = localText.get(dest);
         if (local !== undefined) { st.localHash = hashText(local); }
 
@@ -232,7 +232,7 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
     // Lock entries whose template file is gone upstream.
     for (const [dest, le] of Object.entries(lock?.files ?? {})) {
         if (tracked.has(dest)) { continue; }
-        const srcCat = catalogs.find(c => sameUrl(c.repo.spec.url, le.source));
+        const srcCat = catalogs.find(c => sameUrl(c.repo.key, le.source));
         if (!srcCat) { continue; } // source not loaded -> unknown, leave alone
         const ref = componentOf(le.path);
         const exists = localText.has(dest) || fs.existsSync(disabledPath(root, dest));
@@ -291,7 +291,7 @@ export async function computeStatus(input: StatusInput): Promise<ProjectStatus> 
         const installed = installedComponents.has(id) || files.some(f => f.status === 'custom');
         const templateDisabled = !disabledIds.has(id) && installed && offByTemplate(ref, templateId);
         const status = aggregateStatus(files);
-        const exclude = status === 'available' ? lock?.sources.find(s => sameUrl(s.url, source))?.exclude : undefined;
+        const exclude = status === 'available' ? lock?.sources.find(s => sameUrl(sourceKey(s), source))?.exclude : undefined;
         const excluded = !!exclude?.includes(id);
         components.push({
             ref,
