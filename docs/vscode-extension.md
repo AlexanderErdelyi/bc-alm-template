@@ -20,7 +20,14 @@ extension, a local script run and the weekly PR always agree.
 
 ## Install
 
-Until the extension is on the Marketplace, install the VSIX:
+Install **BC ALM** from the
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=AlexanderErdelyi.bc-alm),
+either way:
+
+- in the Extensions view, search for **BC ALM**;
+- or from a terminal: `code --install-extension AlexanderErdelyi.bc-alm`.
+
+**Fallback (offline, or a specific build):** install the VSIX instead.
 
 1. Download `bc-alm-<version>.vsix` from the
    [Releases](https://github.com/AlexanderErdelyi/bc-alm-template/releases) page (tags `ext-v*`),
@@ -377,8 +384,9 @@ to the Marketplace (see [Releasing](#releasing-to-the-marketplace)).
 1. **Bump the version** in `vscode-extension/package.json`:
    - `npm version X.Y.Z --no-git-tag-version` in `vscode-extension/`;
    - this also updates the lockfile.
-2. **Add a `## X.Y.Z — Title` section** to `vscode-extension/CHANGELOG.md`. It becomes the
-   GitHub release notes.
+2. **Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`** in `vscode-extension/CHANGELOG.md`
+   ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format), and add a new empty
+   `## [Unreleased]` above it. That section becomes the GitHub release notes.
 3. **Run the [smoke test](#pre-release-smoke-test)** on the PR's VSIX, then merge the PR.
 4. **Tag `main` and push the tag:**
 
