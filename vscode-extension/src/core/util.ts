@@ -73,6 +73,55 @@ export function removeEmptyParents(file: string, stopAt: string): void {
     }
 }
 
+function clearReadOnly(dir: string): void {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+        const full = path.join(dir, e.name);
+        try { fs.chmodSync(full, 0o666); } catch { /* best effort */ }
+        if (e.isDirectory()) { clearReadOnly(full); }
+    }
+}
+
+/**
+ * Remove a temporary directory without ever throwing. On Windows git leaves read-only pack files
+ * and child processes may still hold handles for a moment, which makes a plain rmSync fail with
+ * EPERM/EBUSY - that must never mask the result of the operation that used the directory.
+ */
+export function safeRemove(dir: string, log?: (line: string) => void): boolean {
+    if (!fs.existsSync(dir)) { return true; }
+    const attempt = () => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    try {
+        attempt();
+        return true;
+    } catch {
+        clearReadOnly(dir);
+        try {
+            attempt();
+            return true;
+        } catch (e) {
+            log?.(`Warning: could not remove temporary folder ${dir} (${(e as Error).message}). It will be cleaned up later.`);
+            return false;
+        }
+    }
+}
+
+/** Remove leftover temporary folders (from earlier runs that could not clean up) older than maxAgeMs. */
+export function sweepStale(root: string, prefix: string, maxAgeMs: number, now = Date.now()): number {
+    let removed = 0;
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return 0; }
+    for (const e of entries) {
+        if (!e.isDirectory() || !e.name.startsWith(prefix)) { continue; }
+        const full = path.join(root, e.name);
+        try {
+            if (now - fs.statSync(full).mtimeMs < maxAgeMs) { continue; }
+        } catch { continue; }
+        if (safeRemove(full)) { removed++; }
+    }
+    return removed;
+}
+
 export function escapeRegExp(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -6,7 +6,9 @@ import { DependencyGraph, referencedComponents } from '../core/deps';
 import { migrateToBcAlm, needsMigration, rewriteTrackedForLayout, STATE_DIR, statePath } from '../core/layout';
 import { emptyLock, ensureSource, readLock, writeLock } from '../core/lock';
 import { componentOf, isReparamTarget, resolveDest, srcFromDest } from '../core/paths';
-import { createOwnTemplate, DeliveryMode, executePublish, githubSlug, isLocalPath, preparePublish, PublishPlan, syncForkFromUpstream } from '../core/publish';
+import { commandExists } from '../core/exec';
+import { findFork, forkBlocker, ghOwners, ghRepoInfo, requireGh } from '../core/github';
+import { createOwnTemplate, CreateTemplateHow, DeliveryMode, executePublish, githubSlug, isLocalPath, preparePublish, PublishPlan, syncForkFromUpstream, syncFromUpstream } from '../core/publish';
 import { isValidComponentName, scaffold, scaffoldPath, ScaffoldInput } from '../core/scaffolds';
 import { ComponentState, disabledPath, FileState, STATUS_LABEL } from '../core/status';
 import { TemplateSourceSpec } from '../core/templateRepo';
@@ -496,36 +498,77 @@ export function registerCommands(cx: CommandContext): void {
     reg('bcAlm.contributeUpstream', (arg: unknown) => publish(arg, true));
 
     reg('bcAlm.createTemplateRepo', async () => {
-        const how = await vscode.window.showQuickPick([
-            { label: 'Fork the BC ALM template', detail: 'Keeps a link to upstream: pull upstream improvements with one click, contribute back via PR.', v: 'fork' as const },
-            { label: 'Copy as a new template repository', detail: 'Independent copy (GitHub "Use this template"). No upstream link.', v: 'template' as const }
-        ], { placeHolder: 'Create your team\'s own template' });
-        if (!how) { return; }
-        const repoName = await vscode.window.showInputBox({ prompt: 'New repository: name or owner/name (owner = your org)', value: 'bc-alm-template', validateInput: v => /^([\w.-]+\/)?[\w.-]+$/.test(v.trim()) ? undefined : 'Use name or owner/name' });
-        if (!repoName) { return; }
-        let visibility: 'private' | 'public' | 'internal' = 'private';
-        if (how.v === 'template') {
-            const v = await vscode.window.showQuickPick(['private', 'internal', 'public'], { placeHolder: 'Visibility' });
-            if (!v) { return; }
-            visibility = v as typeof visibility;
+        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Checking GitHub CLI…' }, () => requireGh());
+        const ghSources = [...settingsSources(), ...state.sources].filter((s, i, all) => githubSlug(s.url) && all.findIndex(x => sameUrl(x.url, s.url)) === i);
+        if (!ghSources.some(s => sameUrl(s.url, UPSTREAM_URL))) { ghSources.push({ name: 'BC ALM Template (upstream)', url: UPSTREAM_URL, ref: 'main' }); }
+        let base: TemplateSourceSpec = ghSources.find(s => sameUrl(s.url, UPSTREAM_URL))!;
+        if (ghSources.length > 1) {
+            const b = await vscode.window.showQuickPick(ghSources.map(s => ({ label: s.name ?? s.url, description: s.ref, detail: s.url, s })), { placeHolder: 'Start the new template from which template?' });
+            if (!b) { return; }
+            base = b.s;
         }
-        const upstream = settingsSources().find(s => sameUrl(s.url, UPSTREAM_URL)) ?? { url: UPSTREAM_URL, ref: 'main' };
-        const url = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Creating template repository with gh…' },
-            () => createOwnTemplate({ upstreamUrl: upstream.url, newRepo: repoName.trim(), how: how.v, visibility }));
+        const up = githubSlug(base.url)!;
+        const { login, orgs, info } = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Reading your GitHub accounts…' }, async () => {
+            const o = await ghOwners();
+            return { ...o, info: await ghRepoInfo(up) };
+        });
+        if (!info) { throw new Error(`Cannot read ${up.owner}/${up.repo} with the GitHub CLI. Check the URL and your access ("gh auth status").`); }
+        const ownerPick = await vscode.window.showQuickPick([
+            { label: `$(account) ${login}`, description: 'your account', owner: login },
+            ...orgs.map(o => ({ label: `$(organization) ${o}`, description: 'organization', owner: o }))
+        ], { placeHolder: 'Who should own the new template repository?' });
+        if (!ownerPick) { return; }
+        const owner = ownerPick.owner;
+        const name = (await vscode.window.showInputBox({
+            prompt: `Repository name (created as ${owner}/<name>)`, value: owner.toLowerCase() === info.owner.toLowerCase() ? `${up.repo}-team` : up.repo,
+            validateInput: v => /^[\w.-]+$/.test(v.trim()) ? undefined : 'Letters, digits, ".", "-" and "_" only'
+        }))?.trim();
+        if (!name) { return; }
+
+        const blocker = forkBlocker(info.fullName, info.owner, owner, await findFork(up, owner));
+        type HowPick = vscode.QuickPickItem & { v: CreateTemplateHow | 'existing' };
+        const hows: HowPick[] = [];
+        if (!blocker) {
+            hows.push({ label: 'Fork', detail: 'GitHub fork - pull upstream improvements with one click, contribute back via pull request.', v: 'fork' });
+        } else if (blocker.kind === 'existing') {
+            hows.push({ label: `Use my existing fork ${blocker.fork}`, detail: 'Add the fork you already have as a template source.', v: 'existing' });
+        }
+        hows.push({
+            label: 'Duplicate (keeps upstream link)', v: 'duplicate',
+            detail: `New repository with the full history of ${info.fullName}; "Sync from Upstream" merges later improvements.${blocker?.kind === 'owner' ? ' Recommended - you own the upstream, so it cannot be forked.' : ''}`
+        });
+        hows.push({ label: 'Independent copy', detail: 'Fresh copy with no upstream link (GitHub "Use this template").', v: 'template' });
+        const how = await vscode.window.showQuickPick(hows, { placeHolder: blocker ? `${blocker.message.split(';')[0]}. How should the template be created?` : 'How should the template be created?' });
+        if (!how) { return; }
+
+        let created: { url: string; upstream?: string };
+        if (how.v === 'existing' && blocker?.kind === 'existing') {
+            created = { url: `https://github.com/${blocker.fork}`, upstream: base.url };
+        } else {
+            let visibility: 'private' | 'public' | 'internal' = 'private';
+            if (how.v !== 'fork') {
+                const v = await vscode.window.showQuickPick(['private', 'internal', 'public'], { placeHolder: 'Visibility' });
+                if (!v) { return; }
+                visibility = v as typeof visibility;
+            }
+            log.appendLine(`\n=== Create template ${owner}/${name} (${how.v}) from ${info.fullName} ===`);
+            created = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Creating ${owner}/${name}…` },
+                () => createOwnTemplate({ upstreamUrl: base.url, upstreamRef: base.ref, owner, name, how: how.v as CreateTemplateHow, visibility, workRoot: path.join(state.storageRoot, 'work'), log: l => log.appendLine(l) }));
+        }
+        const url = created.url;
         const gitUrl = url.endsWith('.git') ? url : `${url}.git`;
         const list = settingsSources();
-        const name = `${repoName.trim()} (my template)`;
         if (!list.some(s => sameUrl(s.url, gitUrl))) {
             const asDefault = await vscode.window.showQuickPick(['Yes - use it for new projects by default', 'No - just add it to the list'], { placeHolder: `Created ${url}. Make it the default template?` });
-            const entry = { name, url: gitUrl, ref: 'main' };
+            const entry: TemplateSourceSpec = { name: `${owner}/${name}`, url: gitUrl, ref: base.ref, ...(created.upstream ? { upstream: created.upstream } : {}) };
             await saveSettingsSources(asDefault?.startsWith('Yes') ? [entry, ...list] : [...list, entry]);
         }
         await state.refresh(false, true);
         const next = state.root ? await vscode.window.showInformationMessage(`Template ${url} added to BC ALM sources.`, 'Use in This Project', 'Open on GitHub') : await vscode.window.showInformationMessage(`Template ${url} added.`, 'Open on GitHub');
         if (next === 'Open on GitHub') { await vscode.env.openExternal(vscode.Uri.parse(url)); }
         if (next === 'Use in This Project') {
-            const info = state.sources.find(s => sameUrl(s.url, gitUrl));
-            if (info) { await vscode.commands.executeCommand('bcAlm.useSourceInProject', info); }
+            const info2 = state.sources.find(s => sameUrl(s.url, gitUrl));
+            if (info2) { await vscode.commands.executeCommand('bcAlm.useSourceInProject', info2); }
         }
     });
 
@@ -601,10 +644,41 @@ export function registerCommands(cx: CommandContext): void {
 
     reg('bcAlm.syncTemplateFromUpstream', async (s: SourceInfo) => {
         if (!s) { return; }
-        const out = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Syncing ${s.name ?? s.url} with its upstream…` }, () => syncForkFromUpstream(s.url, s.ref));
-        log.appendLine(out);
+        const label = s.name ?? s.url;
+        const slug = githubSlug(s.url);
+        const info = slug && await commandExists('gh') ? await ghRepoInfo(slug) : undefined;
+        let upstream = s.upstream ?? (info?.parent ? `https://github.com/${info.parent}.git` : undefined);
+        if (info?.isFork) {
+            try {
+                const out = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Syncing ${label} with its upstream…` }, () => syncForkFromUpstream(s.url, s.ref));
+                log.appendLine(out);
+                await state.refresh(true);
+                vscode.window.showInformationMessage(`${label} is up to date with its upstream. ${out.split('\n')[0]}`);
+                return;
+            } catch (e) {
+                log.appendLine(`gh repo sync failed (${(e as Error).message.split('\n')[0]}) - merging with git instead.`);
+            }
+        }
+        if (!upstream) {
+            upstream = (await vscode.window.showInputBox({
+                prompt: `Which template was ${label} created from? (git URL)`, value: UPSTREAM_URL,
+                validateInput: v => /^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/.test(v.trim()) || isLocalPath(v.trim()) ? undefined : 'Enter a git URL'
+            }))?.trim();
+            if (!upstream) { return; }
+            const list = settingsSources();
+            if (list.some(x => sameUrl(x.url, s.url))) {
+                await saveSettingsSources(list.map(x => sameUrl(x.url, s.url) ? { ...x, upstream } : x));
+            }
+        }
+        const up = upstream;
+        log.appendLine(`\n=== Sync ${label} (${s.ref}) from ${up} ===`);
+        const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Syncing ${label} with ${up}…` },
+            () => syncFromUpstream({ url: s.url, ref: s.ref, upstream: up, workRoot: path.join(state.storageRoot, 'work'), log: l => log.appendLine(l) }));
+        log.appendLine(r.message + (r.prUrl ? ` PR: ${r.prUrl}` : ''));
         await state.refresh(true);
-        vscode.window.showInformationMessage(`${s.name ?? s.url} is up to date with its upstream. ${out.split('\n')[0]}`);
+        const link = r.prUrl ?? r.compareUrl;
+        const a = await vscode.window.showInformationMessage(`${label}: ${r.message}`, ...(link ? ['Open Pull Request'] : []));
+        if (a && link) { await vscode.env.openExternal(vscode.Uri.parse(link)); }
     });
 
     // ------------------------------------------------------------ guidance

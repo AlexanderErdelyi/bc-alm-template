@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { LOCK_FILE } from './core/lock';
 import { needsMigration } from './core/layout';
@@ -5,6 +6,7 @@ import { registerCommands } from './ui/commands';
 import { CustomizationDiagnostics, TEMPLATE_SCHEME, TemplateContentProvider } from './ui/diagnostics';
 import { ProjectState } from './ui/projectState';
 import { ComponentsTree, GuidanceTree, SourcesTree } from './ui/trees';
+import { sweepStale } from './core/util';
 
 const BASELINE_PROMPT_KEY = 'bcAlm.baselinePromptDismissed';
 const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
@@ -12,6 +14,8 @@ const MIGRATE_PROMPT_KEY = 'bcAlm.migratePromptDismissed';
 export async function activate(ext: vscode.ExtensionContext): Promise<void> {
     const log = vscode.window.createOutputChannel('BC ALM');
     const state = new ProjectState(ext.globalStorageUri.fsPath);
+    // Leftovers from runs whose cleanup was blocked (Windows file locks).
+    sweepStale(path.join(ext.globalStorageUri.fsPath, 'work'), '', 24 * 60 * 60_000);
     const content = new TemplateContentProvider();
     const diagnostics = new CustomizationDiagnostics(state);
     const bestPractices = vscode.Uri.joinPath(ext.extensionUri, 'guidance', 'best-practices.md');

@@ -2,7 +2,7 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "alexandererdelyi",
   "license": "MIT",
   "repository": {
@@ -571,6 +571,10 @@
                 "type": "string",
                 "default": "main",
                 "description": "Branch or tag to track."
+              },
+              "upstream": {
+                "type": "string",
+                "description": "Git URL of the template this one was created from. \"Sync from Upstream\" merges its changes in."
               }
             }
           }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.2
+
+- Fixed: Publish / Contribute Upstream no longer fails with `EPERM` on Windows when removing its
+  temp clone. Git pack files are read-only, and cleanup now retries and never hides the real
+  result. Leftover work folders older than a day are removed on startup. (#56)
+- Fixed: **Create Template** no longer fails with "cannot be forked" when you own the upstream.
+  You can now pick the owner (you or one of your orgs). Options:
+  - Fork, or reuse your existing fork.
+  - Duplicate, which keeps history and records `upstream`.
+  - Independent copy. (#57)
+- Contribute Upstream reuses your existing fork when the direct push is rejected, and explains
+  when you own the upstream instead of trying to fork it. (#57)
+- **Sync from Upstream** works for duplicates as well as forks. It merges with git and opens a
+  `bc-alm/upstream-sync-*` branch and pull request when there are conflicts. Copies without
+  shared history get a clear message. (#57)
+
 ## 0.2.1
 
 - Projects are found when the workspace only opens subfolders of the repository, for example a

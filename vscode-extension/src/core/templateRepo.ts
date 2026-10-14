@@ -8,6 +8,8 @@ export interface TemplateSourceSpec {
     name?: string;
     url: string;
     ref: string;
+    /** Template this one was created from (duplicate/fork); used by "Sync from upstream". */
+    upstream?: string;
 }
 
 export interface CommitInfo {

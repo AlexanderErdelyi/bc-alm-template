@@ -22,7 +22,7 @@ export interface SourceInfo extends TemplateSourceSpec {
 
 export function settingsSources(): TemplateSourceSpec[] {
     const list = vscode.workspace.getConfiguration('bcAlm').get<Partial<TemplateSourceSpec>[]>('templateSources') ?? [];
-    const out = list.filter(s => s && s.url).map(s => ({ name: s.name, url: s.url!, ref: s.ref || 'main' }));
+    const out = list.filter(s => s && s.url).map(s => ({ name: s.name, url: s.url!, ref: s.ref || 'main', ...(s.upstream ? { upstream: s.upstream } : {}) }));
     return out.length ? out : [{ name: 'BC ALM Template (upstream)', url: UPSTREAM_URL, ref: 'main' }];
 }
 
@@ -99,7 +99,7 @@ export class ProjectState implements vscode.Disposable {
             const all: SourceInfo[] = [];
             const push = (s: TemplateSourceSpec, inSettings: boolean) => {
                 const ex = all.find(x => sameUrl(x.url, s.url));
-                if (ex) { ex.inSettings ||= inSettings; return; }
+                if (ex) { ex.inSettings ||= inSettings; ex.upstream ??= s.upstream; return; }
                 const pi = projectSrc.findIndex(p => sameUrl(p.url, s.url));
                 all.push({ ...s, ref: s.ref || 'main', inProject: pi >= 0, primary: pi === 0, upstreamDefault: sameUrl(s.url, UPSTREAM_URL), inSettings });
             };

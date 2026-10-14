@@ -16,9 +16,15 @@ Business Central projects: its Copilot agents, skills, prompts, instructions and
 - **Pick what you use**: install, disable, or pin ("always keep my version") individual
   components. The same policy is honored by `Update-FromTemplate.ps1` and the template-sync
   GitHub Action.
-- **Your own template**: create a company template (fork or copy), add more template sources,
-  **save** a customized component to it (overwrite or save as new; commit or PR), sync your fork
-  from upstream, or **contribute** improvements back upstream.
+- **Your own template**: create a company template, add more template sources, **save** a
+  customized component to it (overwrite or save as new; commit or PR), sync it from upstream,
+  or **contribute** improvements back upstream. Create Template offers:
+  - **Fork**: not possible in the account that owns the upstream. Reuses your existing fork.
+  - **Duplicate**: keeps history and the upstream link. Use this when you own the upstream.
+  - **Independent copy**: GitHub "Use this template". It shares no history and can't be synced.
+
+  **Sync from Upstream** fast-forwards or merges. On conflicts it pushes a
+  `bc-alm/upstream-sync-*` branch and offers a pull request.
 - **Authoring help**: scaffolds for new agents, skills, prompts and instructions. Live
   diagnostics with quick fixes based on current GitHub Copilot / VS Code guidance. A
   "Review with Copilot" action.
@@ -45,7 +51,7 @@ Full guide: [docs/vscode-extension.md](https://github.com/AlexanderErdelyi/bc-al
 
 | Setting | Purpose |
 | --- | --- |
-| `bcAlm.templateSources` | Template repositories (URL or local path) and refs. |
+| `bcAlm.templateSources` | Template repositories (URL or local path), refs and optional `upstream` to sync from. |
 | `bcAlm.checkForUpdatesOnStartup` | Check for template updates when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | Minimum minutes between automatic fetches. |
 | `bcAlm.powershellPath` | PowerShell executable for project creation. |

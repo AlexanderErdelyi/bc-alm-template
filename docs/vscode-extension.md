@@ -134,9 +134,19 @@ template-sync Action share the same state.
 The **Template Sources** view lists the repositories you pull from. The default is this
 template; configure more in `bcAlm.templateSources`. Typical setups:
 
-- **Company template**: **Create My Own Template Repository…** forks or copies the upstream into
-  your organization. Projects then use it as their primary source, and **Pull Upstream Updates
-  into My Template** keeps the fork current.
+- **Company template**: **Create My Own Template Repository…** creates your own copy of a GitHub
+  template source under your account or one of your organizations:
+  - **Fork**: GitHub doesn't allow it in the account that owns the upstream, or when the account
+    already has a fork. In that case the existing fork is offered.
+  - **Duplicate**: a new repository with the full history, with the original recorded as
+    `upstream` in `bcAlm.templateSources`. Use this when you own the upstream.
+  - **Independent copy**: GitHub's "Use this template". It shares no history and can't be synced.
+
+  Projects then use it as their primary source. **Pull Upstream Updates into My Template** keeps
+  it current:
+  - For forks, it tries `gh repo sync` first.
+  - Otherwise it merges with git.
+  - On conflicts it pushes a `bc-alm/upstream-sync-*` branch and offers a pull request.
 - **Multiple sources**: add a second source (e.g. a team's extra skills). **Track Component from
   Another Template Source…** switches a single component to a different source.
 
@@ -162,7 +172,8 @@ syncing from it.
     template prefix and project-only tools are removed. You get a diff to confirm first.
   - Delivery is either a **direct commit** or a **pull request** on the template repository.
 - **Contribute to Source Template (Pull Request)…** does the same against the upstream template
-  so improvements can flow back.
+  so improvements can flow back. If you can't push to it, your existing fork is used, or one is
+  created. If you own the upstream, the branch is pushed there directly.
 
 ## Guidance and what's new
 
@@ -178,7 +189,7 @@ The **Guidance & What's New** view combines:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `bcAlm.templateSources` | upstream template @ `main` | Template repositories (git URL or local path) and refs. |
+| `bcAlm.templateSources` | upstream template @ `main` | Template repositories (git URL or local path), refs and optional `upstream` to sync from. |
 | `bcAlm.checkForUpdatesOnStartup` | `true` | Fetch sources and compute status when a project opens. |
 | `bcAlm.fetchIntervalMinutes` | `60` | Minimum time between automatic fetches. |
 | `bcAlm.powershellPath` | auto | PowerShell used for project creation. |

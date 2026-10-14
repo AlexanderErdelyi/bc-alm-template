@@ -6,7 +6,7 @@ import { Catalog, transformedAt } from './catalog';
 import { run } from './exec';
 import { emptyLock, ensureSource, LockFile, writeLock } from './lock';
 import { ComponentState, disabledPath, FileState } from './status';
-import { hashText, normalizeText, readTextIfExists, removeEmptyParents, sameUrl, writeTextPreservingEol } from './util';
+import { hashText, normalizeText, readTextIfExists, removeEmptyParents, safeRemove, sameUrl, writeTextPreservingEol } from './util';
 
 /**
  * Mutating operations on a project. The lock semantics:
@@ -89,7 +89,7 @@ export class ProjectOps {
             this.record(st, cat, st.template.transformed);
             return { conflicts: r.code, text: r.stdout };
         } finally {
-            fs.rmSync(tmp, { recursive: true, force: true });
+            safeRemove(tmp);
         }
     }
 
