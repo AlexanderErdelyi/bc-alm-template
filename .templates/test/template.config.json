@@ -1,0 +1,14 @@
+{
+  "_readme": "Variant template: starts from the \"extends\" template, drops the \"remove\" component ids and replaces every component that has files in this folder. Placeholder values are inherited from the base.",
+  "template": {
+    "id": "test",
+    "name": "test",
+    "description": "BC ALM without release management: triage, plan, spec, build, PR and docs agents for teams that deploy through their own pipeline.",
+    "version": "0.1.0",
+    "icon": "beaker",
+    "extends": "bc-alm-lite",
+    "maintainers": [
+      "AlexanderErdelyi"
+    ]
+  }
+}
