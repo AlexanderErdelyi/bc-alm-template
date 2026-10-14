@@ -7,7 +7,8 @@ import { ComponentState, FileState, FileStatus, STATUS_LABEL } from '../core/sta
 import { CommitInfo } from '../core/templateRepo';
 import { DOCS, Finding } from '../core/validator';
 import { githubSlug } from '../core/publish';
-import { sameUrl } from '../core/util';
+import { LATEST_REF } from '../core/catalogAuthoring';
+import { sameUrl, sourceKey } from '../core/util';
 import { ProjectState, SourceInfo, TemplateGroup } from './projectState';
 
 const ICONS: Record<FileStatus, [string, string | undefined]> = {
@@ -69,12 +70,18 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
 
     private sourceName(url?: string): string | undefined {
         if (!url) { return undefined; }
-        return this.state.sources.find(s => sameUrl(s.url, url))?.name ?? url;
+        return this.state.sources.find(s => sameUrl(sourceKey(s), url))?.name ?? url;
     }
 
     private templateName(id?: string): string | undefined {
         if (!id) { return undefined; }
         return this.state.sources.find(s => s.manifest?.id === id)?.manifest?.name ?? id;
+    }
+
+    /** Variant information of the template a component comes from. */
+    private variantOf(c: ComponentState) {
+        if (!c.source) { return undefined; }
+        return this.state.catalogs.find(k => sameUrl(k.repo.key, c.source))?.variant;
     }
 
     /** Installed components by kind, then "Available" (and "Excluded" when a selection was made). */
@@ -152,6 +159,8 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 const available = g.components.filter(c => c.status === 'available' && !c.excluded).length;
                 const d: string[] = [];
                 if (g.primary) { d.push('★ primary'); }
+                if (g.source?.variantOf) { d.push(`variant of ${g.source.variantOf}`); }
+                if (g.source?.upgrade) { d.push(`v${g.source.upgrade.version} available`); }
                 if (g.disabled) { d.push('disabled'); }
                 d.push(`${installed} installed`);
                 if (available) { d.push(`${available} available`); }
@@ -201,17 +210,23 @@ export class ComponentsTree implements vscode.TreeDataProvider<ComponentsNode> {
                 if (c.newInTemplate) { desc.push('new in template'); }
                 if (tplOff && !c.templateDisabled) { desc.push('template off'); }
                 if (c.keepLocal) { desc.push(c.implicitKeep ? 'kept local (sync setting)' : 'kept local'); }
+                const variant = this.variantOf(c);
+                if (variant?.baseChanged.has(c.ref.id)) { desc.push('base changed'); }
+                else if (variant?.overridden.has(c.ref.id)) { desc.push('variant override'); }
                 if (groupMode(this.state) === 'kind') {
-                    const primary = this.state.catalogs[0]?.repo.spec.url;
+                    const primary = this.state.catalogs[0]?.repo.key;
                     if (this.state.templateGroups().length > 1) { if (c.templateId) { desc.push(this.templateName(c.templateId)!); } }
                     else if (c.source && primary && !sameUrl(c.source, primary)) { desc.push(`from ${this.sourceName(c.source)}`); }
                 }
                 t.description = desc.join(' · ');
                 t.iconPath = c.newInTemplate ? new vscode.ThemeIcon('sparkle', new vscode.ThemeColor('charts.green')) : statusIcon(c.status);
                 t.id = `component:${c.ref.id}`;
-                t.contextValue = `component:${c.status}${c.keepLocal ? ':keepLocal' : ''}${c.alsoIn.length ? ':multiSource' : ''}${tplOff ? ':templateOff' : ''}`;
+                t.contextValue = `component:${c.status}${c.keepLocal ? ':keepLocal' : ''}${c.alsoIn.length ? ':multiSource' : ''}${tplOff ? ':templateOff' : ''}${variant?.overridden.has(c.ref.id) ? ':override' : ''}`;
                 const md = new vscode.MarkdownString(`**${c.ref.name}** (${c.ref.kind})\n\n${STATUS_LABEL[c.status]}`);
                 if (c.templateId) { md.appendMarkdown(`\n\nTemplate: ${this.templateName(c.templateId)}${tplOff ? ' (switched off in this project)' : ''}`); }
+                if (variant?.overridden.has(c.ref.id)) {
+                    md.appendMarkdown(`\n\nThis variant replaces the component of \`${variant.base}\`.${variant.baseChanged.has(c.ref.id) ? ' **The base version changed after the variant last updated it** - use "Compare with Base Template".' : ''}`);
+                }
                 if (c.source) { md.appendMarkdown(`\n\nSource: ${this.sourceName(c.source)}`); }
                 if (c.newInTemplate) { md.appendMarkdown('\n\nAdded to the template after you chose its components.'); }
                 if (c.alsoIn.length) { md.appendMarkdown(`\n\nAlso offered by: ${c.alsoIn.map(u => this.sourceName(u)).join(', ')}`); }
@@ -247,25 +262,55 @@ function commonDir(paths: string[]): string {
 
 // ---------------------------------------------------------------- Sources
 
-export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
-    private readonly emitter = new vscode.EventEmitter<SourceInfo | undefined>();
+/** A repository that provides several template sources (a catalog). */
+export interface RepoNode { type: 'repo'; url: string; name: string; sources: SourceInfo[] }
+export type SourcesNode = SourceInfo | RepoNode;
+
+export const isRepoNode = (n: unknown): n is RepoNode => !!n && typeof n === 'object' && (n as RepoNode).type === 'repo';
+
+export class SourcesTree implements vscode.TreeDataProvider<SourcesNode> {
+    private readonly emitter = new vscode.EventEmitter<SourcesNode | undefined>();
     readonly onDidChangeTreeData = this.emitter.event;
     constructor(private readonly state: ProjectState) {
         state.onDidChange(() => this.emitter.fire(undefined));
     }
-    getChildren(node?: SourceInfo): SourceInfo[] {
-        return node ? [] : this.state.sources;
+    /** Sources grouped by repository when a repository provides more than one template. */
+    getChildren(node?: SourcesNode): SourcesNode[] {
+        if (isRepoNode(node)) { return node.sources; }
+        if (node) { return []; }
+        const out: SourcesNode[] = [];
+        for (const s of this.state.sources) {
+            const same = this.state.sources.filter(x => sameUrl(x.url, s.url));
+            if (same.length < 2) { out.push(s); continue; }
+            if (same[0] !== s) { continue; }
+            const slug = githubSlug(s.url);
+            out.push({ type: 'repo', url: s.url, name: slug ? `${slug.owner}/${slug.repo}` : s.url, sources: same });
+        }
+        return out;
     }
-    getTreeItem(s: SourceInfo): vscode.TreeItem {
+    getTreeItem(n: SourcesNode): vscode.TreeItem {
+        if (isRepoNode(n)) {
+            const t = new vscode.TreeItem(n.name, vscode.TreeItemCollapsibleState.Expanded);
+            const inProject = n.sources.filter(s => s.inProject).length;
+            t.description = `${n.sources.length} templates${inProject ? ` · ${inProject} in project` : ''}`;
+            t.tooltip = `Template catalog: ${n.url}`;
+            t.iconPath = new vscode.ThemeIcon('library');
+            t.contextValue = `repo${githubSlug(n.url) ? ':github' : ''}`;
+            t.id = `repo:${n.url}`;
+            return t;
+        }
+        const s = n;
         const t = new vscode.TreeItem(s.name ?? s.manifest?.name ?? s.url);
-        const d = [s.ref + (s.sha ? ` @ ${s.sha.slice(0, 7)}` : '')];
-        if (s.manifest?.version) { d.push(`v${s.manifest.version}`); }
+        const d = [s.ref + (s.ref === LATEST_REF && s.resolvedVersion ? ` → v${s.resolvedVersion}` : '') + (s.sha ? ` @ ${s.sha.slice(0, 7)}` : '')];
+        if (s.manifest?.version && s.resolvedVersion !== s.manifest.version) { d.push(`v${s.manifest.version}`); }
+        if (s.upgrade) { d.push(`v${s.upgrade.version} available`); }
+        if (s.variantOf) { d.push(`variant of ${s.variantOf}`); }
         if (s.primary) { d.push('★ primary'); } else if (s.inProject) { d.push('in project'); }
         if (s.disabled) { d.push('disabled'); }
         if (s.inProject && !s.inSettings) { d.push('from project'); }
         if (s.componentCount !== undefined) {
             const g = s.inProject && s.manifest ? this.state.templateGroup(s.manifest.id) : undefined;
-            const inst = g?.components.filter(c => c.installed && !c.disabled && c.source && sameUrl(c.source, s.url)).length;
+            const inst = g?.components.filter(c => c.installed && !c.disabled && c.source && sameUrl(c.source, sourceKey(s))).length;
             d.push(`${s.componentCount} components${inst !== undefined ? ` · ${inst} installed` : ''}`);
         }
         if (s.upstreamDefault) { d.push('upstream'); }
@@ -276,7 +321,10 @@ export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
         md.supportThemeIcons = true;
         if (s.manifest) { md.appendMarkdown(`\n\nTemplate: ${s.manifest.name}${s.manifest.version ? ` v${s.manifest.version}` : ''} \`${s.manifest.id}\``); }
         if (s.manifest?.description) { md.appendMarkdown(`\n\n${s.manifest.description}`); }
-        md.appendMarkdown(`\n\n${s.url}\n\nBranch/tag: \`${s.ref}\`${s.sha ? ` @ \`${s.sha.slice(0, 7)}\`` : ''}`);
+        if (s.variantOf) { md.appendMarkdown(`\n\nVariant of \`${s.variantOf}\`: inherits its components, replaces the ones it has files for${s.manifest?.remove?.length ? ` and removes ${s.manifest.remove.map(r => `\`${r}\``).join(', ')}` : ''}.`); }
+        md.appendMarkdown(`\n\n${s.url}${s.path ? ` · \`${s.path}\`` : ''}\n\nBranch/tag: \`${s.ref}\`${s.sha ? ` @ \`${s.sha.slice(0, 7)}\`` : ''}`);
+        if (s.latestVersion) { md.appendMarkdown(`\n\nLatest release: v${s.latestVersion}`); }
+        if (s.upgrade) { md.appendMarkdown(`\n\n$(arrow-up) **v${s.upgrade.version} is available** (you follow \`${s.ref}\`).${s.upgrade.notes ? `\n\n${s.upgrade.notes}` : ''}`); }
         if (s.inProject && !s.inSettings) { md.appendMarkdown('\n\nUsed by this project (template.lock.json) but not in your bcAlm.templateSources setting.'); }
         if (s.disabled) { md.appendMarkdown('\n\nSwitched off in this project.'); }
         if (s.duplicateOf) { md.appendMarkdown(`\n\n$(warning) Uses the same template id as ${s.duplicateOf}.`); }
@@ -292,10 +340,11 @@ export class SourcesTree implements vscode.TreeDataProvider<SourceInfo> {
             : new vscode.ThemeIcon(s.manifest?.icon || 'repo');
         const flags = [
             s.inProject && 'inProject', s.primary && 'primary', s.upstreamDefault && 'upstreamDefault', githubSlug(s.url) && 'github',
-            s.inSettings && 'inSettings', s.inProject && (s.disabled ? 'tplDisabled' : 'tplEnabled'), s.manifest && 'loaded'
+            s.inSettings && 'inSettings', s.inProject && (s.disabled ? 'tplDisabled' : 'tplEnabled'), s.manifest && 'loaded',
+            s.upgrade && 'upgrade', s.variantOf && 'variant', s.manifest?.version && 'versioned'
         ].filter(Boolean);
         t.contextValue = `source:${flags.join(':')}`;
-        t.id = `source:${s.url}`;
+        t.id = `source:${sourceKey(s)}`;
         return t;
     }
 }
@@ -392,12 +441,12 @@ export class GuidanceTree implements vscode.TreeDataProvider<GuidanceNode> {
     }
 
     private async changesFor(s: SourceInfo): Promise<GuidanceNode[]> {
-        const cat = this.state.catalogs.find(c => sameUrl(c.repo.spec.url, s.url));
+        const cat = this.state.catalogs.find(c => sameUrl(c.repo.key, sourceKey(s)));
         if (!cat) { return []; }
         // "Since your last sync" = the commit most of your tracked files were taken from.
         const counts = new Map<string, number>();
         for (const e of Object.values(this.state.lock?.files ?? {})) {
-            if (sameUrl(e.source, s.url)) { counts.set(e.commit, (counts.get(e.commit) ?? 0) + 1); }
+            if (sameUrl(e.source, sourceKey(s))) { counts.set(e.commit, (counts.get(e.commit) ?? 0) + 1); }
         }
         let since: string | undefined = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
         if (since && !(await cat.repo.hasCommit(since))) { since = undefined; }

@@ -194,15 +194,19 @@ it offers:
 - Components you leave out are recorded as `exclude` on the source in the lock, so they don't
   keep showing up as new.
 
-**Create a new template.** **Create New Template…** in the Template Sources view offers three
-starting points:
-- **Blank**: the folder structure, a README and a `template.config.json` with your identity.
-- **Seed from this project**: pick components from your project. Your project values are turned
-  back into placeholders.
-- **Copy an existing template**: copies the repository with its history under a new identity.
-  This never forks, so it also works when you own the original.
+**Create a new template.** **Create New Template…** in the Template Sources view first asks
+where the template should live:
+- **In a catalog repository** (e.g. this one): the template goes into `.templates/<id>/` of an
+  existing repository and is delivered as a commit or a pull request. See
+  [Template catalogs](#template-catalogs-variants-and-versions).
+- **In a new GitHub repository**, with three starting points:
+  - **Blank**: the folder structure, a README and a `template.config.json` with your identity.
+  - **Seed from this project**: pick components from your project. Your project values are
+    turned back into placeholders.
+  - **Copy an existing template**: copies the repository with its history under a new identity.
+    This never forks, so it also works when you own the original.
 
-The repository is created on GitHub with `gh`, pushed, and added as a template source.
+  The repository is created on GitHub with `gh`, pushed, and added as a template source.
 
 **Share with your team.**
 - Commit `.bc-alm/template.lock.json`. It records every source (URL, ref, id, exclusions), so
@@ -213,9 +217,84 @@ The repository is created on GitHub with `gh`, pushed, and added as a template s
   to the workspace settings (`.vscode/settings.json`).
 
 **Source actions.**
-- **Change Branch/Tag…**: pins a source to another ref.
+- **Change Version / Branch…**: follow `latest`, pin a released version, or track a branch.
 - **Open Template Repository**: opens the repository on GitHub.
 - Error badges explain whether a source failed because of access, a bad ref or the network.
+
+## Template catalogs, variants and versions
+
+One repository can hold several templates, so a team shares a single **catalog** instead of a
+repository per template. This repository is one: the root template `bc-alm` plus
+[`.templates/<id>/`](https://github.com/AlexanderErdelyi/bc-alm-template/blob/main/.templates/README.md) folders such as the `bc-alm-lite` variant.
+
+```text
+template.config.json        root template (id "bc-alm")
+.github/agents|skills|...   root template components
+.templates/
+  bc-alm-lite/              template.config.json (+ README.md, CHANGELOG.md, own components)
+  bc-upgrade/
+```
+
+**Use templates from a catalog.** The Template Sources view groups sources by repository.
+- **Add Template Source…** lists the templates of the repository and adds the ones you pick, each
+  as its own source with a `path` (`.templates/<id>`).
+- **Browse Templates…** on a repository shows every template, including ones you haven't added
+  yet. From there you can **Use in This Project**, **Add to My Sources**, **Preview Components**
+  or **Open README**.
+- **Contribute…** and **Save to My Template…** also offer catalog templates you haven't added.
+
+**Add a template to a catalog.** **Add New Template to This Repository…** on a repository node
+starts blank, seeded from your project, or as a variant:
+- It checks that the id is unique and asks for **maintainers**, who review future pull requests.
+- It writes `.templates/<id>/` with `template.config.json`, `README.md` and `CHANGELOG.md`, and
+  delivers it as a direct commit, or as a pull request (through a fork if you can't push).
+- After a PR you can **Try It Now** from the PR branch, or add it after the merge.
+
+**Variants.** A variant reuses another template of the same repository and stores only what it
+changes:
+
+```jsonc
+"template": {
+  "id": "bc-alm-lite",
+  "name": "BC ALM Lite",
+  "version": "0.1.0",
+  "extends": "bc-alm",                                     // base template (same repository)
+  "remove": ["agent:bc-deploy", "skill:bc-ship-release"]   // base components left out
+}
+```
+
+- Files in the variant folder add components or replace a base component as a whole.
+- Without its own `values`, the variant inherits the base's placeholders.
+- Base changes flow through automatically.
+- In the Components view, overridden components show **variant override**, or **base changed**
+  when the base moved on since. **Compare with Base Template** opens the diffs.
+- **Create Variant…** builds one: pick the base, the components to override (from the base or
+  from your project's version), and the components to remove.
+
+**Versions.** Each catalog template is versioned on its own with tags `<id>/v<semver>` (for
+example `bc-alm-lite/v0.1.0`).
+- **Release Version…** (maintainers) does the release:
+  - shows the commits since the last tag and suggests the bump from conventional commits;
+  - updates `template.version` and `CHANGELOG.md`;
+  - creates the tag.
+  With pull-request delivery, run it again after the merge to tag.
+- **Change Version / Branch…** sets what a source follows:
+  - `latest`: the newest release;
+  - a pinned `<id>/vX.Y.Z`: the source shows **vX.Y.Z available** and offers **Upgrade to
+    Newest Version**;
+  - a branch.
+- `Update-FromTemplate.ps1 -Branch latest` resolves `latest` the same way, and
+  `-TemplatePath .templates/<id>` selects the template.
+
+**Contribution checks.** In this repository, the `template-validate` workflow checks every pull
+request that touches templates:
+- manifests: the id equals the folder, ids are unique, versions are semver, `extends` and
+  `remove` targets exist, and there are no cycles;
+- every agent, skill, prompt and instruction, with the extension's validator;
+- a changed `.templates/<id>/` bumps its version and adds a `CHANGELOG.md` section.
+
+`.github/CODEOWNERS` routes reviews to each template's maintainers. Run the same check locally
+with `node vscode-extension/out/src/cli/validate.js --root . --base origin/main`.
 
 ## Build and share your own customizations
 
@@ -236,7 +315,10 @@ The repository is created on GitHub with `gh`, pushed, and added as a template s
   - Delivery is either a **direct commit** or a **pull request** on the template repository.
 - **Contribute to Source Template (Pull Request)…** does the same against the upstream template
   so improvements can flow back. If you can't push to it, your existing fork is used, or one is
-  created. If you own the upstream, the branch is pushed there directly.
+  created. If you own the upstream, the branch is pushed there directly. For catalog templates it
+  also proposes a version bump with a changelog entry and requests the template's maintainers as
+  reviewers. When the component belongs to another template of the same repository, you choose
+  to **Copy** it or **Move** it.
 
 ## Guidance and what's new
 

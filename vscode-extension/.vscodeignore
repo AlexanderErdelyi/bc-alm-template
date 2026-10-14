@@ -9,3 +9,4 @@ node_modules/**
 *.vsix
 .gitignore
 package-lock.json
+out/src/cli/**

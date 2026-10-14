@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { buildCatalog, Catalog } from '../core/catalog';
+import { changelogSection, compareSemver, LATEST_REF, pinnedVersion, templateVersionTags } from '../core/catalogAuthoring';
 import { classifySourceError } from '../core/access';
 import { manifestOf, ProjectConfig, readProjectConfig, TemplateManifest, templateIdFromUrl } from '../core/config';
 import { resolveProjectRoot } from '../core/layout';
@@ -9,7 +10,7 @@ import { componentOf, isManaged } from '../core/paths';
 import { ComponentState, computeStatus, FileState, ProjectStatus } from '../core/status';
 import { TemplateRepo, TemplateRepoRegistry, TemplateSourceSpec } from '../core/templateRepo';
 import { ProjectOps } from '../core/operations';
-import { sameUrl } from '../core/util';
+import { sameSource, sameUrl, sourceKey, templatePath } from '../core/util';
 
 export const UPSTREAM_URL = 'https://github.com/AlexanderErdelyi/bc-alm-template.git';
 
@@ -31,6 +32,14 @@ export interface SourceInfo extends TemplateSourceSpec {
     disabled?: boolean;
     /** Another loaded source uses the same template id. */
     duplicateOf?: string;
+    /** Template id this variant extends (same repository). */
+    variantOf?: string;
+    /** Newest released version (tag `<id>/v<version>`). */
+    latestVersion?: string;
+    /** Released version the source follows (pinned tag or "latest"). */
+    resolvedVersion?: string;
+    /** A newer release than the pinned tag exists. */
+    upgrade?: { tag: string; version: string; notes?: string };
 }
 
 export interface TemplateGroup {
@@ -44,7 +53,7 @@ export interface TemplateGroup {
 
 export function settingsSources(): TemplateSourceSpec[] {
     const list = vscode.workspace.getConfiguration('bcAlm').get<Partial<TemplateSourceSpec>[]>('templateSources') ?? [];
-    const out = list.filter(s => s && s.url).map(s => ({ name: s.name, url: s.url!, ref: s.ref || 'main', ...(s.upstream ? { upstream: s.upstream } : {}) }));
+    const out = list.filter(s => s && s.url).map(s => ({ name: s.name, url: s.url!, ref: s.ref || 'main', ...(templatePath(s.path) ? { path: templatePath(s.path) } : {}), ...(s.upstream ? { upstream: s.upstream } : {}) }));
     return out.length ? out : [{ name: 'BC ALM Template (upstream)', url: UPSTREAM_URL, ref: 'main' }];
 }
 
@@ -95,7 +104,7 @@ export class ProjectState implements vscode.Disposable {
     projectSources(): LockSource[] {
         if (this.lock?.sources?.length) { return this.lock.sources; }
         const s = settingsSources()[0];
-        return [{ name: s.name, url: s.url, ref: s.ref }];
+        return [{ name: s.name, url: s.url, ref: s.ref, ...(s.path ? { path: s.path } : {}) }];
     }
 
     /** Serializes refreshes so tree/commands never see a half-built state. */
@@ -120,18 +129,18 @@ export class ProjectState implements vscode.Disposable {
             const projectSrc = this.root ? this.projectSources() : [];
             const all: SourceInfo[] = [];
             const push = (s: TemplateSourceSpec, inSettings: boolean) => {
-                const ex = all.find(x => sameUrl(x.url, s.url));
+                const ex = all.find(x => sameSource(x, s));
                 if (ex) { ex.inSettings ||= inSettings; ex.upstream ??= s.upstream; return; }
-                const pi = projectSrc.findIndex(p => sameUrl(p.url, s.url));
-                all.push({ ...s, ref: s.ref || 'main', inProject: pi >= 0, primary: pi === 0, upstreamDefault: sameUrl(s.url, UPSTREAM_URL), inSettings });
+                const pi = projectSrc.findIndex(p => sameSource(p, s));
+                all.push({ ...s, ref: s.ref || 'main', inProject: pi >= 0, primary: pi === 0, upstreamDefault: sameUrl(s.url, UPSTREAM_URL) && !templatePath(s.path), inSettings });
             };
-            projectSrc.forEach(s => push({ name: s.name, url: s.url, ref: s.ref }, false));
+            projectSrc.forEach(s => push({ name: s.name, url: s.url, ref: s.ref, ...(s.path ? { path: s.path } : {}) }, false));
             settingsSources().forEach(s => push(s, true));
 
             this.catalogs = [];
             const problems: string[] = [];
             const load = async (info: SourceInfo, p: TemplateSourceSpec, age: number) => {
-                const repo = this.repo({ name: p.name, url: p.url, ref: p.ref });
+                const repo = this.repo({ name: p.name, url: p.url, ref: p.ref, path: p.path });
                 try {
                     await repo.ensure(age);
                 } catch (e) {
@@ -141,13 +150,29 @@ export class ProjectState implements vscode.Disposable {
                 }
                 return repo;
             };
+            const versions = async (info: SourceInfo, repo: TemplateRepo) => {
+                const id = info.manifest?.id;
+                info.variantOf = info.manifest?.extends;
+                if (!id) { return; }
+                try {
+                    const tags = templateVersionTags(await repo.mirror.tags(), id);
+                    const pinned = pinnedVersion(info.ref, id);
+                    info.latestVersion = tags[0]?.version;
+                    info.resolvedVersion = info.ref === LATEST_REF ? tags[0]?.version : pinned;
+                    if (pinned && tags[0] && compareSemver(tags[0].version, pinned) > 0) {
+                        const tagSha = await repo.mirror.resolve(`refs/tags/${tags[0].tag}`);
+                        const notes = changelogSection(await repo.mirror.readFile(tagSha, repo.writePath('CHANGELOG.md')), tags[0].version);
+                        info.upgrade = { tag: tags[0].tag, version: tags[0].version, ...(notes ? { notes } : {}) };
+                    }
+                } catch { /* version info is optional */ }
+            };
             const fail = (info: SourceInfo, e: unknown) => {
                 const err = e as Error & { detail?: string };
                 info.error = err.detail ? err.message : classifySourceError(err.message, info.url, info.ref).message;
             };
             if (this.root && this.project) {
                 for (const p of projectSrc) {
-                    const info = all.find(x => sameUrl(x.url, p.url))!;
+                    const info = all.find(x => sameSource(x, p))!;
                     try {
                         const repo = await load(info, p, maxAge);
                         const sha = await repo.resolve();
@@ -156,6 +181,7 @@ export class ProjectState implements vscode.Disposable {
                         this.catalogs.push(cat);
                         info.manifest = cat.manifest;
                         info.componentCount = new Set([...cat.files.values()].map(f => f.component.id)).size;
+                        await versions(info, repo);
                     } catch (e) {
                         fail(info, e);
                     }
@@ -169,14 +195,15 @@ export class ProjectState implements vscode.Disposable {
             // Settings-only sources: read the identity from the cached copy (no network unless asked to refresh).
             for (const info of all.filter(s => !s.sha && !s.error)) {
                 try {
-                    const spec = { name: info.name, url: info.url, ref: info.ref };
+                    const spec = { name: info.name, url: info.url, ref: info.ref, path: info.path };
                     const repo = this.repo(spec);
                     if (!repo.isCached() && !fetch) { continue; }
                     await load(info, spec, fetch ? 0 : Number.POSITIVE_INFINITY);
                     const sha = await repo.resolve();
                     info.sha = sha;
                     const cfg = await repo.readConfig(sha);
-                    info.manifest = manifestOf(cfg, info.url, info.name);
+                    info.manifest = manifestOf(cfg, sourceKey(info), info.name);
+                    await versions(info, repo);
                     const sync = this.project?.sync ?? cfg?.sync;
                     if (sync) { info.componentCount = new Set((await repo.listFiles(sha)).filter(f => isManaged(f, sync)).map(f => componentOf(f).id)).size; }
                 } catch (e) {
@@ -226,7 +253,7 @@ export class ProjectState implements vscode.Disposable {
             return g;
         };
         for (const s of this.sources.filter(x => x.inProject)) {
-            const id = s.manifest?.id ?? templateIdFromUrl(s.url);
+            const id = s.manifest?.id ?? templateIdFromUrl(sourceKey(s));
             add(id, s.manifest ?? { id, name: s.name ?? id }, s);
         }
         for (const c of this.status?.components ?? []) {

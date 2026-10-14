@@ -130,7 +130,7 @@ async function finishProject(root: string, repo: TemplateRepo, sha: string, drop
     }
     const status = await computeStatus({ root, project, lock: readLock(root), catalogs: [catalog] });
     const lock = readLock(root) ?? emptyLock();
-    ensureSource(lock, { name: repo.spec.name, url: repo.spec.url, ref: repo.spec.ref }, true);
+    ensureSource(lock, { name: repo.spec.name, url: repo.spec.url, ref: repo.spec.ref, ...(repo.root ? { path: repo.root } : {}) }, true);
     const ops = new ProjectOps(root, project, lock, [catalog]);
     let tracked = 0, differing = 0, installed = 0;
     const taken = new Set<string>();

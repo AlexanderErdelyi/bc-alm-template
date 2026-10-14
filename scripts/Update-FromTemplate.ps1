@@ -69,6 +69,16 @@
 
     Nothing is committed. After it runs, review 'git diff' and commit what you want.
 
+    Catalog repositories hold several templates: the root one plus .templates/<id>/ folders.
+    -TemplatePath (or the lock source's "path") selects one. A template whose
+    template.config.json has "template.extends" is a variant: it starts from its base,
+    replaces every component it ships its own files for, and drops the component ids
+    listed in "template.remove".
+
+    -Branch (or the lock source's "ref") can be a branch, a release tag such as
+    bc-upgrade/v1.2.0, or "latest" - the newest released version (highest <id>/v<semver>
+    tag) of the selected template.
+
 .EXAMPLE
     pwsh ./scripts/Update-FromTemplate.ps1 -WhatIf
 
@@ -80,11 +90,17 @@
 
 .EXAMPLE
     pwsh ./scripts/Update-FromTemplate.ps1 -TemplateUrl https://github.com/AlexanderErdelyi/bc-alm-template.git -Branch main
+
+.EXAMPLE
+    pwsh ./scripts/Update-FromTemplate.ps1 -TemplateUrl https://github.com/my-org/bc-templates.git -TemplatePath .templates/bc-upgrade
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string] $TemplateUrl = 'https://github.com/AlexanderErdelyi/bc-alm-template.git',
     [string] $Branch = 'main',
+    # Folder of the template inside the repository for catalog repositories (e.g. .templates/bc-upgrade).
+    # Default: the lock's primary source path, else the repository root.
+    [string] $TemplatePath = '',
     # Repository root. Default: the folder above scripts/ (or above .bc-alm/scripts/).
     [string] $RepoRoot = '',
     [switch] $OverwriteLocalChanges,
@@ -359,9 +375,25 @@ function Get-NormHash([string] $path) {
     finally { $sha.Dispose() }
 }
 
+# Folder of a template in its repository ('' = root). Mirrors templatePath() in the extension.
+function Get-TplPath([string] $p) {
+    if (-not $p) { return '' }
+    return ($p.Trim().Replace('\', '/') -replace '^(\./)+', '' -replace '^/+|/+$', '' -replace '^\.$', '')
+}
+
+# Normalized source key: the URL, plus "#<path>" for a template in a catalog subfolder.
+# Mirrors normalizeUrl() in the extension (lock entries store url or url#path).
 function Get-NormUrl([string] $url) {
     if (-not $url) { return '' }
-    return ($url.Trim().Replace('\', '/') -replace '/+$', '' -replace '(?i)\.git$', '').ToLowerInvariant()
+    $i = $url.IndexOf('#')
+    $base = if ($i -ge 0) { $url.Substring(0, $i) } else { $url }
+    $base = ($base.Trim().Replace('\', '/') -replace '/+$', '' -replace '(?i)\.git$', '').ToLowerInvariant()
+    $p = if ($i -ge 0) { (Get-TplPath $url.Substring($i + 1)).ToLowerInvariant() } else { '' }
+    if ($p) { return "$base#$p" } else { return $base }
+}
+function Get-SourceKey($s) {
+    $p = if ($s.PSObject.Properties['path']) { Get-TplPath ([string]$s.path) } else { '' }
+    if ($p) { return "$($s.url)#$p" } else { return [string]$s.url }
 }
 
 # Component id of a template-relative path (agent:<name>, skill:<folder>, ...). Mirrors
@@ -395,6 +427,7 @@ if ($hasLock) {
         if ($s.PSObject.Properties['name'] -and $s.name) { $o.name = [string]$s.name }
         if ($s.PSObject.Properties['id'] -and $s.id) { $o.id = [string]$s.id }
         $o.url = [string]$s.url
+        if ($s.PSObject.Properties['path'] -and (Get-TplPath ([string]$s.path))) { $o.path = Get-TplPath ([string]$s.path) }
         $o.ref = if ($s.PSObject.Properties['ref'] -and $s.ref) { [string]$s.ref } else { 'main' }
         if ($s.PSObject.Properties['exclude'] -and $null -ne $s.exclude) { $o.exclude = @($s.exclude | Where-Object { $_ } | ForEach-Object { [string]$_ }) }
         $lockSources.Add([pscustomobject]$o)
@@ -405,11 +438,17 @@ if ($hasLock) {
     # The primary lock source is the template this project tracks (a fork or your own
     # template). Use it unless -TemplateUrl / -Branch were given explicitly.
     if ($lockSources.Count -gt 0) {
-        if (-not $PSBoundParameters.ContainsKey('TemplateUrl')) { $TemplateUrl = $lockSources[0].url }
+        if (-not $PSBoundParameters.ContainsKey('TemplateUrl')) {
+            $TemplateUrl = $lockSources[0].url
+            if (-not $PSBoundParameters.ContainsKey('TemplatePath') -and $lockSources[0].PSObject.Properties['path']) { $TemplatePath = [string]$lockSources[0].path }
+        }
         if (-not $PSBoundParameters.ContainsKey('Branch'))      { $Branch = $lockSources[0].ref }
     }
 }
-$templateKey = Get-NormUrl $TemplateUrl
+$TemplatePath = Get-TplPath $TemplatePath
+if ($TemplatePath -split '/' -contains '..') { throw "Invalid -TemplatePath '$TemplatePath'." }
+$sourceKey = if ($TemplatePath) { "$TemplateUrl#$TemplatePath" } else { $TemplateUrl }
+$templateKey = Get-NormUrl $sourceKey
 
 if ($policyDisabled.Count -or $policyKeep.Count) {
     Write-Host ("  components: disabled=[{0}], keepLocal=[{1}]" -f ($policyDisabled -join ', '), ($policyKeep -join ', ')) -ForegroundColor DarkGray
@@ -417,17 +456,116 @@ if ($policyDisabled.Count -or $policyKeep.Count) {
 
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("bc-template-" + [guid]::NewGuid().ToString('N'))
 $stage = "$temp-stage"
-Write-Host "Fetching template $TemplateUrl ($Branch)..." -ForegroundColor White
-& git clone --depth 1 --branch $Branch --quiet $TemplateUrl $temp 2>$null
-if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($Branch)." }
-$commit = ([string](& git -C $temp rev-parse HEAD)).Trim()
-
-# Template identity: "template.id" in the template's template.config.json, else the repository
-# name. Mirrors manifestOf() in the VS Code extension; sync.templates.disabled lists these ids.
 function Get-SlugId([string] $s) {
     $id = ($s.Trim().ToLowerInvariant() -replace '\.git$', '' -replace '[^a-z0-9._-]+', '-').Trim('-')
     if ($id) { return $id } else { return 'template' }
 }
+$repoClone = "$temp-repo"
+Write-Host "Fetching template $TemplateUrl ($Branch)$(if ($TemplatePath) { " [$TemplatePath]" })..." -ForegroundColor White
+$cloneRef = $Branch
+if ($Branch -eq 'latest') {
+    # "latest" = newest <id>/v<semver> tag of the selected template (mirrors TemplateRepo.resolve('latest')).
+    $latestId = if ($TemplatePath) { Get-SlugId (Split-Path $TemplatePath -Leaf) } else { '' }
+    if (-not $latestId) {
+        $probe = "$temp-probe"
+        & git clone --depth 1 --quiet $TemplateUrl $probe 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl." }
+        $probeCfg = $null
+        try { $probeCfg = Read-Text (Join-Path $probe 'template.config.json') | ConvertFrom-Json } catch { $probeCfg = $null }
+        $latestId = if ($probeCfg -and $probeCfg.template -and $probeCfg.template.id) { Get-SlugId ([string]$probeCfg.template.id) } else { Get-SlugId ((($TemplateUrl.Trim() -replace '[\\/]+$', '') -split '[\\/:]')[-1]) }
+        Remove-Item -LiteralPath $probe -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $tagRx = '^' + [regex]::Escape($latestId) + '/v(\d+)\.(\d+)\.(\d+)$'
+    $cloneRef = @(& git ls-remote --tags --refs $TemplateUrl "refs/tags/$latestId/v*" 2>$null) |
+        ForEach-Object { (($_ -split "`t")[-1]) -replace '^refs/tags/', '' } |
+        Where-Object { $_ -match $tagRx } |
+        Sort-Object { [version](($_ -split '/v')[-1]) } -Descending |
+        Select-Object -First 1
+    if (-not $cloneRef) { throw "$TemplateUrl follows 'latest', but template '$latestId' has no released versions yet (tags '$latestId/v<version>')." }
+    Write-Host "  latest = $cloneRef" -ForegroundColor DarkGray
+}
+& git clone --depth 1 --branch $cloneRef --quiet $TemplateUrl $repoClone 2>$null
+if ($LASTEXITCODE -ne 0) { throw "git clone failed for $TemplateUrl ($cloneRef)." }
+$commit = ([string](& git -C $repoClone rev-parse HEAD)).Trim()
+
+# --- Template view (mirrors TemplateRepo.layout() in the extension) ----------------------
+# A catalog repository keeps extra templates in .templates/<id>/. A variant's template.config.json
+# has "template.extends" (base id) and optional "template.remove" (component ids). The view is
+# assembled base first: a variant that ships any file of a component replaces that whole
+# component of its base. $temp then holds exactly the files of the selected template.
+function Read-TplConfig([string] $dir) {
+    $p = Join-Path $dir 'template.config.json'
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $null }
+    try { return (Read-Text $p | ConvertFrom-Json) } catch { return $null }
+}
+function Get-LayerFiles([string] $layerPath) {
+    $out = [ordered]@{}
+    $base = if ($layerPath) { Join-Path $repoClone $layerPath } else { $repoClone }
+    if (-not (Test-Path -LiteralPath $base)) { return $out }
+    $full = (Get-Item -LiteralPath $base).FullName
+    Get-ChildItem -LiteralPath $full -Recurse -File -Force | ForEach-Object {
+        $rel = $_.FullName.Substring($full.Length).TrimStart('\', '/').Replace('\', '/')
+        if ($rel -match '^\.git/' -or (-not $layerPath -and $rel -match '^\.templates/')) { return }
+        $out[$rel] = $_.FullName
+    }
+    return $out
+}
+function Find-TemplateLayer([string] $id) {
+    $rootCfg = Read-TplConfig $repoClone
+    $rootId = if ($rootCfg -and $rootCfg.template -and $rootCfg.template.id) { Get-SlugId ([string]$rootCfg.template.id) } else { Get-SlugId ((($TemplateUrl.Trim() -replace '[\\/]+$', '') -split '[\\/:]')[-1]) }
+    if ($rootId -eq $id) { return [pscustomobject]@{ Path = ''; Id = $id; Cfg = $rootCfg } }
+    $cat = Join-Path $repoClone '.templates'
+    if (Test-Path -LiteralPath $cat) {
+        foreach ($d in Get-ChildItem -LiteralPath $cat -Directory) {
+            $c = Read-TplConfig $d.FullName
+            if ($c -and $c.template -and $c.template.id -and (Get-SlugId ([string]$c.template.id)) -eq $id -and (Get-SlugId $d.Name) -eq $id) {
+                return [pscustomobject]@{ Path = ".templates/$($d.Name)"; Id = $id; Cfg = $c }
+            }
+        }
+    }
+    return $null
+}
+$topDir = if ($TemplatePath) { Join-Path $repoClone $TemplatePath } else { $repoClone }
+if (-not (Test-Path -LiteralPath $topDir)) { throw "Template folder '$TemplatePath' does not exist in $TemplateUrl ($Branch)." }
+$topCfg = Read-TplConfig $topDir
+$chain = New-Object System.Collections.Generic.List[object]
+$chain.Add([pscustomobject]@{ Path = $TemplatePath; Id = $(if ($topCfg -and $topCfg.template -and $topCfg.template.id) { Get-SlugId ([string]$topCfg.template.id) } else { '' }); Cfg = $topCfg })
+$cur = $topCfg
+while ($cur -and $cur.template -and $cur.template.PSObject.Properties['extends'] -and $cur.template.extends) {
+    $baseId = Get-SlugId ([string]$cur.template.extends)
+    $layer = Find-TemplateLayer $baseId
+    if (-not $layer) { throw "Template '$($chain[$chain.Count - 1].Id)' extends '$baseId', which is not a template in this repository." }
+    if ($chain | Where-Object { $_.Path -eq $layer.Path -or $_.Id -eq $layer.Id }) { throw ("Template inheritance cycle: {0} -> {1}." -f (($chain | ForEach-Object { $_.Id }) -join ' -> '), $layer.Id) }
+    $chain.Add($layer)
+    $cur = $layer.Cfg
+}
+$layers = @($chain.ToArray()); [array]::Reverse($layers)
+# Placeholder values of the template: its own, else the nearest base that has them.
+$tplValues = $null
+foreach ($l in $chain) { if ($l.Cfg -and $l.Cfg.PSObject.Properties['values'] -and $l.Cfg.values) { $tplValues = $l.Cfg.values; break } }
+$viewFiles = [ordered]@{}
+for ($i = 0; $i -lt $layers.Count; $i++) {
+    $own = Get-LayerFiles $layers[$i].Path
+    if ($i -gt 0) {
+        $rm = @(); if ($layers[$i].Cfg -and $layers[$i].Cfg.template -and $layers[$i].Cfg.template.PSObject.Properties['remove']) { $rm = @($layers[$i].Cfg.template.remove | ForEach-Object { [string]$_ }) }
+        $ownComps = @($own.Keys | ForEach-Object { Get-ComponentId $_ } | Select-Object -Unique)
+        foreach ($rel in @($viewFiles.Keys)) {
+            $cid = Get-ComponentId $rel
+            if ($rm -contains $cid -or $ownComps -contains $cid) { $viewFiles.Remove($rel) }
+        }
+    }
+    foreach ($k in $own.Keys) { $viewFiles[$k] = $own[$k] }
+}
+if ($layers.Count -gt 1) { Write-Host ("Variant: {0}" -f (($layers | ForEach-Object { $_.Id }) -join ' -> ')) -ForegroundColor DarkGray }
+foreach ($k in $viewFiles.Keys) {
+    $to = Join-Path $temp $k
+    $d = Split-Path $to -Parent
+    if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force -WhatIf:$false | Out-Null }
+    Copy-Item -LiteralPath $viewFiles[$k] -Destination $to -Force -WhatIf:$false
+}
+
+# Template identity: "template.id" in the template's template.config.json, else the repository
+# name. Mirrors manifestOf() in the VS Code extension; sync.templates.disabled lists these ids.
 $templateId = $null
 $tplCfgPath = Join-Path $temp 'template.config.json'
 if (Test-Path -LiteralPath $tplCfgPath) {
@@ -439,6 +577,7 @@ if (Test-Path -LiteralPath $tplCfgPath) {
         }
     } catch { }
 }
+if (-not $templateId -and $TemplatePath) { $templateId = Get-SlugId (Split-Path $TemplatePath -Leaf) }
 if (-not $templateId) { $templateId = Get-SlugId ((($TemplateUrl.Trim() -replace '[\\/]+$', '') -split '[\\/:]')[-1]) }
 $templateOff = $policyTplDisabled -contains $templateId
 Write-Host "Template id: $templateId$(if ($templateOff) { ' (disabled in this project: its agents, skills, prompts and instructions are skipped)' })" -ForegroundColor DarkGray
@@ -597,9 +736,7 @@ function Convert-StagedLayout {
 function Reparameterize {
     if (-not ($config -and $config.values)) { return }
     $v = $config.values
-    $tpl = $null
-    $tplCfg = Join-Path $temp 'template.config.json'
-    if (Test-Path $tplCfg) { try { $tpl = (Read-Text $tplCfg | ConvertFrom-Json).values } catch { $tpl = $null } }
+    $tpl = $tplValues
     if (-not $tpl) { return }
 
     $fromPrefix = [string]$tpl.appPrefix
@@ -649,7 +786,7 @@ function Reparameterize {
 
 function Set-LockEntry($entry, [string] $installedHash) {
     $lockFiles[$entry.Dest] = [pscustomobject][ordered]@{
-        source        = $TemplateUrl
+        source        = $sourceKey
         template      = $templateId
         path          = $entry.Src
         commit        = $commit
@@ -673,7 +810,7 @@ function Write-Lock {
     else {
         $parts = foreach ($s in $lockSources) {
             $props = @()
-            foreach ($k in 'name', 'id', 'url', 'ref') { if ($s.PSObject.Properties[$k] -and $s.$k) { $props += ('      "{0}": {1}' -f $k, (& $J $s.$k)) } }
+            foreach ($k in 'name', 'id', 'url', 'path', 'ref') { if ($s.PSObject.Properties[$k] -and $s.$k) { $props += ('      "{0}": {1}' -f $k, (& $J $s.$k)) } }
             if ($s.PSObject.Properties['exclude'] -and $null -ne $s.exclude) {
                 [string[]]$ex = @($s.exclude | Where-Object { $_ } | ForEach-Object { [string]$_ } | Select-Object -Unique)
                 [System.Array]::Sort($ex, [System.StringComparer]::Ordinal)
@@ -771,12 +908,15 @@ try {
         }
     }
 
-    if (-not ($lockSources | Where-Object { (Get-NormUrl $_.url) -eq $templateKey })) {
-        $lockSources.Add([pscustomobject][ordered]@{ id = $templateId; url = $TemplateUrl; ref = $Branch }); $lockChanged = $true
+    if (-not ($lockSources | Where-Object { (Get-NormUrl (Get-SourceKey $_)) -eq $templateKey })) {
+        $ns = [ordered]@{ id = $templateId; url = $TemplateUrl }
+        if ($TemplatePath) { $ns.path = $TemplatePath }
+        $ns.ref = $Branch
+        $lockSources.Add([pscustomobject]$ns); $lockChanged = $true
     }
     else {
         foreach ($s in $lockSources) {
-            if ((Get-NormUrl $s.url) -ne $templateKey) { continue }
+            if ((Get-NormUrl (Get-SourceKey $s)) -ne $templateKey) { continue }
             if ($s.ref -ne $Branch) { $s.ref = $Branch; $lockChanged = $true }
             if (-not ($s.PSObject.Properties['id'] -and $s.id)) { $s | Add-Member -NotePropertyName id -NotePropertyValue $templateId -Force; $lockChanged = $true }
         }
@@ -784,7 +924,7 @@ try {
     if ($lockChanged -and $PSCmdlet.ShouldProcess($lockPath, 'Record synced template versions')) { Write-Lock }
 }
 finally {
-    foreach ($d in $temp, $stage) { if (Test-Path $d) { Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue -WhatIf:$false } }
+    foreach ($d in $temp, $stage, $repoClone) { if (Test-Path $d) { Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue -WhatIf:$false } }
 }
 
 Write-Host "`nSummary: $added added, $updated updated, $unchanged already current, $keptLocal kept (local changes)." -ForegroundColor White

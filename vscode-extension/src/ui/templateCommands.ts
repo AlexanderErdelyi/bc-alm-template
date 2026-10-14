@@ -12,7 +12,7 @@ import { KIND_LABELS } from '../core/paths';
 import { githubSlug, isLocalPath } from '../core/publish';
 import { ComponentState, STATUS_LABEL } from '../core/status';
 import { TemplateSourceSpec } from '../core/templateRepo';
-import { safeRemove, sameUrl } from '../core/util';
+import { safeRemove, sameSource, sameUrl, sourceKey } from '../core/util';
 import { ProjectState, saveSettingsSources, settingsSources, SourceInfo, TemplateGroup } from './projectState';
 import { ComponentsNode } from './trees';
 
@@ -43,7 +43,7 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
         let id: string | undefined;
         if (isNode(arg) && arg.type === 'template') { id = arg.group.id; }
         else if (isNode(arg) && (arg.type === 'component' || arg.type === 'file')) { id = arg.comp.templateId; }
-        else if (isSource(arg)) { id = arg.manifest?.id ?? templateIdFromUrl(arg.url); }
+        else if (isSource(arg)) { id = arg.manifest?.id ?? templateIdFromUrl(sourceKey(arg)); }
         if (id) {
             const g = state.templateGroup(id);
             if (!g) { throw new Error(`"${id}" is not a template of this project. Choose "Use in This Project" on its source first.`); }
@@ -160,7 +160,7 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
             if (!src) { throw new Error(`"${g.manifest.name}" has no loaded template source.`); }
         }
         const s = src;
-        const cat = state.catalogs.find(c => sameUrl(c.repo.spec.url, s.url));
+        const cat = state.catalogs.find(c => sameUrl(c.repo.key, sourceKey(s)));
         if (!cat) {
             if (!s.inProject) {
                 const a = await vscode.window.showInformationMessage(`"${s.name ?? s.url}" is not used in this project yet.`, 'Use in This Project');
@@ -179,13 +179,13 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
         const ids = [...new Set([...cat.files.values()].map(f => f.component).filter(r => r.kind !== 'file').map(r => r.id))];
         const comps = ids.map(id => state.component(id)).filter((c): c is ComponentState => !!c)
             .sort((a, b) => a.ref.kind.localeCompare(b.ref.kind) || a.ref.name.localeCompare(b.ref.name));
-        const fromOther = (c: ComponentState) => c.installed && !!c.source && !sameUrl(c.source, s.url);
+        const fromOther = (c: ComponentState) => c.installed && !!c.source && !sameUrl(c.source, sourceKey(s));
         const active = (c: ComponentState) => c.installed && !c.disabled;
         type Item = vscode.QuickPickItem & { c: ComponentState };
         const items: Item[] = comps.map(c => ({
             label: c.ref.name,
             description: [KIND_LABELS[c.ref.kind] ?? c.ref.kind, c.disabled ? 'disabled' : c.installed ? STATUS_LABEL[c.status] : c.newInTemplate ? 'new in template' : 'not installed',
-                fromOther(c) ? `tracked from ${state.sources.find(x => sameUrl(x.url, c.source))?.name ?? c.source}` : ''].filter(Boolean).join(' · '),
+                fromOther(c) ? `tracked from ${state.sources.find(x => sameUrl(sourceKey(x), c.source))?.name ?? c.source}` : ''].filter(Boolean).join(' · '),
             picked: active(c),
             c
         }));
@@ -221,7 +221,7 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
             files += ops.installFrom(c, cat);
         }
         for (const c of remove) { ops.disable(c); }
-        ops.setExclude(s.url, ids.filter(id => !chosen.has(id)).sort());
+        ops.setExclude(sourceKey(s), ids.filter(id => !chosen.has(id)).sort());
         ops.save();
         const parts = [install.length ? `installed ${install.length}${files ? ` (${files} files)` : ''}` : '', remove.length ? `disabled ${remove.length}` : ''].filter(Boolean);
         await done(`${s.name ?? cat.manifest.name}: ${parts.join(', ') || 'selection saved'}.`);
@@ -230,6 +230,12 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
     // ------------------------------------------------------------ create a new template
 
     reg('bcAlm.createNewTemplate', async () => {
+        const where = await vscode.window.showQuickPick([
+            { label: '$(library) In a template repository (pull request)', detail: 'Add it as .templates/<id>/ to a repository your team already uses - e.g. this BC ALM repository. Best for sharing and variants.', v: 'catalog' },
+            { label: '$(repo-create) In a new GitHub repository', detail: 'A repository of its own, owned by you or your organization.', v: 'repo' }
+        ], { placeHolder: 'Where should the new template live?' });
+        if (!where) { return; }
+        if (where.v === 'catalog') { await vscode.commands.executeCommand('bcAlm.createCatalogTemplate'); return; }
         type Start = vscode.QuickPickItem & { v: 'blank' | 'seed' | 'copy' };
         const starts: Start[] = [
             { label: '$(new-file) Blank template', detail: 'Empty agents/skills/prompts/instructions folders, a README and template.config.json.', v: 'blank' }
@@ -318,43 +324,23 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
     /** Add a created template to the settings and offer to use it in this project. */
     const addAndOffer = async (entry: TemplateSourceSpec, webUrl: string, note: string) => {
         const list = settingsSources();
-        if (!list.some(x => sameUrl(x.url, entry.url))) { await saveSettingsSources([...list, entry]); }
+        if (!list.some(x => sameSource(x, entry))) { await saveSettingsSources([...list, entry]); }
         await state.refresh(false, true);
         const actions = state.root ? ['Use in This Project', 'Open on GitHub'] : ['Open on GitHub'];
         const a = await vscode.window.showInformationMessage(`Created template "${entry.name}" ${note ? `${note} ` : ''}at ${webUrl} and added it to your template sources.`, ...actions);
         if (a === 'Open on GitHub') { await vscode.env.openExternal(vscode.Uri.parse(webUrl)); }
         if (a === 'Use in This Project') {
-            const info = state.sources.find(x => sameUrl(x.url, entry.url));
+            const info = state.sources.find(x => sameSource(x, entry));
             if (info) { await vscode.commands.executeCommand('bcAlm.useSourceInProject', info); }
         }
     };
 
     // ------------------------------------------------------------ source actions
 
-    reg('bcAlm.changeSourceRef', async (s: SourceInfo) => {
-        if (!s) { return; }
-        const ref = (await vscode.window.showInputBox({ prompt: `Branch or tag of ${s.name ?? s.url} to follow`, value: s.ref, validateInput: v => v.trim() ? undefined : 'Enter a branch or tag' }))?.trim();
-        if (!ref || ref === s.ref) { return; }
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Checking ${ref}…` }, async () => {
-            const repo = state.repo({ ...s, ref });
-            await repo.ensure(0);
-            await repo.resolve();
-        });
-        const list = settingsSources();
-        if (list.some(x => sameUrl(x.url, s.url))) { await saveSettingsSources(list.map(x => sameUrl(x.url, s.url) ? { ...x, ref } : x)); }
-        if (s.inProject && state.root) {
-            const lock = readLock(state.root) ?? emptyLock();
-            const ls = lock.sources.find(x => sameUrl(x.url, s.url));
-            if (ls) { ls.ref = ref; writeLock(state.root, lock); }
-        }
-        await state.refresh(true);
-        vscode.window.showInformationMessage(`${s.name ?? s.url} now follows ${ref}.${s.inProject ? ' Commit .bc-alm/template.lock.json so your team follows it too.' : ''}`);
-    });
-
     reg('bcAlm.openSourceOnGitHub', async (s: SourceInfo) => {
         if (!s) { return; }
         const slug = githubSlug(s.url);
-        if (slug) { await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${slug.owner}/${slug.repo}/tree/${encodeURIComponent(s.ref)}`)); return; }
+        if (slug) { await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${slug.owner}/${slug.repo}/tree/${encodeURIComponent(s.ref)}${s.path ? `/${s.path}` : ''}`)); return; }
         if (isLocalPath(s.url)) { await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(s.url.replace(/^file:\/\//, ''))); return; }
         await vscode.env.openExternal(vscode.Uri.parse(s.url));
     });
@@ -384,7 +370,7 @@ export function registerTemplateCommands(cx: TemplateCommandContext): void {
         if (!missing.length) { vscode.window.showInformationMessage('All template sources of this project are already in your settings.'); return; }
         const picks = await vscode.window.showQuickPick(missing.map(x => ({ label: x.name ?? x.url, description: x.ref, detail: x.url, picked: true, x })), { canPickMany: true, placeHolder: 'Add these project sources to your template sources' });
         if (!picks?.length) { return; }
-        await saveSettingsSources([...settingsSources(), ...picks.map(p => ({ name: p.x.name, url: p.x.url, ref: p.x.ref, ...(p.x.upstream ? { upstream: p.x.upstream } : {}) }))]);
+        await saveSettingsSources([...settingsSources(), ...picks.map(p => ({ name: p.x.name, url: p.x.url, ref: p.x.ref, ...(p.x.path ? { path: p.x.path } : {}), ...(p.x.upstream ? { upstream: p.x.upstream } : {}) }))]);
         await done(`Added ${picks.length} source(s) to your template sources.`);
     });
 }

@@ -32,10 +32,13 @@ export interface PublishPlan {
 export interface PublishResult {
     commit: string;
     branch: string;
+    /** Branch the change targets (pull request base or pushed branch). */
+    base?: string;
     pushedTo: string;
     prUrl?: string;
     compareUrl?: string;
     forked?: boolean;
+    tag?: string;
 }
 
 export function githubSlug(url: string): { owner: string; repo: string } | undefined {
@@ -101,10 +104,10 @@ export async function preparePublish(opts: {
     return { repo, baseSha, componentId: opts.componentId, newName: opts.newName, files };
 }
 
-async function cloneWork(repo: TemplateRepo, workRoot: string): Promise<string> {
+async function cloneWork(repo: TemplateRepo, branch: string, workRoot: string): Promise<string> {
     fs.mkdirSync(workRoot, { recursive: true });
     const dir = fs.mkdtempSync(path.join(workRoot, 'pub-'));
-    await git(['clone', '--quiet', '--reference-if-able', repo.gitDir, '--dissociate', '--branch', repo.spec.ref, '--single-branch', repo.spec.url, dir]);
+    await git(['clone', '--quiet', '--reference-if-able', repo.gitDir, '--dissociate', '--branch', branch, '--single-branch', repo.spec.url, dir]);
     return dir;
 }
 
@@ -113,24 +116,45 @@ async function tryPush(cwd: string, remote: string, refspec: string): Promise<{ 
     return { ok: r.code === 0, err: r.stderr.trim() };
 }
 
-/** Commit the plan into the target template and deliver it directly or as a pull request (forking when needed). */
-export async function executePublish(plan: PublishPlan, opts: {
+/** A change to a template repository: write `text` to the repository path, or delete it when `text` is undefined. */
+export interface RepoChange { path: string; text?: string }
+
+export interface DeliverOptions {
     workRoot: string;
     delivery: DeliveryMode;
     message: string;
     body?: string;
+    /** Short slug used for the pull request branch (bc-alm/<slug>-<timestamp>). */
+    branchName: string;
+    /** GitHub handles requested as pull request reviewers (failures are only logged). */
+    reviewers?: string[];
+    /** Tag created on the commit when it is pushed directly (release). */
+    tag?: string;
     log?: (line: string) => void;
-}): Promise<PublishResult> {
+}
+
+/**
+ * Commit changes to a template repository and deliver them: push directly to the branch the source follows
+ * (the default branch when it is pinned to a tag), or push a branch and open a pull request. Without push
+ * access the branch goes to the user's fork; when the user owns the repository no fork is attempted.
+ */
+export async function deliverChanges(repo: TemplateRepo, changes: RepoChange[], opts: DeliverOptions): Promise<PublishResult> {
     const log = opts.log ?? (() => undefined);
-    const spec = plan.repo.spec;
-    const dir = await cloneWork(plan.repo, opts.workRoot);
+    const spec = repo.spec;
+    const base = await repo.branchForWrites();
+    const dir = await cloneWork(repo, base, opts.workRoot);
     try {
-        for (const f of plan.files) {
-            const abs = path.join(dir, ...f.srcRel.split('/'));
+        for (const c of changes) {
+            if (c.path.split('/').some(s => s === '..')) { throw new Error(`Invalid path "${c.path}".`); }
+            const abs = path.join(dir, ...c.path.split('/'));
+            if (c.text === undefined) {
+                if (fs.existsSync(abs)) { await git(['rm', '--quiet', '-r', '--', c.path], dir); }
+                continue;
+            }
             fs.mkdirSync(path.dirname(abs), { recursive: true });
             const crlf = fs.existsSync(abs) && /\r\n/.test(fs.readFileSync(abs, 'utf8'));
-            fs.writeFileSync(abs, crlf ? f.text.replace(/\n/g, '\r\n') : f.text, 'utf8');
-            await git(['add', '--', f.srcRel], dir);
+            fs.writeFileSync(abs, crlf ? c.text.replace(/\r?\n/g, '\r\n') : c.text, 'utf8');
+            await git(['add', '--', c.path], dir);
         }
         const st = await git(['status', '--porcelain'], dir);
         if (!st.stdout.trim()) { throw new Error('Nothing to publish: the template already has this content.'); }
@@ -140,13 +164,18 @@ export async function executePublish(plan: PublishPlan, opts: {
         const commit = (await git(['rev-parse', 'HEAD'], dir)).stdout.trim();
 
         if (opts.delivery === 'direct') {
-            log(`Pushing to ${spec.url} (${spec.ref})…`);
-            const p = await tryPush(dir, 'origin', `HEAD:refs/heads/${spec.ref}`);
-            if (!p.ok) { throw new Error(`Push to ${spec.ref} was rejected. Try "Pull request" instead.\n${p.err}`); }
-            return { commit, branch: spec.ref, pushedTo: spec.url };
+            log(`Pushing to ${spec.url} (${base})…`);
+            const p = await tryPush(dir, 'origin', `HEAD:refs/heads/${base}`);
+            if (!p.ok) { throw new Error(`Push to ${base} was rejected. Try "Pull request" instead.\n${p.err}`); }
+            if (opts.tag) {
+                log(`Tagging ${opts.tag}…`);
+                const t = await tryPush(dir, 'origin', `HEAD:refs/tags/${opts.tag}`);
+                if (!t.ok) { throw new Error(`Committed, but the tag ${opts.tag} was rejected.\n${t.err}`); }
+            }
+            return { commit, branch: base, pushedTo: spec.url, ...(opts.tag ? { tag: opts.tag } : {}) };
         }
 
-        const name = (plan.newName ?? plan.componentId.replace(/^[a-z]+:/, '')).replace(/[^A-Za-z0-9._-]+/g, '-');
+        const name = opts.branchName.replace(/[^A-Za-z0-9._-]+/g, '-');
         const branch = `bc-alm/${name}-${timestamp()}`;
         const slug = githubSlug(spec.url);
         log(`Pushing branch ${branch}…`);
@@ -182,20 +211,50 @@ export async function executePublish(plan: PublishPlan, opts: {
             forked = true;
         }
 
-        const result: PublishResult = { commit, branch, pushedTo: forked ? 'fork' : spec.url, forked };
+        const result: PublishResult = { commit, branch, base, pushedTo: forked ? 'fork' : spec.url, forked };
         if (slug) {
-            result.compareUrl = `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(spec.ref)}...${encodeURIComponent(headRef)}?expand=1`;
+            result.compareUrl = `https://github.com/${slug.owner}/${slug.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(headRef)}?expand=1`;
             if (await commandExists('gh')) {
-                const pr = await run('gh', ['pr', 'create', '--repo', `${slug.owner}/${slug.repo}`, '--base', spec.ref, '--head', headRef,
+                const pr = await run('gh', ['pr', 'create', '--repo', `${slug.owner}/${slug.repo}`, '--base', base, '--head', headRef,
                     '--title', opts.message, '--body', opts.body ?? 'Published from the BC ALM VS Code extension.'], { cwd: dir, allowFailure: true });
                 const url = /https:\/\/\S+\/pull\/\d+/.exec(pr.stdout + pr.stderr)?.[0];
                 if (url) { result.prUrl = url; } else { log(`gh pr create failed: ${pr.stderr.trim()}`); }
+                if (url && opts.reviewers?.length) {
+                    const me = (await ghLogin().catch(() => '')).toLowerCase();
+                    const who = opts.reviewers.filter(r => r.toLowerCase() !== me);
+                    if (who.length) {
+                        const r = await run('gh', ['pr', 'edit', url, '--add-reviewer', who.join(',')], { cwd: dir, allowFailure: true });
+                        log(r.code === 0 ? `Requested review from ${who.join(', ')}.` : `Could not request reviewers (${who.join(', ')}): ${r.stderr.trim()}`);
+                    }
+                }
             }
         }
         return result;
     } finally {
         safeRemove(dir, log);
     }
+}
+
+/** Commit the plan into the target template and deliver it directly or as a pull request (forking when needed). */
+export async function executePublish(plan: PublishPlan, opts: {
+    workRoot: string;
+    delivery: DeliveryMode;
+    message: string;
+    body?: string;
+    /** Extra repository changes in the same commit (version bump, changelog, removal from another template). */
+    extra?: RepoChange[];
+    reviewers?: string[];
+    log?: (line: string) => void;
+}): Promise<PublishResult> {
+    const changes: RepoChange[] = [...plan.files.map(f => ({ path: plan.repo.writePath(f.srcRel), text: f.text })), ...(opts.extra ?? [])];
+    return deliverChanges(plan.repo, changes, { ...opts, branchName: plan.newName ?? plan.componentId.replace(/^[a-z]+:/, '') });
+}
+
+/** Push an existing commit of the template's mirror as a tag (releasing a version that was merged via pull request). */
+export async function pushTag(repo: TemplateRepo, sha: string, tag: string): Promise<void> {
+    const r = await git(['--git-dir', repo.gitDir, 'push', '--quiet', repo.spec.url, `${sha}:refs/tags/${tag}`], undefined, { allowFailure: true });
+    if (r.code !== 0) { throw new Error(`Could not push tag ${tag} to ${repo.spec.url}. Releasing needs push access.\n${r.stderr.trim()}`); }
+    await repo.ensure(0);
 }
 
 export type CreateTemplateHow = 'fork' | 'duplicate' | 'template';
