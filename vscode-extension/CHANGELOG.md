@@ -6,6 +6,12 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+### Security
+
+- Release downloads are now signed. Each GitHub release includes a Sigstore build-provenance
+  bundle (`*.vsix.sigstore.json`); verify a VSIX with
+  `gh attestation verify <file> --repo AlexanderErdelyi/bc-alm-template`.
+
 ## [0.4.5] - 2026-10-15
 
 ### Added

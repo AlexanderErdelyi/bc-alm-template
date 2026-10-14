@@ -33,8 +33,7 @@ jobs:
         working-directory: vscode-extension
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Version guard (tag must match package.json)
         id: version
         env:
@@ -59,7 +58,7 @@ jobs:
           echo "Version $PKG_VERSION (pre-release: $PRERELEASE)"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -98,7 +97,7 @@ jobs:
           printf '\n---\nInstall from the Extensions view (search "BC ALM"), or download the .vsix below and use **Extensions → … → Install from VSIX**.\n' >> release-notes.md
 
       - name: Upload VSIX
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bc-alm-vsix
           path: |
@@ -111,11 +110,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Sigstore-signed build provenance for the VSIX (verifiable with `gh attestation verify`).
+      id-token: write
+      attestations: write
     steps:
       - name: Download VSIX
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bc-alm-vsix
+
+      - name: Name VSIX for release
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: mv bc-alm.vsix "bc-alm-${VERSION}.vsix"
+
+      # The marketplace job publishes these exact bytes, so the attestation also covers the Marketplace build.
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: bc-alm-${{ needs.build.outputs.version }}.vsix
 
       - name: Create release
         env:
@@ -123,11 +137,13 @@ jobs:
           TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.build.outputs.version }}
           PRERELEASE: ${{ needs.build.outputs.prerelease }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          mv bc-alm.vsix "bc-alm-${VERSION}.vsix"
+          cp "$BUNDLE" "bc-alm-${VERSION}.vsix.sigstore.json"
+          printf '\n**Verify this download:** `gh attestation verify bc-alm-%s.vsix --repo %s`\n' "$VERSION" "${{ github.repository }}" >> release-notes.md
           FLAGS=()
           [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
-          gh release create "$TAG" "bc-alm-${VERSION}.vsix" \
+          gh release create "$TAG" "bc-alm-${VERSION}.vsix" "bc-alm-${VERSION}.vsix.sigstore.json" \
             --repo "${{ github.repository }}" \
             --title "BC ALM VS Code extension ${VERSION}$([ "$PRERELEASE" = "true" ] && echo ' (pre-release)')" \
             --notes-file release-notes.md \
@@ -148,10 +164,9 @@ jobs:
         working-directory: vscode-extension
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -162,7 +177,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Download the tested VSIX
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: bc-alm-vsix
           path: vscode-extension/dist
