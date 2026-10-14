@@ -21,7 +21,7 @@ export interface Catalog {
     /** Identity of the template (manifest block or repository name). */
     manifest: TemplateManifest;
     /** Set when the template extends another template of its repository. */
-    variant?: { base: string; overridden: Set<string>; removed: Set<string> };
+    variant?: { base: string; overridden: Set<string>; removed: Set<string>; baseChanged: Set<string> };
 }
 
 /** Everything a template source would manage in this project at a given commit. */
@@ -33,7 +33,7 @@ export async function buildCatalog(repo: TemplateRepo, sha: string, project: Pro
     let variant: Catalog['variant'];
     if (manifest.extends) {
         const layout = await repo.layout(sha);
-        variant = { base: manifest.extends, overridden: layout.overridden, removed: layout.removed };
+        variant = { base: manifest.extends, overridden: layout.overridden, removed: layout.removed, baseChanged: await repo.baseChanged(sha).catch(() => new Set<string>()) };
     }
     const from = tplCfg?.values ?? project.values;
     const blobs = await repo.readFiles(sha, managed);

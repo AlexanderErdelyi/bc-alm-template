@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { CATALOG_DIR, LATEST_REF, templateVersionTags, VersionTag } from './catalogAuthoring';
 import { catFileBatch, git } from './exec';
 import { parseConfig, ProjectConfig, slugId, TemplateManifest, templateIdFromUrl } from './config';
 import { componentOf } from './paths';
@@ -24,8 +25,7 @@ export interface CommitInfo {
     subject: string;
 }
 
-/** Folder of a catalog repository that holds additional templates (one sub-folder per template id). */
-export const CATALOG_DIR = '.templates';
+export { CATALOG_DIR };
 
 /** A template found in a repository: the root template or a `.templates/<id>/` folder. */
 export interface TemplateEntry {
@@ -115,6 +115,23 @@ export class GitMirror {
     async hasCommit(sha: string): Promise<boolean> {
         const r = await git(['--git-dir', this.gitDir, 'cat-file', '-e', `${sha}^{commit}`], undefined, { allowFailure: true });
         return r.code === 0;
+    }
+
+    private async refs(prefix: string): Promise<string[]> {
+        const r = await git(['--git-dir', this.gitDir, 'for-each-ref', '--format=%(refname)', prefix], undefined, { allowFailure: true });
+        return r.code === 0 ? r.stdout.split('\n').map(s => s.trim()).filter(Boolean).map(s => s.slice(prefix.length + 1)) : [];
+    }
+
+    /** Tag names of the mirror. */
+    tags(): Promise<string[]> { return this.refs('refs/tags'); }
+
+    /** Branch names of the mirror. */
+    branches(): Promise<string[]> { return this.refs('refs/heads'); }
+
+    /** The repository's default branch (HEAD of the mirror). */
+    async defaultBranch(): Promise<string> {
+        const r = await git(['--git-dir', this.gitDir, 'symbolic-ref', '--short', 'HEAD'], undefined, { allowFailure: true });
+        return r.code === 0 && r.stdout.trim() ? r.stdout.trim() : 'main';
     }
 
     async isAncestor(a: string, b: string): Promise<boolean> {
@@ -294,7 +311,62 @@ export class TemplateRepo {
 
     isCached(): boolean { return this.mirror.isCached(); }
     ensure(maxAgeMs = 0): Promise<void> { return this.mirror.ensure(maxAgeMs); }
-    resolve(ref: string = this.spec.ref): Promise<string> { return this.mirror.resolve(ref); }
+
+    /** Commit of `ref` (default: the source's ref). "latest" is the newest released version of this template. */
+    async resolve(ref: string = this.spec.ref): Promise<string> {
+        if (ref === LATEST_REF) {
+            const v = (await this.versions())[0];
+            if (!v) { throw new Error(`${this.label} follows "latest", but the template has no released versions yet (tags "${await this.templateId()}/v<version>").`); }
+            return this.mirror.resolve(`refs/tags/${v.tag}`);
+        }
+        return this.mirror.resolve(ref);
+    }
+
+    /** The template id without a commit: the folder name of a catalog template, or the root manifest id at the default branch. */
+    async templateId(): Promise<string> {
+        if (this.root) { return slugId(path.posix.basename(this.root)); }
+        const head = await this.mirror.resolve('HEAD').catch(() => undefined);
+        const cfg = head ? await this.ownConfig(head) : undefined;
+        return cfg?.template?.id ?? templateIdFromUrl(this.spec.url);
+    }
+
+    /** Released versions of this template (tags `<id>/v<semver>`), newest first. */
+    async versions(): Promise<VersionTag[]> {
+        return templateVersionTags(await this.mirror.tags(), await this.templateId());
+    }
+
+    /** Branch that publishing writes to: the followed branch, or the default branch when the source is pinned to a tag or "latest". */
+    async branchForWrites(): Promise<string> {
+        const ref = this.spec.ref;
+        if (ref !== LATEST_REF && (await this.mirror.branches()).includes(ref)) { return ref; }
+        return this.mirror.defaultBranch();
+    }
+
+    /** The template this variant directly extends (same repository), or undefined for a plain template. */
+    async baseRepo(sha: string): Promise<TemplateRepo | undefined> {
+        const layers = (await this.layout(sha)).layers;
+        if (layers.length < 2) { return undefined; }
+        const base = layers[layers.length - 2];
+        return new TemplateRepo({ name: base.config?.template?.name ?? base.id, url: this.spec.url, ref: this.spec.ref, ...(base.path ? { path: base.path } : {}) }, this.mirror);
+    }
+
+    /** Overridden components whose base files changed after the variant last changed its copy ("base changed"). */
+    async baseChanged(sha: string): Promise<Set<string>> {
+        const out = new Set<string>();
+        const layout = await this.layout(sha);
+        const base = await this.baseRepo(sha);
+        if (!base || !layout.overridden.size) { return out; }
+        const baseLayout = await base.layout(sha);
+        for (const id of layout.overridden) {
+            const own = [...layout.files.entries()].filter(([rel]) => componentOf(rel).id === id).map(([, p]) => p);
+            const theirs = [...baseLayout.files.entries()].filter(([rel]) => componentOf(rel).id === id).map(([, p]) => p);
+            if (!own.length || !theirs.length) { continue; }
+            const [mine] = await this.mirror.log(sha, own, 1);
+            const [other] = await this.mirror.log(sha, theirs, 1);
+            if (mine && other && mine.sha !== other.sha && await this.mirror.isAncestor(mine.sha, other.sha)) { out.add(id); }
+        }
+        return out;
+    }
     hasCommit(sha: string): Promise<boolean> { return this.mirror.hasCommit(sha); }
     isAncestor(a: string, b: string): Promise<boolean> { return this.mirror.isAncestor(a, b); }
     listTemplates(sha: string): Promise<TemplateListing> { return this.mirror.listTemplates(sha); }
