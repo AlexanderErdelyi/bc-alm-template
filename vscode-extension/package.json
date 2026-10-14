@@ -2,9 +2,20 @@
   "name": "bc-alm",
   "displayName": "BC ALM — Business Central Copilot Template Manager",
   "description": "Create Business Central projects from the BC ALM template, keep agents/skills/prompts/instructions up to date without losing your own changes, enable or disable components, and publish your customizations to your own template or upstream.",
-  "version": "0.4.0",
-  "publisher": "alexandererdelyi",
+  "version": "0.4.1",
+  "publisher": "AlexanderErdelyi",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "preview": true,
+  "pricing": "Free",
+  "galleryBanner": {
+    "color": "#0B3D5C",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/AlexanderErdelyi/bc-alm-template/tree/main/vscode-extension#readme",
+  "bugs": {
+    "url": "https://github.com/AlexanderErdelyi/bc-alm-template/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/AlexanderErdelyi/bc-alm-template.git",
@@ -13,6 +24,19 @@
   "engines": {
     "vscode": "^1.95.0"
   },
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "BC ALM runs git, the GitHub CLI and the template's PowerShell scripts, and reads executable paths from settings, so it only runs in trusted workspaces."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "BC ALM needs the project on a local or remote file system to run git and PowerShell."
+    }
+  },
   "categories": [
     "Other",
     "AI",
@@ -20,12 +44,20 @@
   ],
   "keywords": [
     "business central",
+    "dynamics 365",
+    "d365",
+    "bc",
     "al",
     "copilot",
+    "github copilot",
     "agents",
+    "custom agents",
     "skills",
+    "prompts",
+    "instructions",
     "alm",
-    "template"
+    "template",
+    "spec-driven development"
   ],
   "activationEvents": [
     "workspaceContains:template.config.json",
