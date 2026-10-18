@@ -1,6 +1,6 @@
 ---
 name: bc-spec-author
-description: "Authors the Business Central spec folder (index, brief, plan, acceptance-criteria, change-log) under its module/functional area so a developer can implement without guessing. Use when: create a spec, write the spec folder, draft brief and plan, prepare a feature for development, spec out an AL change, technical specification for BC."
+description: "Authors the Business Central spec folder (index, brief, plan, acceptance-criteria, change-log, optional customer-facing estimation) under its module/functional area so a developer can implement without guessing. Use when: create a spec, write the spec folder, draft brief and plan, prepare a feature for development, spec out an AL change, technical specification for BC, estimate a story, effort in hours, quote work packages."
 ---
 
 # BC · Author a Spec
@@ -23,6 +23,7 @@ specs/
         ├── brief.md               # business request, value, scope (non-technical)
         ├── plan.md                # technical approach + AL objects + task breakdown (for the developer)
         ├── acceptance-criteria.md # Given/When/Then, testable
+        ├── estimation.md          # optional: customer-facing work packages + hours (on request)
         └── change-log.md          # version history of the spec itself
 ```
 
@@ -52,7 +53,7 @@ and `change-log.md`, and the technical detail moves down into numbered task sub-
 - Example: `specs/Finance/us-2117-country-division-bank-data/`.
 
 > ⚠️ **Never put the app/ticket prefix in a spec path.** The folder is `us-2117-…`, **not**
-> `NOB-2117-…` / `ABC-2117-…`. The prefix belongs **only** to git branches (`feature/NOB-2117-…`) and
+> `ABC-2117-…`. The prefix belongs **only** to git branches (`feature/ABC-2117-…`) and
 > functional-doc folders — never to `specs/`. If you find yourself typing the prefix into a spec
 > folder name, stop.
 
@@ -92,7 +93,7 @@ depth regardless of type. Agents use this to locate a ticket's spec.
 `brief.md` should be able to jump to `plan.md` without going back through `index.md`. Start each
 document (immediately under its H1 title) with a one-line nav bar that links its siblings and bolds
 the current file:
-- **Story docs:** `**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)` (the story `index.md` also adds `· [↑ Area](../index.md)`; a broken-down story swaps Plan/Acceptance for `[Roadmap](roadmap.md)`).
+- **Story docs:** `**Story:** [Index](index.md) · [Brief](brief.md) · [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md)` (the story `index.md` also adds `· [↑ Area](../index.md)`; a broken-down story swaps Plan/Acceptance for `[Roadmap](roadmap.md)`; when the story has an estimate, add `· [Estimation](estimation.md)` before Change Log).
 - **Task docs:** `**Task NN:** [Plan](plan.md) · [Acceptance](acceptance-criteria.md) · [Change Log](change-log.md) · [↑ Story](../index.md)`.
 - **Area docs:** `**Area:** [Index](index.md) · [Roadmap](roadmap.md)`.
 
@@ -107,7 +108,9 @@ be read by any developer. The one exception: you may keep a *verbatim* customer 
 **Customer Request** section in the customer's own language (e.g. German) when that customer is
 non-English-speaking — but add an English summary alongside it. Everything else (business value,
 open questions, plan, acceptance criteria, change log) is English. Summarise any foreign-language
-source material (tickets, call notes) into English rather than copying it wholesale.
+source material (tickets, call notes) into English rather than copying it wholesale. The optional
+`estimation.md` is the other exception — it is customer-facing and written in the customer's
+language (see step 5b).
 
 **Spec depth — full vs lightweight.** Decide up front (ask the user if unclear) how detailed the
 `plan.md` needs to be:
@@ -213,6 +216,15 @@ Seed with v1.0:
 | 1.0 | YYYY-MM-DD | <you> | Initial spec created | <requestor> |
 ```
 
+### 5b — `estimation.md` (optional, on request)
+When the user or customer asks for an **estimate / effort / hours / quote**, add a customer-facing
+`estimation.md` next to `plan.md`: plan tasks grouped into work packages with 🟥 Must / 🟨 Should /
+🟩 Could priority and hours, rolled up into options **A Basic / B Recommended / C Complete**, plus an
+appendix mapping every plan task to objects and acceptance criteria. Follow
+**[references/estimation.md](references/estimation.md)** — it covers realistic hours for
+AI-assisted development, target budgets, language, and the template. Record the customer's chosen
+option in the document; `bc-dev` builds only that scope.
+
 ### 6 — `index.md` (story overview)
 A short navigation page: status (Draft / Spec review / In development / In test / Done), a link to
 the work item, one-paragraph overview, links to the sibling documents, and an optional diagram.
@@ -247,6 +259,7 @@ brief, and acceptance criteria are still required.)*
 - [ ] Every document written in English (a verbatim customer quote may stay in their language, with an English summary).
 - [ ] Minimum BC version stated in `plan.md`.
 - [ ] Permission sets noted if new objects are created.
+- [ ] If an estimate was requested: `estimation.md` lists every plan task exactly once in its appendix, Must packages cover every AC, options A/B/C add up, and it is linked from the nav bars and `index.md`.
 
 If critical info is missing, output a numbered "⚠️ Missing information" list and stop.
 

@@ -641,12 +641,15 @@ function Restore-Models {
         if (-not $name -or $name -eq '_readme') { continue }
         $prop = $config.models.PSObject.Properties[$name]
         if (-not $prop) { continue }
-        $model = [string]$prop.Value
+        $model = $prop.Value
+        $modelYaml = if ($model -is [array]) {
+            if ($model.Count -eq 1) { '"{0}"' -f $model[0] } else { '[' + (($model | ForEach-Object { '"{0}"' -f $_ }) -join ', ') + ']' }
+        } else { '"{0}"' -f $model }
         $aText = Read-Text $e.Stage
-        $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', ('model: "{0}"' -f $model))
+        $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', { param($m) "model: $modelYaml" })
         if ($newText -ne $aText) {
             Write-Text $e.Stage $newText
-            Write-Verbose ("model      {0,-16} -> {1}" -f $name, $model)
+            Write-Verbose ("model      {0,-16} -> {1}" -f $name, $modelYaml)
         }
     }
 }

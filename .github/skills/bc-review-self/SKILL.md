@@ -54,7 +54,7 @@ STOP (nothing to review). If it is very large (> ~5 000 lines) → warn and offe
 | 8 | **DataClassification** | Every new field has `DataClassification` | 🟡 Major |
 | 9 | **Legacy C/AL casing** | grep uppercase `^\s*(SETRANGE\|FINDSET\|MODIFY\|INSERT)\b` → should be PascalCase | 🟡 Major |
 | 10 | **Enums vs Option / magic values** | New choices use enums (`Extensible = true` unless closed); no literal IDs/country codes | 🟡 Major |
-| 11 | **`app.json` version bump** | Bumped correctly for the change type (fix/feature/breaking) | 🟡 Major |
+| 11 | **`app.json` version bump** | Bumped correctly for the change type (fix/feature/breaking). With `versioning: pipeline`: **unchanged** (a manual bump is the finding) | 🟡 Major |
 | 12 | **Tests present** | Test codeunit in `test/` covering the acceptance criteria | 🟡 Major |
 | 13 | **Permission set** | Updated for every new/changed object | 🟡 Major |
 | 14 | **Translation drift** | If `.al` changed but no `.xlf` in `Translations/` changed → *report* (do not auto-fix) | 🟡 Major |

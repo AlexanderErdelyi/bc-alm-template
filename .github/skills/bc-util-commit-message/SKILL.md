@@ -68,6 +68,23 @@ refactor: #12360 - (Mail): extract DMS error handling to a helper
 docs: #12354 - update release process documentation
 ```
 
+## Pull request titles
+
+PR titles use the **same format** (`feat: #2117 - Country-division footer data in a configurable
+table`). Squash merges turn the PR title into the commit subject on the target branch, so a
+non-conventional title would break the history and the changelog generation. See
+[`bc-ship-pull-request`](../bc-ship-pull-request/SKILL.md).
+
+## Work-item link syntax
+
+- `#123` in the subject is the human-readable ticket reference used by this convention.
+- **Azure DevOps Boards + GitHub repo:** add `AB#123` in the commit body or PR description — the
+  Azure Boards app turns it into a link on the work item (`Fixes AB#123` also transitions it on merge
+  to the default branch).
+- **Azure Repos:** link the work item in the PR's **Work items** field (or `#123` mentions in commits
+  when the project setting is enabled).
+- **GitHub Issues:** `#123` links directly; `Closes #123` closes the issue on merge to the default branch.
+
 ## Multiple work items
 
 ```

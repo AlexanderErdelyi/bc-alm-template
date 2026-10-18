@@ -31,12 +31,13 @@ Business Central** AL development. It combines:
 - **AL code** must follow [AL coding standards](instructions/al-coding-standards.instructions.md):
   PascalCase object names with the app prefix, no hardcoded text or IDs, extension tables
   for new fields, event subscribers over base modifications, permission sets for every
-  object, and `app.json` version bumps in the same PR.
+  object, and `app.json` version bumps in the same PR (unless `template.config.json` `versioning` is `pipeline`).
 - **App prefix** is `ABC` and the **object ID range** is `50100–50199` in the sample app.
   Replace both with your team's assigned prefix and range (see the "Customizing this
   template" section of the README).
 - **Branching**: feature branches are cut from `main` as `feature/<id>-<short-name>`;
-  release branches are composed selectively. See [docs/branching-strategy.md](../docs/branching-strategy.md).
+  release branches are composed selectively. See [docs/branching-strategy.md](../docs/branching-strategy.md),
+  which also documents the optional `environment-promotion` model (`template.config.json` `branchingStrategy`).
 - **Specs come first**: do not implement AL objects until the spec folder exists and is
   reviewed. The `bc-dev` agent reads `plan.md` and `acceptance-criteria.md`.
 

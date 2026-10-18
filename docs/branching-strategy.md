@@ -15,6 +15,10 @@ Instead, this strategy is based on:
 - Release branches composed selectively from specific feature merges
 - `main` is always production-ready
 
+> This is the **default** model (`template.config.json` → `values.branchingStrategy` =
+> `feature-release-selective`). Projects that run one long-lived branch per BC environment can opt into
+> the [environment-promotion alternative](#alternative-environment-promotion) instead.
+
 ---
 
 ## Why Not Git Flow?
@@ -212,6 +216,115 @@ Feature is done. Prefer shipping independent stories as separate feature branche
 
 ---
 
+## Alternative: environment-promotion
+
+> **Optional alternative.** Enable it with `template.config.json` → `values.branchingStrategy` =
+> `environment-promotion`. The default stays `feature-release-selective` (everything above). The
+> agents (`bc-pr`, `bc-deploy`, `bc-workflow`) read the setting and switch their procedure.
+
+One **long-lived branch per BC environment**, and the **same feature branch** is promoted through
+them by successive pull requests. It keeps selective deployment — every feature travels on its own
+branch and only reaches an environment through its own PR — while giving each environment a branch
+that always reflects what is deployed there.
+
+| Branch | Environment (example) | Deployed on |
+|---|---|---|
+| `develop` | DEV — internal QA | merge of a PR into `develop` |
+| `release/UAT` | TEST / UAT — customer acceptance | merge of a PR into `release/UAT` |
+| `main` (`values.defaultBranch`) | PROD | merge of a PR into `main` |
+
+Environment and branch names are **configurable**: environment names come from
+`values.environments` (e.g. `["DEV", "TEST", "PROD"]`), the production branch from
+`values.defaultBranch`. Record the branch → environment mapping in your pipeline (see the
+`bc-cicd-pipeline` skill) and keep it in sync with this table.
+
+```mermaid
+flowchart LR
+    P[(main = PROD)] -->|"cut from main"| F[feature/ABC-123-payment-tolerance]
+    F -->|"PR 1: into develop (minimal)"| D[(develop = DEV)]
+    F -->|"PR 2: into release/UAT (functional)"| U[(release/UAT = TEST/UAT)]
+    F -->|"PR 3: into main (technical, squash)"| P
+    P -.->|"back-merge after PROD"| U
+    P -.->|"back-merge after PROD"| D
+```
+
+### PR sequence
+
+1. **Cut** `feature/ABC-{ID}-short-name` from `main` (as in the default model).
+2. **PR → `develop`** — merges and deploys to DEV for internal QA.
+3. **PR → `release/UAT`** — the **same** feature branch, after DEV QA passed; deploys to TEST/UAT
+   for customer acceptance.
+4. **PR → `main`** — the **same** feature branch, after customer sign-off and functional docs;
+   **squash merge**; deploys to PROD.
+5. **Back-merge** `main` into `release/UAT` and `develop` (see below), then delete the feature branch.
+
+Each target gets a different PR description depth — Tier A minimal for `develop`, Tier B functional
+(what to test) for `release/UAT`, Tier C technical for `main`. See *PR description tiers* in the
+`bc-ship-pull-request` skill. Work-item states move with the PRs (Azure DevOps or GitHub Issues).
+
+### Rules
+
+- **Never merge `develop` or `release/UAT` into a feature branch.** It would drag unapproved work
+  from other features into the PR to `main`. A feature branch only ever receives `main`
+  (`git merge origin/main` when it needs a newer baseline).
+- **Never promote branch-to-branch** (no PR `develop` → `release/UAT` or `release/UAT` → `main`).
+  Only feature, bugfix and hotfix branches are PR'd into environment branches.
+- **Conflicts with an environment branch** (e.g. `develop` contains another feature touching the
+  same object): resolve them on a throw-away helper branch, never on the feature branch:
+  ```bash
+  git switch -c merge/ABC-123-into-develop feature/ABC-123-payment-tolerance
+  git merge origin/develop          # resolve conflicts here
+  git push -u origin merge/ABC-123-into-develop   # PR this helper into develop, then delete it
+  ```
+- **Protect all environment branches** (PR required, build check required), not only `main`.
+- **Versioning:** several branches build in parallel, so a hand-bumped `app.json` version conflicts
+  constantly. Pair this model with pipeline-managed versioning (`values.versioning` = `pipeline`,
+  see `.github/skills/bc-cicd-pipeline/references/versioning.md`).
+
+### Back-merge after every PROD release
+
+`main` is squash-merged, so its history differs from the environment branches. Realign them right
+after each PROD merge (and after each hotfix):
+
+```bash
+git fetch origin
+git switch release/UAT
+git merge origin/main      # fast-forwards when possible, otherwise creates a merge commit
+git push origin release/UAT
+git switch develop
+git merge origin/main
+git push origin develop
+```
+
+A merge commit is expected when the branch holds features not yet in PROD.
+Push the back-merge directly or via an auto-approved PR, depending on your branch protection.
+If `develop` accumulates abandoned features, re-create it from `main` (agree on it with the team
+first — it rewrites a shared branch) and re-PR the still-active feature branches.
+
+### Hotfix flow
+
+1. Cut `hotfix/ABC-{ID}-short-name` from `main`.
+2. Optional: PR it into `release/UAT` first when the fix must be verified on TEST/UAT.
+3. PR it into `main` (squash), deploy to PROD.
+4. Back-merge `main` into `release/UAT` and `develop` as above.
+
+With pipeline-managed versioning, a hand-deployed emergency `.app` can use a revision between two
+pipeline slots (e.g. `.11`) without colliding with the next pipeline build.
+
+### When to choose which
+
+| Choose **feature-release-selective** (default) when… | Choose **environment-promotion** when… |
+|---|---|
+| Releases ship in planned waves of selected features | Features go live individually, as soon as each is approved |
+| One shared TEST environment per wave is enough | You run a permanent DEV and a permanent TEST/UAT environment that must always match a branch |
+| You want the fewest long-lived branches | Your pipeline deploys per branch (push to `develop` → DEV, `release/UAT` → TEST, `main` → PROD) |
+| Versions are bumped by hand in each PR | The pipeline computes versions (`values.versioning` = `pipeline`) |
+
+Cost of the alternative: three PRs per feature, mandatory back-merges, and discipline around the
+"never merge environment branches into a feature" rule.
+
+---
+
 ## Branch Protection Rules for `main`
 
 Configure these in GitHub → Settings → Branches → Branch protection rules for `main`:
@@ -234,7 +347,9 @@ Configure these in GitHub → Settings → Branches → Branch protection rules 
 
 - AL-Go's default workflow triggers on PR to `main` — aligns with our PR-to-main model
 - AL-Go build pipelines can be triggered on `release/*` branches for TEST deployments
-- The `app.json` version bump requirement aligns with AL-Go's version management
+- The `app.json` version bump requirement aligns with AL-Go's version management (with
+  `values.versioning` = `pipeline` the build computes the version instead — see the
+  `bc-cicd-pipeline` skill's `references/versioning.md`)
 - AL-Go's branch naming conventions (`release/` prefix) are directly compatible
 
 When using AL-Go, configure `AL-Go-Settings.json` to point deployments to the correct BC environments based on branch:
@@ -250,6 +365,9 @@ When using AL-Go, configure `AL-Go-Settings.json` to point deployments to the co
 ---
 
 ## Summary
+
+Default model (`feature-release-selective`); for the optional alternative see
+[environment-promotion](#alternative-environment-promotion).
 
 | Decision | Choice | Reason |
 |---|---|---|

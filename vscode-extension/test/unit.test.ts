@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { parseConfig } from '../src/core/config';
+import { modelKey, parseConfig } from '../src/core/config';
 import { parseFeed } from '../src/core/changelog';
 import { parseFrontmatter, setFrontmatterScalar } from '../src/core/frontmatter';
 import { componentOf, implicitlyKeptLocal, isManaged, resolveDest, srcFromDest } from '../src/core/paths';
 import { githubSlug, renamePath } from '../src/core/publish';
 import { aggregateStatus, FileState } from '../src/core/status';
-import { addTools, generalize, reparameterize, transformTemplateFile, trimAzureDevOpsTools } from '../src/core/transform';
+import { addTools, applyModel, generalize, reparameterize, transformTemplateFile, trimAzureDevOpsTools } from '../src/core/transform';
 import { hashText, normalizeText, sameUrl } from '../src/core/util';
 import { validateFile } from '../src/core/validator';
 
@@ -75,6 +75,17 @@ test('transformTemplateFile applies models, trims ADO tools and merges extra too
     const out = transformTemplateFile('.github/agents/bc-dev.agent.md', raw, { from: tplValues as any, project: p });
     assert.match(out, /^model: "Claude Sonnet 4"$/m);
     assert.match(out, /^tools: \['read', 'edit', 'al\/\*', 'my\/tool'\]$/m);
+});
+
+test('model fallback lists are parsed from config and written as a YAML array', () => {
+    const p = parseConfig({ models: { _readme: 'x', 'bc-dev': ['Claude Sonnet 5.5', 'Claude Sonnet 5'], 'bc-pr': 'Claude Opus 5.5', 'bc-doc': [] } });
+    assert.deepEqual(p.models['bc-dev'], ['Claude Sonnet 5.5', 'Claude Sonnet 5']);
+    assert.equal(p.models['bc-pr'], 'Claude Opus 5.5');
+    assert.equal(p.models['bc-doc'], undefined);
+    assert.equal(applyModel('model: "X"', p.models['bc-dev']), 'model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]');
+    assert.equal(applyModel('model: ["A", "B"]', 'Claude Opus 5.5'), 'model: "Claude Opus 5.5"');
+    assert.equal(modelKey('A'), modelKey(['A']));
+    assert.notEqual(modelKey(['A', 'B']), modelKey(['B', 'A']));
 });
 
 test('addTools is idempotent and trimAzureDevOpsTools handles every position', () => {

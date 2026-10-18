@@ -34,6 +34,7 @@
         "-DefaultBranch", "${input:defaultBranch}",
         "-BranchingStrategy", "${input:branchingStrategy}",
         "-CommitConvention", "${input:commitConvention}",
+        "-Versioning", "${input:versioning}",
         "-Environments", "${input:environments}",
         "-CleanupTemplateFiles:${input:cleanupTemplateFiles}",
         "-Prune:${input:pruneContent}"
@@ -67,6 +68,7 @@
         "-DefaultBranch", "${input:defaultBranch}",
         "-BranchingStrategy", "${input:branchingStrategy}",
         "-CommitConvention", "${input:commitConvention}",
+        "-Versioning", "${input:versioning}",
         "-Environments", "${input:environments}",
         "-CleanupTemplateFiles:${input:cleanupTemplateFiles}",
         "-Prune:${input:pruneContent}",
@@ -102,88 +104,95 @@
     {
       "id": "appPrefix",
       "type": "promptString",
-      "description": "1/14  App / object prefix (2-4 chars). Appears in every AL object name, identifier and file name.",
+      "description": "1/15  App / object prefix (2-4 chars). Appears in every AL object name, identifier and file name.",
       "default": "ABC"
     },
     {
       "id": "ticketPrefix",
       "type": "promptString",
-      "description": "2/14  Ticket prefix (used in PREFIX-123 references and branch names). Often same as the app prefix.",
+      "description": "2/15  Ticket prefix (used in PREFIX-123 references and branch names). Often same as the app prefix.",
       "default": "ABC"
     },
     {
       "id": "appName",
       "type": "promptString",
-      "description": "3/14  App display name (app.json 'name').",
+      "description": "3/15  App display name (app.json 'name').",
       "default": "ABC Payment Tolerance"
     },
     {
       "id": "publisher",
       "type": "promptString",
-      "description": "4/14  Publisher / company name (app.json 'publisher').",
+      "description": "4/15  Publisher / company name (app.json 'publisher').",
       "default": "ABC"
     },
     {
       "id": "objectIdFrom",
       "type": "promptString",
-      "description": "5/14  AL object ID range - FROM (lower bound of your assigned range). Sample IDs are shifted into this range.",
+      "description": "5/15  AL object ID range - FROM (lower bound of your assigned range). Sample IDs are shifted into this range.",
       "default": "50100"
     },
     {
       "id": "objectIdTo",
       "type": "promptString",
-      "description": "6/14  AL object ID range - TO (upper bound of your assigned range).",
+      "description": "6/15  AL object ID range - TO (upper bound of your assigned range).",
       "default": "50199"
     },
     {
       "id": "repoSlug",
       "type": "promptString",
-      "description": "7/14  GitHub repository slug (owner/repo).",
+      "description": "7/15  GitHub repository slug (owner/repo).",
       "default": "owner/repo"
     },
     {
       "id": "adoOrg",
       "type": "promptString",
-      "description": "8/14  Azure DevOps organization name (used by .vscode/mcp.json and docs). Leave default if you only use GitHub.",
+      "description": "8/15  Azure DevOps organization name (used by .vscode/mcp.json and docs). Leave default if you only use GitHub.",
       "default": "your-organization"
     },
     {
       "id": "adoProject",
       "type": "promptString",
-      "description": "9/14  Azure DevOps project name (optional - leave blank if not used).",
+      "description": "9/15  Azure DevOps project name (optional - leave blank if not used).",
       "default": ""
     },
     {
       "id": "workItemSystem",
       "type": "pickString",
-      "description": "10/14  Work-item system. 'GitHub' converts ADO 'AB#123' commit links to '#123'.",
+      "description": "10/15  Work-item system. 'GitHub' converts ADO 'AB#123' commit links to '#123'.",
       "options": ["ADO", "GitHub"],
       "default": "ADO"
     },
     {
       "id": "defaultBranch",
       "type": "promptString",
-      "description": "11/14  Default (production) branch name.",
+      "description": "11/15  Default (production) branch name.",
       "default": "main"
     },
     {
       "id": "branchingStrategy",
       "type": "pickString",
-      "description": "12/14  Branching strategy (see docs/branching-strategy.md).",
-      "options": ["feature-release-selective", "github-flow", "gitflow", "trunk"],
+      "description": "12/15  Branching strategy (see docs/branching-strategy.md).",
+      "options": ["feature-release-selective", "environment-promotion", "github-flow", "gitflow", "trunk"],
       "default": "feature-release-selective"
     },
     {
       "id": "commitConvention",
       "type": "pickString",
-      "description": "13/14  Commit message convention.",
+      "description": "13/15  Commit message convention.",
       "options": ["conventional", "freeform"],
       "default": "conventional"
     },
     {
+      "id": "versioning",
+      "type": "pickString",
+      "description": "14/15  app.json versioning: 'manual' = bumped in each PR, 'pipeline' = computed by the build (agents leave app.json alone).",
+      "options": ["manual", "pipeline"],
+      "default": "manual"
+    },
+    {
       "id": "environments",
       "type": "promptString",
-      "description": "14/14  Deployment environments, comma-separated, in promotion order.",
+      "description": "15/15  Deployment environments, comma-separated, in promotion order.",
       "default": "TEST,PROD"
     },
     {

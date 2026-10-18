@@ -34,12 +34,13 @@ into one prompt.
 | 7 | **Work-item system** | `workItemSystem` | `ADO` | `ADO` -> keep `AB#` commit linking. `GitHub` -> convert to `#`. |
 | 8 | Azure DevOps **org** / **project** | `adoOrg` / `adoProject` | `your-organization` / — | Skip / leave blank if using GitHub Issues only. |
 | 9 | Default (production) **branch** | `defaultBranch` | `main` | |
-| 10 | **Branching strategy** | `branchingStrategy` | `feature-release-selective` | The model in `docs/branching-strategy.md`. Keep the default unless the team uses something else. |
+| 10 | **Branching strategy** | `branchingStrategy` | `feature-release-selective` | The model in `docs/branching-strategy.md`. `environment-promotion` = long-lived DEV → UAT → PROD branches, the same feature branch promoted by PR to each (PR tiers A/B/C). Keep the default unless the team works that way. |
 | 11 | **Commit convention** | `commitConvention` | `conventional` | e.g. Conventional Commits, or a custom `PREFIX-123: ...` style. |
 | 12 | **Environments** | `environments` | `TEST,PROD` | Ordered deployment targets. |
-| 13 | **Agent models** (optional) | `models.*` | Sonnet 4.6 / Opus 4.8 | Per-agent model. Keep the defaults or set names from the user's Copilot picker in `template.config.json` `models`. The script writes them into each agent's `model:` line. |
+| 13 | **Agent models** (optional) | `models.*` | Sonnet 5.5 → Sonnet 5 / Opus 5.5 → Sonnet 5.5 | Per-agent model: one name or a prioritized fallback list. Keep the defaults or set names from the user's Copilot picker in `template.config.json` `models`. The script writes them into each agent's `model:` line. |
 | 14 | **BCQuality** (optional) | `bcQuality.mode` | `off` | Add Microsoft's [BCQuality](https://github.com/microsoft/BCQuality) knowledge base to back AL review. `vendor` (tracked copy) / `submodule` / `off`. If on, run `scripts/Add-BCQuality.ps1` after the initializer. See [`docs/bcquality.md`](../../../docs/bcquality.md). |
 | 15 | **Target BC version** (optional) | `bcVersion.*` | v28 / runtime 16.0 | Target Business Central release. Set `application`/`platform`/`runtime` in `template.config.json` `bcVersion`; the script writes them into both `app/app.json` and `test/app.json`. |
+| 16 | **app.json versioning** (optional) | `versioning` | `manual` | `manual` = each PR bumps `app.json` (agents do it). `pipeline` = the build computes `Major.Minor.Build.Revision` from branch + tags and agents never touch the version (see `bc-cicd-pipeline/references/versioning.md`); keep `app.json` at `<Major>.<Minor>.0.0`. Parameter `-Versioning`. |
 
 ## Confirm, then apply
 
@@ -91,7 +92,7 @@ regenerated so Copilot's always-on context describes the **adopter's actual app*
 3. **Target version** — the initializer sets `app.json` `platform`/`application`/`runtime` from
    `template.config.json` `bcVersion` (default v28 / runtime 16.0). Edit that block to retarget,
    then re-download matching symbols (see [`docs/al-agent-tools.md`](../../../docs/al-agent-tools.md)).
-4. **Models** — defaults are Sonnet 4.6 for most agents and Opus 4.8 for `bc-spec` / `bc-pr`. To
+4. **Models** — defaults are the fallback lists Sonnet 5.5 → Sonnet 5 for most agents and Opus 5.5 → Sonnet 5.5 for `bc-spec` / `bc-pr`. To
    change them, edit the `models` map in `template.config.json` and re-run the initializer (it
    rewrites each agent's `model:` line). Each name must match your Copilot model picker exactly.
 5. **Extensions** — accept VS Code's prompt to install the recommended AL extensions

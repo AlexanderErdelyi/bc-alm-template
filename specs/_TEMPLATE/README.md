@@ -26,6 +26,10 @@ Find a spec by ID with the recursive glob `specs/**/*-{ID}-*/`.
 └── change-log.md          # spec version history
 ```
 
+Optional in either shape: a story-level **`estimation.md`** — customer-facing work packages, hours
+and A/B/C scope options, added when an estimate is requested (see `bc-spec-author`
+`references/estimation.md`). It is the one spec document written in the customer's language.
+
 **Broken into tasks** (large / multi-part story) — the story keeps the shared docs and the technical
 detail moves into numbered task sub-folders:
 

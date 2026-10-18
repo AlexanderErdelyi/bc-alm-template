@@ -1,7 +1,7 @@
 ---
 description: "BC Orchestrator - detects your current workflow stage from a ticket ID and routes you to the right agent. Use when: where am I in the workflow, what should I do next for ABC-123, route this ticket, which BC agent do I need, start a BC task, orchestrate the BC pipeline, run the full delivery pipeline."
-model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'web/githubRepo', 'web/fetch', 'agent/runSubagent', 'github/*', 'azure-devops/*']
+model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]
+tools: ['search/codebase', 'search/textSearch', 'read/readFile', 'vscode/askQuestions', 'web/githubRepo', 'web/fetch', 'agent/runSubagent', 'github/*', 'azure-devops/*']
 agents: ['bc-pm', 'bc-plan', 'bc-spec', 'bc-dev', 'bc-pr', 'bc-deploy', 'bc-doc']
 handoffs:
   - label: "TRIAGE · Intake & triage the ticket"
@@ -15,7 +15,7 @@ handoffs:
     prompt: "The orchestrator detected the SPEC phase for this ticket. Take over: create or complete the story folder under its area (specs/<Area>/<type>-{ID}-*/ with index, brief, plan, acceptance-criteria, change-log) following the bc-spec-author skill, then have the user open a spec PR."
   - label: "BUILD · Implement the feature"
     agent: "bc-dev"
-    prompt: "The orchestrator detected the BUILD phase. Take over: read the spec, confirm the working branch (reuse the branch you're already on if its name contains the ticket ID — only create one from main if there is none), implement the AL objects following the bc-build-feature skill and the al-coding-standards instructions, bump app.json, and add tests."
+    prompt: "The orchestrator detected the BUILD phase. Take over: read the spec, confirm the working branch (reuse the branch you're already on if its name contains the ticket ID — only create one from main if there is none), implement the AL objects following the bc-build-feature skill and the al-coding-standards instructions, bump app.json (unless template.config.json versioning is pipeline), and add tests."
   - label: "SHIP · Prepare the pull request"
     agent: "bc-pr"
     prompt: "The orchestrator detected the SHIP phase. Take over: run bc-review-self, then compose the PR description and quality checklist following the bc-ship-pull-request skill and link the ADO work item."
@@ -98,6 +98,14 @@ If open PR found:
 
 ### Step 6 — Check release branch inclusion
 Look for a `release/*` branch that includes commits from this feature.
+
+> **Environment promotion.** If `template.config.json` `values.branchingStrategy` is
+> `environment-promotion`, the same feature branch is promoted by PR into each environment branch
+> (see [`docs/branching-strategy.md`](../../docs/branching-strategy.md)). Read the stage from which
+> environment branches already contain the feature: none → **bc-pr** for the DEV PR (Tier A); DEV only →
+> **bc-pr** for the UAT PR (Tier B); UAT → after approval, **bc-doc** then **bc-pr** for the PROD PR
+> (Tier C); PROD → **bc-deploy** for the back-merge and deployment. Requests like "promote to UAT" or
+> "back-merge" route the same way.
 
 - **PR merged, not in any release branch** → Stage: **MERGED, NOT IN TEST**
   - Action: "Feature is merged to main. Use the **bc-deploy agent** to compose a release branch that includes ABC-{ID}."

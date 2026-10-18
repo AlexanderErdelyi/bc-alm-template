@@ -24,10 +24,11 @@ procedure lives in one place.
 | PLAN | [`bc-breakdown-feature`](bc-breakdown-feature/SKILL.md) | Break a Feature/Epic into child stories + one estimate carrier each (ADO Task, or GitHub sub-issue/Project field) | `bc-plan` |
 | SPEC | [`bc-spec-author`](bc-spec-author/SKILL.md) | Author the 4-document spec folder | `bc-spec` |
 | BUILD | [`bc-build-feature`](bc-build-feature/SKILL.md) | Implement AL objects to spec, standards, version bump, tests | `bc-dev` |
+| BUILD | [`bc-interactive-test`](bc-interactive-test/SKILL.md) | Browser test of a published feature against a `launch.json` environment (manual ACs) | `bc-dev` / `bc-doc` |
 | REVIEW | [`bc-review-self`](bc-review-self/SKILL.md) | Pre-PR self-review against the BC quality gate | `bc-dev` / `bc-pr` |
 | SHIP | [`bc-ship-pull-request`](bc-ship-pull-request/SKILL.md) | Compose the PR description + checklist + ADO link | `bc-pr` |
 | SHIP | [`bc-ship-release`](bc-ship-release/SKILL.md) | Compose a release branch and guide TEST/PROD deployment | `bc-deploy` |
-| DOCS | [`bc-docs-feature`](bc-docs-feature/SKILL.md) | Generate customer-facing functional docs + changelog | `bc-doc` |
+| DOCS | [`bc-docs-feature`](bc-docs-feature/SKILL.md) | Feature docs + changelog (PROD gate), area/module doc sets, docs drift/coverage checks, optional Wiki.js publishing | `bc-doc` |
 | CI/CD | [`bc-cicd-pipeline`](bc-cicd-pipeline/SKILL.md) | Author/maintain GitHub Actions & AL-Go for GitHub pipelines | `bc-workflow` |
 | UTIL | [`bc-util-commit-message`](bc-util-commit-message/SKILL.md) | Conventional commits with ADO work-item linking | any |
 | SETUP | [`bc-init-template`](bc-init-template/SKILL.md) | One-time guided setup: replace prefix/range/org across the repo | `bc-init` |
@@ -41,7 +42,15 @@ See [`../WHEN-TO-USE.md`](../WHEN-TO-USE.md) for a decision map and
 - **Object prefix & range:** replace the sample `ABC` prefix and `50100–50199` range with
   your own assigned values (see [`app/app.json`](../../app/app.json)).
 - **Coding standards:** all AL work follows
-  [`../instructions/al-coding-standards.instructions.md`](../instructions/al-coding-standards.instructions.md).
+  [`../instructions/al-coding-standards.instructions.md`](../instructions/al-coding-standards.instructions.md);
+  test codeunits also follow [`../instructions/al-test-standards.instructions.md`](../instructions/al-test-standards.instructions.md),
+  and spec folders [`../instructions/spec-workflow.instructions.md`](../instructions/spec-workflow.instructions.md).
+- **Progressive disclosure:** `SKILL.md` stays a short router; long procedures, templates and
+  helper scripts live in the skill's `references/` folder and are read only when a step needs them
+  (e.g. `bc-spec-author/references/estimation.md`, `bc-cicd-pipeline/references/versioning.md`,
+  `bc-docs-feature/references/`).
+- **Config-driven behaviour:** skills read `template.config.json` `values` (`workItemSystem`,
+  `branchingStrategy`, `versioning`, `commitConvention`) instead of assuming one way of working.
 
 ## Adapting these skills
 

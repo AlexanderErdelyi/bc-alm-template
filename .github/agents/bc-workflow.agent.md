@@ -1,7 +1,7 @@
 ---
 description: "BC Workflow Engineer - authors and maintains CI/CD pipelines for Business Central (GitHub Actions and AL-Go for GitHub). Use when: set up CI/CD, create a GitHub Actions workflow, configure AL-Go for GitHub, add a build/test/publish pipeline, fix a failing workflow, add a deployment environment, automate AL compile and test, set up the .AL-Go settings."
-model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'edit/editFiles', 'execute/runInTerminal', 'execute/runTask', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'github/*']
+model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]
+tools: ['search/codebase', 'search/textSearch', 'read/readFile', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'execute/runInTerminal', 'execute/runTask', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'github/*']
 handoffs:
   - label: "SHIP · Hand the pipeline to deploy"
     agent: "bc-deploy"
@@ -63,4 +63,12 @@ Ask the user which path they want before scaffolding, and respect any choice alr
 - Never commit secrets or PATs — always reference GitHub secrets and list the ones the user must add.
 - Pin third-party actions to a version/SHA; don't use floating `@main` for production pipelines.
 - Keep object ID ranges, prefix, and environment names in sync with `template.config.json`.
+- Respect the optional modes in `template.config.json` → `values` (see *Mode awareness* in the skill):
+  - `branchingStrategy: environment-promotion` — trigger builds/deployments per environment branch
+    (e.g. `develop` → DEV, `release/UAT` → TEST/UAT, production branch → PROD; names from
+    `values.environments` / `values.defaultBranch`) and run the CI build on PRs into each of them.
+  - `versioning: pipeline` — add the version step from
+    [`references/versioning.md`](../skills/bc-cicd-pipeline/references/versioning.md) (script
+    `Get-BranchVersion.ps1`, tags fetched, version tag pushed after a successful deployable build);
+    never add a "version was bumped" PR check in this mode.
 - When the pipeline is ready, hand off to **bc-deploy** for the actual release/deploy run.

@@ -68,6 +68,8 @@ param(
     [string] $DefaultBranch,
     [string] $BranchingStrategy,
     [string] $CommitConvention,
+    [ValidateSet('manual', 'pipeline')]
+    [string] $Versioning,
     [string[]] $Environments,
     # Project-specific tool IDs kept in every agent/prompt 'tools:' list across template
     # syncs (persisted to values.extraTools.all). Additive; e.g. -ExtraTools 'bc-code-intel/*','prism/*'.
@@ -356,8 +358,10 @@ if (-not $RepoSlug)         { $RepoSlug         = $cur.repoSlug }
 if (-not $AdoOrg)           { $AdoOrg           = Read-Value 'Azure DevOps organization (the {org} in dev.azure.com/{org})' $cur.adoOrg }
 if (-not $AdoProject)       { $AdoProject       = Read-Value 'Azure DevOps project (optional)'     $cur.adoProject }
 if (-not $DefaultBranch)    { $DefaultBranch    = Read-Value 'Default (production) branch'         $cur.defaultBranch }
-if (-not $BranchingStrategy){ $BranchingStrategy= Read-Value 'Branching strategy id (feature-release-selective | gitflow | github-flow | trunk)' $cur.branchingStrategy }
+if (-not $BranchingStrategy){ $BranchingStrategy= Read-Value 'Branching strategy id (feature-release-selective | environment-promotion | gitflow | github-flow | trunk)' $cur.branchingStrategy }
 if (-not $CommitConvention) { $CommitConvention = Read-Value 'Commit convention (conventional | none)' $cur.commitConvention }
+if (-not $Versioning)       { $Versioning       = Read-Value 'app.json versioning (manual = bumped in each PR | pipeline = computed by the build)' $(if ($cur.PSObject.Properties['versioning'] -and $cur.versioning) { $cur.versioning } else { 'manual' }) }
+if ($Versioning -notin 'manual', 'pipeline') { throw "Versioning must be 'manual' or 'pipeline' (got '$Versioning')." }
 if (-not $Environments)     { $Environments     = (Read-Value 'Environments, comma separated (BC environment/deploy targets; use e.g. DEV,TEST,PROD or a single onprem name)' ($cur.environments -join ',')) -split '\s*,\s*' }
 
 # Normalize Environments so a single comma-joined value (e.g. "TEST,PROD" passed by a VS Code
@@ -605,14 +609,17 @@ if (-not $SkipModels -and $config.models) {
         if ($prop.Name -eq '_readme') { continue }
         $agentPath = Join-Path $agentsDir ("{0}.agent.md" -f $prop.Name)
         if (-not (Test-Path $agentPath)) { continue }
-        $model = [string]$prop.Value
+        $model = $prop.Value
+        $modelYaml = if ($model -is [array]) {
+            if ($model.Count -eq 1) { '"{0}"' -f $model[0] } else { '[' + (($model | ForEach-Object { '"{0}"' -f $_ }) -join ', ') + ']' }
+        } else { '"{0}"' -f $model }
         $aText = Get-Content $agentPath -Raw
-        $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', ('model: "{0}"' -f $model))
+        $newText = [regex]::Replace($aText, '(?m)^model:\s*.*$', { param($m) "model: $modelYaml" })
         if ($newText -ne $aText) {
-            if ($PSCmdlet.ShouldProcess($agentPath, "Set model to $model")) {
+            if ($PSCmdlet.ShouldProcess($agentPath, "Set model to $modelYaml")) {
                 Set-Content -Path $agentPath -Value $newText -NoNewline
             }
-            Write-Host ("  model {0,-16} -> {1}" -f $prop.Name, $model)
+            Write-Host ("  model {0,-16} -> {1}" -f $prop.Name, $modelYaml)
         }
     }
 }
@@ -703,6 +710,7 @@ $config.values.workItemSystem   = $WorkItemSystem
 $config.values.defaultBranch    = $DefaultBranch
 $config.values.branchingStrategy= $BranchingStrategy
 $config.values.commitConvention = $CommitConvention
+$config.values | Add-Member -NotePropertyName versioning -NotePropertyValue $Versioning -Force
 $config.values.environments     = $Environments
 # Persist extra tools (preserving any per-agent/per-prompt maps) so syncs re-apply them.
 $etAgents  = if ($cur.PSObject.Properties['extraTools'] -and $cur.extraTools.PSObject.Properties['agents'])  { $cur.extraTools.agents }  else { [pscustomobject]@{} }
@@ -762,6 +770,7 @@ $projectMd = @"
 | Default (production) branch | ``$DefaultBranch`` |
 | Branching strategy | $BranchingStrategy (see [docs/branching-strategy.md]($pmDocs)) |
 | Commit convention | $CommitConvention |
+| app.json versioning | $Versioning |
 | Environments | $envChain |
 
 ## Work-item linking

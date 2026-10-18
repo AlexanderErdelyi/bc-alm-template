@@ -83,9 +83,27 @@ export interface ProjectConfig {
     values: TemplateValues;
     sync: SyncConfig;
     extraTools: ExtraTools;
-    models: Record<string, string>;
+    /** Agent name -> model name, or a prioritized fallback list of model names. */
+    models: Record<string, ModelSpec>;
     /** The "template" identity block, when this config belongs to a template repository. */
     template?: TemplateManifest;
+}
+
+/** A single model name, or a prioritized list (the first available model is used). */
+export type ModelSpec = string | string[];
+
+/** The YAML value written after `model:` — `"A"` or `["A", "B"]`. */
+export function formatModel(model: ModelSpec): string {
+    const q = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    if (Array.isArray(model)) { return model.length === 1 ? q(model[0]) : `[${model.map(q).join(', ')}]`; }
+    return q(model);
+}
+
+/** Comparable form of a model value as parsed from frontmatter or config. */
+export function modelKey(model: unknown): string | undefined {
+    if (typeof model === 'string') { return model ? JSON.stringify([model]) : undefined; }
+    if (Array.isArray(model)) { const l = model.map(x => String(x)).filter(x => x); return l.length ? JSON.stringify(l) : undefined; }
+    return undefined;
 }
 
 export const CONFIG_FILE = 'template.config.json';
@@ -176,11 +194,15 @@ export function parseConfig(raw: any): ProjectConfig {
         agents: (et.agents && typeof et.agents === 'object') ? et.agents : {},
         prompts: (et.prompts && typeof et.prompts === 'object') ? et.prompts : {}
     };
-    const models: Record<string, string> = {};
+    const models: Record<string, ModelSpec> = {};
     if (raw && raw.models && typeof raw.models === 'object') {
         for (const [k, val] of Object.entries(raw.models)) {
-            if (k.startsWith('_') || typeof val !== 'string') { continue; }
-            models[k] = val;
+            if (k.startsWith('_')) { continue; }
+            if (typeof val === 'string' && val) { models[k] = val; continue; }
+            if (Array.isArray(val)) {
+                const list = asStringArray(val);
+                if (list.length) { models[k] = list; }
+            }
         }
     }
     const values: TemplateValues = {

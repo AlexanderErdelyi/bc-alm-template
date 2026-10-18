@@ -318,6 +318,10 @@ Format: `major.minor.build.revision`
 
 Always bump `app.json` version in the same PR as the code change. Never ship a PR without a version bump.
 
+> **Exception — pipeline versioning.** When `template.config.json` `values.versioning` is `pipeline`,
+> the build computes the version per branch and **nobody edits `app.json` `version`** in a PR (keep it
+> at `<Major>.<Minor>.0.0`; see `bc-cicd-pipeline/references/versioning.md`).
+
 ---
 
 ## Permission Sets

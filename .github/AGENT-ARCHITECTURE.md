@@ -11,7 +11,7 @@ you want to understand *why* it is structured the way it is before adapting it.
    DOCS. The agent set maps onto those phases.
 3. **Coordinator + workers.** One orchestrator (`bc-orchestrator`) detects the current phase and
    hands off to the worker that owns it.
-4. **Portable & durable.** Each agent pins a single `model:` managed centrally in
+4. **Portable & durable.** Each agent pins a `model:` (one name or a fallback list) managed centrally in
    [`template.config.json`](../template.config.json), and tool lists stay generic, so the system
    works in a fresh repo with minimal edits. A guided initializer (`bc-init` /
    `scripts/Initialize-Template.ps1`) handles the project-specific placeholders **and** rewrites
@@ -21,7 +21,7 @@ you want to understand *why* it is structured the way it is before adapting it.
 
 | Layer | Location | Responsibility |
 |---|---|---|
-| **Instructions** | [`instructions/`](instructions) | Always-on coding standards (`applyTo` globs). |
+| **Instructions** | [`instructions/`](instructions) | Always-on standards by `applyTo` glob: AL coding, AL tests, spec folders. |
 | **Skills** | [`skills/`](skills) | Reusable, trigger-fired procedures (the "how"). |
 | **Prompts** | [`prompts/`](prompts) | Explicitly-invoked, parameterized tasks (`/onboard-app`, `/onboarding-plan`). |
 | **Agents** | [`agents/`](agents) | Personas with a tool profile + `handoffs:` (the "who"). |
@@ -32,16 +32,16 @@ you want to understand *why* it is structured the way it is before adapting it.
 
 | Agent | Phase(s) | Default model | Backing skill(s) |
 |---|---|---|---|
-| `bc-orchestrator` | all (router) | Claude Sonnet 4.6 | — |
-| `bc-pm` | TRIAGE | Claude Sonnet 4.6 | `bc-triage-backlog` |
-| `bc-plan` | PLAN | Claude Sonnet 4.6 | `bc-plan-user-story` |
-| `bc-spec` | SPEC | Claude Opus 4.8 | `bc-spec-author` |
-| `bc-dev` | BUILD, REVIEW | Claude Sonnet 4.6 | `bc-build-feature`, `bc-review-self` |
-| `bc-pr` | REVIEW, SHIP | Claude Opus 4.8 | `bc-review-self`, `bc-ship-pull-request` |
-| `bc-deploy` | SHIP | Claude Sonnet 4.6 | `bc-ship-release` |
-| `bc-doc` | DOCS | Claude Sonnet 4.6 | `bc-docs-feature` |
-| `bc-workflow` | CI/CD (utility) | Claude Sonnet 4.6 | `bc-cicd-pipeline` |
-| `bc-init` | setup (one-time utility) | Claude Sonnet 4.6 | `bc-init-template` |
+| `bc-orchestrator` | all (router) | Claude Sonnet 5.5 → Sonnet 5 | — |
+| `bc-pm` | TRIAGE | Claude Sonnet 5.5 → Sonnet 5 | `bc-triage-backlog` |
+| `bc-plan` | PLAN | Claude Sonnet 5.5 → Sonnet 5 | `bc-plan-user-story` |
+| `bc-spec` | SPEC | Claude Opus 5.5 → Sonnet 5.5 | `bc-spec-author` |
+| `bc-dev` | BUILD, REVIEW | Claude Sonnet 5.5 → Sonnet 5 | `bc-build-feature`, `bc-review-self` |
+| `bc-pr` | REVIEW, SHIP | Claude Opus 5.5 → Sonnet 5.5 | `bc-review-self`, `bc-ship-pull-request` |
+| `bc-deploy` | SHIP | Claude Sonnet 5.5 → Sonnet 5 | `bc-ship-release` |
+| `bc-doc` | DOCS | Claude Sonnet 5.5 → Sonnet 5 | `bc-docs-feature` |
+| `bc-workflow` | CI/CD (utility) | Claude Sonnet 5.5 → Sonnet 5 | `bc-cicd-pipeline` |
+| `bc-init` | setup (one-time utility) | Claude Sonnet 5.5 → Sonnet 5 | `bc-init-template` |
 
 > `bc-workflow` (CI/CD & AL-Go pipeline authoring) and `bc-init` (one-time setup) are **utility**
 > agents outside the TRIAGE → DOCS lifecycle. `bc-init` runs once, when a repo is first created
@@ -55,15 +55,19 @@ you want to understand *why* it is structured the way it is before adapting it.
 
 - **`description: "Use when: …"`** — every agent and skill front-loads trigger phrases so
   Copilot can discover them. Keep these when you edit.
-- **Single `model:` per agent, config-managed.** Each agent sets `model:` to one name matching
-  your Copilot model picker. The source of truth is the `models` map in
-  [`template.config.json`](../template.config.json); the initializer writes it into each agent.
-  Defaults: Sonnet 4.6 for most, Opus 4.8 for the deep-reasoning agents (`bc-spec`, `bc-pr`). If
-  VS Code flags a model as unknown, add the ` (copilot)` suffix.
+- **Model fallback lists, config-managed.** Each agent sets `model:` to one name or a prioritized
+  list (`model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]`) — VS Code uses the first model available
+  to the user, so a retired or disabled model doesn't break the agent. The source of truth is the
+  `models` map in [`template.config.json`](../template.config.json); the initializer writes it into
+  each agent. Defaults: Sonnet 5.5 → Sonnet 5 for most, Opus 5.5 → Sonnet 5.5 for the
+  deep-reasoning agents (`bc-spec`, `bc-pr`). Names must match your Copilot model picker; if VS Code
+  flags a model as unknown, add the ` (copilot)` suffix.
 - **Role-based, namespaced tool profiles.** Each agent lists a tool profile sized to its job,
   using namespaced built-in IDs (`search/codebase`, `search/textSearch`, `search/usages`,
-  `edit/editFiles`, `read/problems`, `execute/runInTerminal`, `execute/runTests`, `web/githubRepo`,
-  `web/fetch`, and `agent/runSubagent` for the orchestrator) plus two kinds of provider tools:
+  `edit/editFiles`, `read/readFile`, `read/problems`, `execute/runInTerminal`, `execute/runTests`,
+  `web/githubRepo`, `web/fetch`, `vscode/askQuestions` for structured questions, `agent/runSubagent`,
+  `todo`, and `browser/*` page tools on `bc-dev`/`bc-doc` for interactive testing) plus two kinds of
+  provider tools:
   - **MCP servers** via wildcard IDs from [`.vscode/mcp.json`](../.vscode/mcp.json):
     - `github/*` — on every agent that touches issues, PRs, or repo content.
     - `azure-devops/*` — on the work-item-facing agents (`bc-pm`, `bc-plan`, `bc-spec`, `bc-pr`,
@@ -71,15 +75,18 @@ you want to understand *why* it is structured the way it is before adapting it.
       the initializer (`-WorkItemSystem GitHub`) strips this group automatically.
     - `al/*` — on the AL-heavy agents. Live only once you enable the `al` MCP server (rename
       `_al` → `al` in `.vscode/mcp.json` after installing the AL Dev Tools).
+    - `microsoft.docs.mcp/*` — the public Microsoft Learn docs server, for current BC/AL
+      documentation lookups.
   - **VS Code extension language-model tools** — the AL agents reference the tools contributed by
     extensions in [`.vscode/extensions.json`](../.vscode/extensions.json), so they work in-editor
     with no extra server: `ms-dynamics-smb.al/al_build`, `al_downloadsymbols`, `al_symbolsearch`,
-    `al_get_diagnostics`, `al_publish` (the AL extension), `vjeko.vjeko-al-objid/ninjaNextId`
+    `al_get_diagnostics`, `al_symbolrelations`, `al_getnextobjectid`, `al_publish`, the debug tools
+    (the AL extension), `vjeko.vjeko-al-objid/ninjaNextId`
     (Object ID Ninja, for new object IDs), and `nabsolutions.nab-al-tools/*` (translation/XLF).
     These show as unavailable until the extension is installed, which is harmless.
 
   Trim or extend any profile per repo — the wildcard and `extensionId/tool` IDs are the seam for
-  your own tools.
+  your own tools (project-private MCP servers belong in the adopter's repo, not the template).
 - **Handoffs are human-in-the-loop.** A `handoffs:` entry is a labelled, one-click step to the
   next agent — the human stays in control of phase transitions.
 - **The orchestrator is read-only.** `bc-orchestrator` reads work-item/branch/PR state only to
