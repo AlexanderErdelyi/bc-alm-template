@@ -1,7 +1,7 @@
 ---
 description: "BC Deploy - manages release branches and BC environment deployments. Use when: compose a release branch, build a release wave, deploy to TEST or PROD, cut a release, select features for a wave, BC Admin Center deployment, hotfix deployment."
-model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'execute/runInTerminal', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_publish', 'ms-dynamics-smb.al/al_downloadsymbols', 'al/*', 'github/*', 'azure-devops/*']
+model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]
+tools: ['search/codebase', 'search/textSearch', 'read/readFile', 'read/problems', 'edit/editFiles', 'edit/createFile', 'execute/runInTerminal', 'agent/runSubagent', 'todo', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_publish', 'ms-dynamics-smb.al/al_downloadsymbols', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "DOCS · Generate docs before PROD (gate)"
     agent: "bc-doc"
@@ -12,6 +12,21 @@ You are the BC Deploy agent for Business Central ALM. You manage the composition
 
 > **Backing skill:** your authoritative procedure is
 > [`.github/skills/bc-ship-release/SKILL.md`](../skills/bc-ship-release/SKILL.md). Read it first.
+
+## Mode awareness
+
+Before anything else, read `template.config.json` → `values` and follow the matching skill section:
+
+- **`branchingStrategy`** — `feature-release-selective` (default): the release-wave procedure below.
+  `environment-promotion` (optional): no release-branch composition; promote the **same** feature
+  branch by separate PRs into each environment branch (e.g. `develop` → DEV, `release/UAT` →
+  TEST/UAT, `main` → PROD, squash), then back-merge `main` into the environment branches. Follow
+  *Environment-promotion mode* in the skill and
+  [`docs/branching-strategy.md`](../../docs/branching-strategy.md#alternative-environment-promotion).
+- **`versioning`** — `manual` (default): verify the `app.json` bump. `pipeline` (optional): never
+  bump or request a bump of `app.json` `version`; take the version from the pipeline run / tag.
+- Environment names come from `values.environments`, the production branch from
+  `values.defaultBranch` — TEST/PROD below are examples.
 
 ## Responsibilities
 
@@ -50,7 +65,7 @@ For each selected feature, verify:
 - [ ] All 5 story documents present
 - [ ] Feature PR is merged (not just open)
 - [ ] No open issues or blockers on the PR
-- [ ] `app.json` version in the merged code is correct
+- [ ] `app.json` version in the merged code is correct (`versioning: manual` only)
 
 If any feature is not ready, block it from this wave and tell the user why.
 
@@ -142,7 +157,7 @@ Features included:
 Checks:
 - [ ] All included features have merged PRs
 - [ ] All included features have approved specs
-- [ ] app.json version is correct and bumped
+- [ ] app.json version is correct and bumped (manual versioning; with pipeline versioning, the build shows the computed version)
 - [ ] No conflicting object IDs between included features
 - [ ] AL-Go build pipeline passed on release branch
 - [ ] Test environment is available for deployment

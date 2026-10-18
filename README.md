@@ -18,7 +18,7 @@ Combines spec-driven development, GitHub Copilot custom agents for every workflo
 | **Reusable skills** | [Copilot Agent Skills](.github/skills) — portable, trigger-fired procedures for each lifecycle phase (the "how" behind the agents) |
 | **Prompt files** | Invokable onboarding tasks — [`/onboard-app`, `/generate-copilot-instructions`, `/onboarding-plan`](.github/prompts) — for onboarding projects and people |
 | **Spec-driven development** | Structured spec folder per ticket: brief → plan → acceptance criteria → change log |
-| **Branching strategy** | Documented model: `feature/*` from `main`, `release/*` composed selectively |
+| **Branching strategy** | Documented model: `feature/*` from `main`, `release/*` composed selectively — or, opt-in, environment promotion (DEV → UAT → PROD branches) with pipeline-computed versions |
 | **AL coding standards** | Always-on Copilot instructions applied to every `.al` file |
 | **PR template** | BC-specific checklist: ADO link, affected objects table, quality gates |
 | **Architecture docs** | [`WHEN-TO-USE.md`](.github/WHEN-TO-USE.md) decision map + [`AGENT-ARCHITECTURE.md`](.github/AGENT-ARCHITECTURE.md) design record |
@@ -191,25 +191,28 @@ flowchart TD
 
 | Agent | Default model | What it does |
 |---|---|---|
-| **bc-orchestrator** | Claude Sonnet 4.6 | **Orchestrator.** Give it a ticket ID — it detects your current workflow stage and routes you to the right agent (via `handoffs:` and the `agent` tool). Start here. |
-| **bc-pm** | Claude Sonnet 4.6 | **Project Manager.** Ticket intake, triage, prioritization and backlog grooming (ADO/GitHub). Gets work ready to plan. |
-| **bc-plan** | Claude Sonnet 4.6 | **Planner.** Turns a triaged ticket into a crisp user story with testable acceptance criteria. |
-| **bc-spec** | Claude Opus 4.8 | **Spec Author.** Writes the developer-ready 4-document spec folder from the user story. |
-| **bc-dev** | Claude Sonnet 4.6 | **Developer.** AL implementation specialist. Reads the spec, guides object creation, enforces standards, generates test stubs. |
-| **bc-pr** | Claude Opus 4.8 | **Pull Request.** Self-reviews, generates the PR description, runs the AL quality checklist, links the work item. |
-| **bc-deploy** | Claude Sonnet 4.6 | **Deploy.** Manages release branches. Composes `release/wave-N` from selected features and guides TEST/PROD deployment. |
-| **bc-doc** | Claude Sonnet 4.6 | **Documentation.** Reads specs and code. Generates customer-facing functional docs and changelog. Required gate before PROD. |
-| **bc-workflow** | Claude Sonnet 4.6 | **Workflow Engineer (utility).** Authors and maintains CI/CD — GitHub Actions and AL-Go for GitHub pipelines. |
-| **bc-init** | Claude Sonnet 4.6 | **Template Initializer (utility).** One-time guided setup that adapts this template to your project. |
+| **bc-orchestrator** | Claude Sonnet 5.5 → Sonnet 5 | **Orchestrator.** Give it a ticket ID — it detects your current workflow stage and routes you to the right agent (via `handoffs:` and the `agent` tool). Start here. |
+| **bc-pm** | Claude Sonnet 5.5 → Sonnet 5 | **Project Manager.** Ticket intake, triage, prioritization and backlog grooming (ADO/GitHub). Gets work ready to plan. |
+| **bc-plan** | Claude Sonnet 5.5 → Sonnet 5 | **Planner.** Turns a triaged ticket into a crisp user story with testable acceptance criteria. |
+| **bc-spec** | Claude Opus 5.5 → Sonnet 5.5 | **Spec Author.** Writes the developer-ready 4-document spec folder from the user story. |
+| **bc-dev** | Claude Sonnet 5.5 → Sonnet 5 | **Developer.** AL implementation specialist. Reads the spec, guides object creation, enforces standards, generates test stubs. |
+| **bc-pr** | Claude Opus 5.5 → Sonnet 5.5 | **Pull Request.** Self-reviews, generates the PR description, runs the AL quality checklist, links the work item. |
+| **bc-deploy** | Claude Sonnet 5.5 → Sonnet 5 | **Deploy.** Manages release branches. Composes `release/wave-N` from selected features and guides TEST/PROD deployment. |
+| **bc-doc** | Claude Sonnet 5.5 → Sonnet 5 | **Documentation.** Reads specs and code. Generates customer-facing functional docs and changelog. Required gate before PROD. |
+| **bc-workflow** | Claude Sonnet 5.5 → Sonnet 5 | **Workflow Engineer (utility).** Authors and maintains CI/CD — GitHub Actions and AL-Go for GitHub pipelines. |
+| **bc-init** | Claude Sonnet 5.5 → Sonnet 5 | **Template Initializer (utility).** One-time guided setup that adapts this template to your project. |
 
 All agents live in [`.github/agents/`](.github/agents/).
 
-> **Note on models:** each agent sets a single `model:` that must match a name in your Copilot
-> model picker. They are managed centrally in [`template.config.json`](template.config.json) under
-> `models`. Defaults are **Claude Sonnet 4.6** for most agents and **Claude Opus 4.8** for the
-> deep-reasoning ones (`bc-spec`, `bc-pr`). To change them, edit `template.config.json` and re-run
-> the initializer (it rewrites each agent's `model:` line), or edit a `.agent.md` directly. If
-> VS Code flags a model as unknown, add the ` (copilot)` suffix (e.g. `Claude Sonnet 4.6 (copilot)`).
+> **Note on models:** each agent's `model:` is one name or a **prioritized fallback list**
+> (`model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]`) — VS Code uses the first model available to
+> you, so a retired or disabled model doesn't break the agent. Names must match your Copilot model
+> picker. They are managed centrally in [`template.config.json`](template.config.json) under
+> `models`. Defaults are **Claude Sonnet 5.5 → Sonnet 5** for most agents and **Claude Opus 5.5 →
+> Sonnet 5.5** for the deep-reasoning ones (`bc-spec`, `bc-pr`). To change them, edit
+> `template.config.json` and re-run the initializer (it rewrites each agent's `model:` line), or edit
+> a `.agent.md` directly. If VS Code flags a model as unknown, add the ` (copilot)` suffix
+> (e.g. `Claude Sonnet 5.5 (copilot)`).
 
 Each agent is a thin persona backed by a **skill** that holds the actual procedure, and
 declares **`handoffs:`** so you can step to the next phase in one click. `bc-workflow` and
@@ -231,10 +234,11 @@ for *how* each phase is done, so agents and skills never drift apart.
 | [`bc-plan-user-story`](.github/skills/bc-plan-user-story/SKILL.md) | PLAN | Ticket → user story + acceptance criteria |
 | [`bc-spec-author`](.github/skills/bc-spec-author/SKILL.md) | SPEC | Author the 4-document spec folder |
 | [`bc-build-feature`](.github/skills/bc-build-feature/SKILL.md) | BUILD | Implement AL objects to spec + standards + tests |
+| [`bc-interactive-test`](.github/skills/bc-interactive-test/SKILL.md) | BUILD | Browser test of a published feature against a `launch.json` environment |
 | [`bc-review-self`](.github/skills/bc-review-self/SKILL.md) | REVIEW | Pre-PR self-review against the AL quality gate |
 | [`bc-ship-pull-request`](.github/skills/bc-ship-pull-request/SKILL.md) | SHIP | Compose the PR description + checklist + ADO link |
 | [`bc-ship-release`](.github/skills/bc-ship-release/SKILL.md) | SHIP | Compose a release branch, deploy TEST/PROD |
-| [`bc-docs-feature`](.github/skills/bc-docs-feature/SKILL.md) | DOCS | Customer-facing functional docs + changelog |
+| [`bc-docs-feature`](.github/skills/bc-docs-feature/SKILL.md) | DOCS | Customer-facing functional docs + changelog; module doc sets, drift/coverage checks, optional Wiki.js publishing |
 | [`bc-cicd-pipeline`](.github/skills/bc-cicd-pipeline/SKILL.md) | CI/CD | Author/maintain GitHub Actions & AL-Go for GitHub pipelines |
 | [`bc-util-commit-message`](.github/skills/bc-util-commit-message/SKILL.md) | util | Conventional commits with ADO work-item linking |
 
@@ -824,17 +828,20 @@ bc-alm-template/
 │   │   ├── README.md
 │   │   ├── bc-triage-backlog/SKILL.md
 │   │   ├── bc-plan-user-story/SKILL.md
-│   │   ├── bc-spec-author/SKILL.md
+│   │   ├── bc-spec-author/SKILL.md         ← + references/estimation.md
 │   │   ├── bc-build-feature/SKILL.md       ← + references/al-patterns.md
+│   │   ├── bc-interactive-test/SKILL.md    ← Browser test via launch.json
 │   │   ├── bc-review-self/SKILL.md
 │   │   ├── bc-ship-pull-request/SKILL.md
 │   │   ├── bc-ship-release/SKILL.md
-│   │   ├── bc-docs-feature/SKILL.md
-│   │   ├── bc-cicd-pipeline/SKILL.md
+│   │   ├── bc-docs-feature/SKILL.md        ← + references/ (doc tracks, drift/coverage scripts)
+│   │   ├── bc-cicd-pipeline/SKILL.md       ← + references/versioning.md
 │   │   ├── bc-util-commit-message/SKILL.md
 │   │   └── bc-init-template/SKILL.md       ← Backs the bc-init setup agent
 │   ├── instructions/
-│   │   └── al-coding-standards.instructions.md
+│   │   ├── al-coding-standards.instructions.md
+│   │   ├── al-test-standards.instructions.md   ← Test codeunits
+│   │   └── spec-workflow.instructions.md       ← Spec folders
 │   ├── prompts/                            ← Invokable prompt files (/onboard-app, /onboarding-plan…)
 │   │   ├── README.md
 │   │   ├── onboard-app.prompt.md
@@ -871,7 +878,7 @@ The file [`.github/instructions/al-coding-standards.instructions.md`](.github/in
 - Extension tables for new fields on base objects
 - Event subscribers over direct modifications
 - `WITH (NoLocks)` for read-only queries
-- `app.json` versioning rules (major.minor.build.revision)
+- `app.json` versioning rules (major.minor.build.revision; bumped per PR unless `versioning` is `pipeline`)
 - Permission sets for every new object
 - GIVEN/WHEN/THEN test codeunit structure
 

@@ -1,7 +1,7 @@
 ---
 description: "BC Template Initializer - guided one-time setup that adapts this template to your project and grounds its Copilot instructions in your real app. Use when: initialize the template, set up this repo for my project, run guided setup, customize prefix and object range, replace the ABC placeholders, onboard a new BC repo, first-time template setup, generate project-specific copilot-instructions, my copilot-instructions still describe the template."
-model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'read/readFile', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'execute/runInTerminal', 'execute/runTask', 'web/fetch', 'web/githubRepo', 'al/*', 'github/*', 'azure-devops/*']
+model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]
+tools: ['search/codebase', 'search/textSearch', 'read/readFile', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'execute/runInTerminal', 'execute/runTask', 'vscode/askQuestions', 'web/fetch', 'web/githubRepo', 'al/*', 'github/*', 'azure-devops/*']
 ---
 
 You are the **BC Template Initializer**. You run a single, guided, one-time setup that turns this

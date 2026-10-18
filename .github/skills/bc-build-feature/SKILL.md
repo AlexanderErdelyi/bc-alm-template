@@ -39,10 +39,16 @@ Read the spec for the ticket:
 Search for existing objects you will extend. Then summarise: what to create, what to modify,
 in what order.
 
+**If the story has an `estimation.md`,** read its **Approved option** and the appendix
+(*plan task → work package → objects → ACs*). Build **only** the plan tasks of the approved option
+(A Basic = Must, B Recommended = + Should, C Complete = + Could); leave the others open and say so
+in your summary. If no option is recorded yet, ask the user which one was approved before building
+Should/Could packages.
+
 **Confirm the working branch — reuse before you create.** Run `git branch --show-current` first.
 **If you are already on a feature/bugfix/hotfix branch for this ticket, stay on it** — a branch
 "belongs to" the ticket if its name contains the ticket ID (e.g. `feature/2117-…`,
-`feature/NOB-2117-…`), regardless of prefix or exact wording. Do **not** create a second branch and
+`feature/ABC-2117-…`), regardless of prefix or exact wording. Do **not** create a second branch and
 do **not** rename the one you are on. Only create a branch when you are on `main` (or a branch for a
 different ticket): cut it from an up-to-date `main` following the repo's convention in
 [`docs/branching-strategy.md`](../../../docs/branching-strategy.md). When in doubt about whether the
@@ -80,13 +86,21 @@ spec author first.
 
 See `references/al-patterns.md` for copy-ready snippets.
 
-## 4 — Bump `app/app.json`
+## 4 — Bump `app/app.json` (only with manual versioning)
 
-| Change type | Bump | Example |
-|---|---|---|
-| Bug fix | build +1 | `1.2.3.0 → 1.2.4.0` |
-| New feature | minor +1, build reset | `1.2.3.0 → 1.3.0.0` |
-| Breaking change | major +1 | `1.2.3.0 → 2.0.0.0` |
+Check `values.versioning` in `template.config.json`:
+
+- **`manual`** (default) — bump the version in the same PR:
+
+  | Change type | Bump | Example |
+  |---|---|---|
+  | Bug fix | build +1 | `1.2.3.0 → 1.2.4.0` |
+  | New feature | minor +1, build reset | `1.2.3.0 → 1.3.0.0` |
+  | Breaking change | major +1 | `1.2.3.0 → 2.0.0.0` |
+
+- **`pipeline`** — the build computes and stamps the version per branch
+  (see `bc-cicd-pipeline` → `references/versioning.md`). **Do not touch `version` in `app.json`**;
+  a manual bump would collide with the pipeline's numbering.
 
 ## 5 — Tests & permissions
 - One **test codeunit** (`Subtype = Test;`) per new business-logic codeunit, added to the
@@ -102,6 +116,9 @@ After the objects are in, validate the **whole module**, not just the last file 
   assigned with AL Object ID Ninja" warning means an ID was hand-picked instead of reserved —
   fix it via `ninjaNextId` (release the wrong ID and retake if there's a collision), don't
   ignore it. Pre-existing warnings on code you didn't touch remain out of scope.
+- **Acceptance criteria that can't be automated** (page layout, dialogs, cross-company effects):
+  publish to a DEV/sandbox configuration and verify them in the browser with
+  **[`bc-interactive-test`](../bc-interactive-test/SKILL.md)** — never against production.
 - Update the spec status back into the folder, all committed together with the code:
   - `acceptance-criteria.md` — mark each criterion you verified (`Open → Pass`, or
     `Pass (manual — no test app)` when the repo has no separate test project).
@@ -143,7 +160,7 @@ internals), drop a **changelog fragment** so it can be assembled at release time
 - [ ] No hardcoded text (Labels) and no hardcoded IDs (enums/setup).
 - [ ] No base-table modifications.
 - [ ] Event subscribers used where applicable.
-- [ ] `app/app.json` version bumped per the table.
+- [ ] `app/app.json` version bumped per the table (`versioning: manual`) — or left untouched (`versioning: pipeline`).
 - [ ] Test codeunit in the `test/` project covers the acceptance criteria.
 - [ ] Permission set updated; `DataClassification` on all new fields.
 - [ ] All variables PascalCase; `#region`s not banners; `///` docs on public procedures;

@@ -1,7 +1,7 @@
 ---
 description: "BC Developer - AL implementation specialist. Use when: implement an AL feature, write AL code, build from a spec, create a tableextension/codeunit/page, add a field, bump app.json, generate a test codeunit, fix AL code."
-model: "Claude Sonnet 4.6"
-tools: ['search/codebase', 'search/textSearch', 'search/usages', 'edit/editFiles', 'edit/createFile', 'edit/rename', 'execute/runInTerminal', 'execute/runTests', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_downloadsymbols', 'ms-dynamics-smb.al/al_symbolsearch', 'ms-dynamics-smb.al/al_get_diagnostics', 'ms-dynamics-smb.al/al_publish', 'vjeko.vjeko-al-objid/ninjaNextId', 'vjeko.vjeko-al-objid/ninjaUnassignId', 'nabsolutions.nab-al-tools/refreshXlf', 'nabsolutions.nab-al-tools/getTextsToTranslate', 'al/*', 'github/*', 'azure-devops/*']
+model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]
+tools: ['search/codebase', 'search/textSearch', 'search/usages', 'search/listDirectory', 'read/readFile', 'read/viewImage', 'read/problems', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'edit/rename', 'execute/runInTerminal', 'execute/runTests', 'vscode/askQuestions', 'agent/runSubagent', 'todo', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_downloadsymbols', 'ms-dynamics-smb.al/al_symbolsearch', 'ms-dynamics-smb.al/al_symbolrelations', 'ms-dynamics-smb.al/al_get_diagnostics', 'ms-dynamics-smb.al/al_getnextobjectid', 'ms-dynamics-smb.al/al_publish', 'ms-dynamics-smb.al/al_debug', 'ms-dynamics-smb.al/al_setbreakpoint', 'ms-dynamics-smb.al/al_snapshotdebugging', 'vjeko.vjeko-al-objid/ninjaNextId', 'vjeko.vjeko-al-objid/ninjaUnassignId', 'nabsolutions.nab-al-tools/refreshXlf', 'nabsolutions.nab-al-tools/getTextsToTranslate', 'nabsolutions.nab-al-tools/getTranslatedTextsMap', 'nabsolutions.nab-al-tools/getTextsByKeyword', 'nabsolutions.nab-al-tools/getTranslatedTextsByState', 'nabsolutions.nab-al-tools/saveTranslatedTexts', 'nabsolutions.nab-al-tools/createLanguageXlf', 'nabsolutions.nab-al-tools/getGlossaryTerms', 'browser/openBrowserPage', 'browser/readPage', 'browser/clickElement', 'browser/runPlaywrightCode', 'browser/screenshotPage', 'microsoft.docs.mcp/*', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "REVIEW · Self-review before the PR"
     agent: "bc-pr"
@@ -38,15 +38,18 @@ When given a ticket ID or spec folder path:
 1. Read `specs/**/*-{ID}-*/plan.md` — understand the technical approach, task breakdown, and affected objects
 2. Read `specs/**/*-{ID}-*/acceptance-criteria.md` — understand what done looks like
 3. Read `specs/**/*-{ID}-*/brief.md` — understand the business context
-4. Check `app/app.json` — note current version, confirm object ID range
-5. Search for existing AL objects that will be extended or affected (use `#al_symbolsearch`
+4. Check `app/app.json` — note current version, confirm object ID range. Check `values.versioning`
+   in `template.config.json` (`manual` → you bump `app.json`; `pipeline` → never touch the version)
+5. If the spec has an `estimation.md`, build **only** the plan tasks of its **Approved option**
+   (see its appendix); ask which option was approved if none is recorded
+6. Search for existing AL objects that will be extended or affected (use `#al_symbolsearch`
    for base-app objects)
-6. **Confirm the working branch — reuse before you create.** Run `git branch --show-current`. If you
+7. **Confirm the working branch — reuse before you create.** Run `git branch --show-current`. If you
    are already on a branch for this ticket (its name contains the ticket ID, e.g. `feature/2117-…` —
    prefix or exact wording don't matter), **stay on it**; never create a second branch or rename it.
    Only create a branch (from an up-to-date `main`, per `docs/branching-strategy.md`) when there is
    none for this ticket. If unsure, ask rather than branch.
-7. Summarise: what needs to be created, what needs to be modified, and in what order
+8. Summarise: what needs to be created, what needs to be modified, and in what order
 
 ---
 
@@ -215,6 +218,10 @@ If you see a plan that says "modify table X" and X is a base BC table (no object
 
 ## app.json Version Management
 
+**Only when `values.versioning` is `manual` (default).** With `pipeline`, the build stamps the
+version per branch (see `bc-cicd-pipeline` → `references/versioning.md`) — leave `app.json`'s
+`version` alone and skip this section.
+
 Read `app/app.json` and check the current version. Apply these rules:
 
 | Change type | Version bump | Example |
@@ -269,6 +276,12 @@ Rules:
 - GIVEN/WHEN/THEN comment structure in every test procedure
 - Test both happy path and edge cases from `acceptance-criteria.md`
 - Test ID range: use your object ID range + 50 offset (e.g., objects at 50100-50110, tests at 50150-50160)
+- Full rules: `.github/instructions/al-test-standards.instructions.md` (one `[Test]` per acceptance criterion, no `Commit()`, helper codeunit)
+
+**Interactive verification.** For acceptance criteria that can't be automated (layout, dialogs,
+cross-company effects), publish to a DEV/sandbox launch configuration and verify them in the browser
+with the [`bc-interactive-test`](../skills/bc-interactive-test/SKILL.md) skill — never against
+production. Mark them `Pass (manual)` in `acceptance-criteria.md`.
 
 ---
 
@@ -303,7 +316,7 @@ Before telling the user to open a PR, verify:
 - [ ] No hardcoded IDs — enums or setup tables used
 - [ ] No base table modifications (extension tables used)
 - [ ] Event subscribers used where applicable
-- [ ] `app/app.json` version bumped correctly
+- [ ] `app/app.json` version bumped correctly (manual versioning only)
 - [ ] Test codeunit created in the `test/` project and covers acceptance criteria
 - [ ] Permission set updated for all new objects
 - [ ] `DataClassification` set on all new table fields

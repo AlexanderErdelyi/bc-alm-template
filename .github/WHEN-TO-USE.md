@@ -27,10 +27,13 @@ flowchart LR
 | Break a Feature/Epic into child stories + estimates | PLAN | **bc-plan** | [`bc-breakdown-feature`](skills/bc-breakdown-feature/SKILL.md) |
 | Write the full `specs/<Area>/<type>-<ID>-<slug>/` story folder | SPEC | **bc-spec** | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) |
 | Implement AL objects, bump `app.json`, add tests | BUILD | **bc-dev** | [`bc-build-feature`](skills/bc-build-feature/SKILL.md) |
+| Verify a published feature in the BC web client | BUILD | **bc-dev** | [`bc-interactive-test`](skills/bc-interactive-test/SKILL.md) |
+| Write a customer-facing estimate with scope options | SPEC | **bc-spec** | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) (`references/estimation.md`) |
 | Self-check the branch before a PR | REVIEW | **bc-dev** / **bc-pr** | [`bc-review-self`](skills/bc-review-self/SKILL.md) |
 | Compose the PR description + checklist | SHIP | **bc-pr** | [`bc-ship-pull-request`](skills/bc-ship-pull-request/SKILL.md) |
 | Compose a release branch, deploy to TEST/PROD | SHIP | **bc-deploy** | [`bc-ship-release`](skills/bc-ship-release/SKILL.md) |
 | Write customer-facing functional docs (PROD gate) | DOCS | **bc-doc** | [`bc-docs-feature`](skills/bc-docs-feature/SKILL.md) |
+| Find outdated or missing docs (drift / coverage), publish to Wiki.js | DOCS | **bc-doc** | [`bc-docs-feature`](skills/bc-docs-feature/SKILL.md) (`references/documentation-tooling.md`) |
 | Author/maintain CI/CD (GitHub Actions, AL-Go) | CI/CD | **bc-workflow** | [`bc-cicd-pipeline`](skills/bc-cicd-pipeline/SKILL.md) |
 | Format a commit message | any | _(any)_ | [`bc-util-commit-message`](skills/bc-util-commit-message/SKILL.md) |
 | **Set up this template for a new project** | setup | **bc-init** | [`bc-init-template`](skills/bc-init-template/SKILL.md) |

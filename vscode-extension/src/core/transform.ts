@@ -1,4 +1,4 @@
-import { custRoot, ProjectConfig, TemplateValues } from './config';
+import { custRoot, formatModel, ModelSpec, ProjectConfig, TemplateValues } from './config';
 import { fromBcAlmLayout, relocationDepth, toBcAlmLayout } from './layout';
 import { isReparamTarget, componentOf, resolveDest } from './paths';
 import { escapeRegExp, normalizeText } from './util';
@@ -64,8 +64,8 @@ export function reparameterize(text: string, from: TemplateValues, to: TemplateV
     return s;
 }
 
-export function applyModel(text: string, model: string): string {
-    return text.replace(/^model:\s*.*$/gm, () => `model: "${model}"`);
+export function applyModel(text: string, model: ModelSpec): string {
+    return text.replace(/^model:\s*.*$/gm, () => `model: ${formatModel(model)}`);
 }
 
 export function trimAzureDevOpsTools(text: string): string {

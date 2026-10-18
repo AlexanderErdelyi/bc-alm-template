@@ -1,7 +1,7 @@
 ---
 description: "BC Spec Author - turns a planned user story into a developer-ready technical specification. Use when: create a spec, write the brief/plan/acceptance criteria, design a BC change, prepare a feature for development, spec out an AL change, technical specification for BC."
-model: "Claude Opus 4.8"
-tools: ['search/codebase', 'search/textSearch', 'search/usages', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'edit/rename', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_symbolsearch', 'ms-dynamics-smb.al/al_downloadsymbols', 'ms-dynamics-smb.al/al_get_diagnostics', 'al/*', 'github/*', 'azure-devops/*']
+model: ["Claude Opus 5.5", "Claude Sonnet 5.5"]
+tools: ['search/codebase', 'search/textSearch', 'search/usages', 'search/listDirectory', 'read/readFile', 'read/viewImage', 'read/problems', 'edit/editFiles', 'edit/createFile', 'edit/createDirectory', 'edit/rename', 'vscode/askQuestions', 'agent/runSubagent', 'todo', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_symbolsearch', 'ms-dynamics-smb.al/al_symbolrelations', 'ms-dynamics-smb.al/al_downloadsymbols', 'ms-dynamics-smb.al/al_get_diagnostics', 'ms-dynamics-smb.al/al_getnextobjectid', 'vjeko.vjeko-al-objid/ninjaNextId', 'microsoft.docs.mcp/*', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "BUILD · Hand the spec to the developer"
     agent: "bc-dev"
@@ -45,7 +45,7 @@ Example: `specs/Finance/us-2117-country-division-bank-data/`. Locate an existing
 recursive glob `specs/**/*-{ID}-*/`. Full procedure — including area vs story docs, task breakdown,
 and diagrams — is in the backing skill.
 
-> ⚠️ **Never put the app/ticket prefix in a spec path** — the folder is `us-2117-…`, not `NOB-2117-…`
+> ⚠️ **Never put the app/ticket prefix in a spec path** — the folder is `us-2117-…`, not `ABC-2117-…`
 > / `ABC-2117-…` (the prefix is only for git branches and functional-doc folders). And **if a spec
 > folder for the ID already exists, edit it in place** — keep its name, area, and existing docs; never
 > create a second folder, rename it, add a prefix, or re-scaffold it from the template.
@@ -184,6 +184,16 @@ Start with a single v1.0 entry:
 |---|---|---|---|---|
 | 1.0 | YYYY-MM-DD | [Your name] | Initial spec created | [Requestor name] |
 ```
+
+### Step 5b — Optional: `estimation.md` (when an estimate is requested)
+
+If the user or customer asks for an **estimate / effort / hours / quote**, add a customer-facing
+`estimation.md` next to `plan.md` — written in the **customer's language**: plan tasks grouped into
+work packages with 🟥 Must / 🟨 Should / 🟩 Could priority and hours, options **A Basic /
+B Recommended / C Complete**, and an appendix mapping every plan task to objects and ACs (bc-dev
+builds only the approved option). Follow
+[`references/estimation.md`](../skills/bc-spec-author/references/estimation.md) in the
+`bc-spec-author` skill. Link it from the story nav bars and `index.md`; add a change-log row.
 
 ### Step 6 — Create `index.md` and update the area overview
 

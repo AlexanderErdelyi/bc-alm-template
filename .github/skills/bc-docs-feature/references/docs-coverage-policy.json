@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "_comment": "Objects that intentionally need no functional documentation. Without this list every coverage report would show the same test, install and upgrade objects forever and become noise. Rules match on type, name pattern or file path pattern (any combination); a rule needs at least one of them plus a reason.",
+  "exclude": [
+    {
+      "namePattern": "*Test*",
+      "reason": "Test objects and test libraries"
+    },
+    {
+      "type": "permissionset",
+      "reason": "Permission sets are derived from the objects, not documented functionally"
+    },
+    {
+      "namePattern": "*Install*",
+      "reason": "Install codeunits are technical one-time runs"
+    },
+    {
+      "namePattern": "*Upgrade*",
+      "reason": "Upgrade codeunits are technical one-time runs"
+    },
+    {
+      "type": "enum",
+      "reason": "Enums are documented in the context of the object that uses them, not individually"
+    },
+    {
+      "type": "enumextension",
+      "reason": "Like enums: documented in the context of the base object"
+    }
+  ]
+}

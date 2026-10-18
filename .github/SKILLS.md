@@ -11,10 +11,11 @@ its `Use when:` triggers.
 | [`bc-breakdown-feature`](skills/bc-breakdown-feature/SKILL.md) | PLAN | Break a Feature/Epic into child stories + estimate carriers (ADO Task or GitHub sub-issue/Project field) |
 | [`bc-spec-author`](skills/bc-spec-author/SKILL.md) | SPEC | Author the 4-document spec folder |
 | [`bc-build-feature`](skills/bc-build-feature/SKILL.md) | BUILD | Implement AL objects to spec + standards + tests |
+| [`bc-interactive-test`](skills/bc-interactive-test/SKILL.md) | BUILD | Browser test of a published feature against a `launch.json` environment |
 | [`bc-review-self`](skills/bc-review-self/SKILL.md) | REVIEW | Pre-PR self-review against the AL quality gate |
 | [`bc-ship-pull-request`](skills/bc-ship-pull-request/SKILL.md) | SHIP | Compose the PR description + checklist + ADO link |
 | [`bc-ship-release`](skills/bc-ship-release/SKILL.md) | SHIP | Compose a release branch, deploy to TEST/PROD |
-| [`bc-docs-feature`](skills/bc-docs-feature/SKILL.md) | DOCS | Customer-facing functional docs + changelog |
+| [`bc-docs-feature`](skills/bc-docs-feature/SKILL.md) | DOCS | Customer-facing functional docs + changelog; module doc sets, drift/coverage checks, optional Wiki.js publishing |
 | [`bc-cicd-pipeline`](skills/bc-cicd-pipeline/SKILL.md) | CI/CD | Author/maintain GitHub Actions & AL-Go for GitHub pipelines |
 | [`bc-util-commit-message`](skills/bc-util-commit-message/SKILL.md) | util | Conventional commits with ADO work-item linking |
 | [`bc-init-template`](skills/bc-init-template/SKILL.md) | setup | One-time guided setup — replace prefix/range/org across the repo |

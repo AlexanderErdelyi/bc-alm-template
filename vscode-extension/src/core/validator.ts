@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ProjectConfig } from './config';
+import { ProjectConfig, formatModel, modelKey } from './config';
 import { Frontmatter, parseFrontmatter } from './frontmatter';
 import { parseToolsLine } from './transform';
 
@@ -9,6 +9,7 @@ export type Severity = 'error' | 'warning' | 'info';
 export type QuickFix =
     | { kind: 'renameKey'; from: string; to: string; title: string }
     | { kind: 'setScalar'; key: string; value: string; title: string }
+    | { kind: 'setRaw'; key: string; raw: string; title: string }
     | { kind: 'removeKeyLine'; key: string; title: string }
     | { kind: 'renameFile'; to: string; title: string };
 
@@ -121,9 +122,11 @@ export function validateFile(file: string, text: string, ctx: ValidationContext)
             if (project) {
                 const model = fm.data['model'];
                 const pinned = project.models[name];
-                if (pinned && typeof model === 'string' && model !== pinned && !project.sync.updateModels) {
-                    add(keyLine(fm, 'model'), 'info', 'agent-model-pinned', `template.config.json pins this agent to "${pinned}"; the next template sync re-applies it. Change it in template.config.json → models instead.`,
-                        undefined, { kind: 'setScalar', key: 'model', value: pinned, title: `Use pinned model "${pinned}"` });
+                const current = modelKey(model);
+                if (pinned && current && current !== modelKey(pinned) && !project.sync.updateModels) {
+                    const shown = formatModel(pinned);
+                    add(keyLine(fm, 'model'), 'info', 'agent-model-pinned', `template.config.json pins this agent to ${shown}; the next template sync re-applies it. Change it in template.config.json → models instead.`,
+                        undefined, { kind: 'setRaw', key: 'model', raw: shown, title: `Use pinned model ${shown}` });
                 }
                 if (project.values.workItemSystem === 'GitHub' && (parseToolsLine(text) ?? []).includes('azure-devops/*')) {
                     add(keyLine(fm, 'tools'), 'info', 'agent-ado-tools', 'This project tracks work in GitHub Issues; the `azure-devops/*` tool group is unused here (the template sync trims it).');
@@ -238,6 +241,11 @@ export function applyFix(text: string, fix: QuickFix): string {
             const k = fm.keys.find(x => x.key === fix.key);
             const q = `"${fix.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
             if (k) { lines[k.line] = `${fix.key}: ${q}`; } else if (fm.present) { lines.splice(1, 0, `${fix.key}: ${q}`); }
+            return lines.join(eol);
+        }
+        case 'setRaw': {
+            const k = fm.keys.find(x => x.key === fix.key);
+            if (k) { lines[k.line] = `${fix.key}: ${fix.raw}`; } else if (fm.present) { lines.splice(1, 0, `${fix.key}: ${fix.raw}`); }
             return lines.join(eol);
         }
         default:

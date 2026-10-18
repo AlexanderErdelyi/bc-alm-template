@@ -22,6 +22,9 @@
 - [Plan](plan.md) — technical design, affected AL objects, task breakdown
 - [Acceptance Criteria](acceptance-criteria.md) — testable Given/When/Then
 - [Change Log](change-log.md) — spec version history
+<!-- - [Estimation](estimation.md) — customer-facing work packages, hours and options (optional; add
+     when an estimate is requested — see bc-spec-author references/estimation.md, and add
+     "· [Estimation](estimation.md)" to every story nav bar) -->
 
 <!--
 BROKEN DOWN INTO TASKS? If this story is large or multi-part, split the technical detail into

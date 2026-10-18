@@ -80,7 +80,17 @@ When you update the ADO work item, mind the field formats (see the repo Copilot 
   *User Story* (its title bar says so), so a second "User Story" H1/H2 is redundant noise — lead
   straight with the three-line story statement.
 - Put the **role / goal / reason on three separate lines** with the labels bold, then follow with
-  the background, acceptance criteria, and options sections.
+  the business value line, background, open questions, out-of-scope, and options sections.
+  **Do not put the acceptance criteria in the Description.**
+- **Acceptance criteria go into their own field.** On Azure DevOps *User Story* items (Agile/Scrum
+  processes) the **Acceptance Criteria** field (`Microsoft.VSTS.Common.AcceptanceCriteria`) is a
+  separate **HTML** field — write the Given/When/Then list there so testers and boards see it where
+  they expect it. Each AC is a bulleted item with a short bold **title** and the three clauses as
+  indented sub-bullets. If the process template has no such field (e.g. Basic *Issue*), fall back
+  to an `<h3>Acceptance Criteria</h3>` section at the end of the Description.
+- **Escape non-ASCII characters as HTML entities** in HTML fields (`&ouml;`, `&auml;`, `&uuml;`,
+  `&szlig;`, `&eacute;`, `&mdash;`, `&nbsp;`…) and always escape `<`, `>` and `&`. Raw umlauts and
+  typographic characters are mangled by some MCP/REST paths and then show up as `Ã¶` in the item.
 - **Discussion/comments** use **Markdown**, not HTML — only the Description (and similar large
   fields) are HTML.
 - **Screenshots/attachments can't be uploaded via the MCP tools** — they only *download* existing
@@ -89,15 +99,46 @@ When you update the ADO work item, mind the field formats (see the repo Copilot 
   upload it via the REST `POST _apis/wit/attachments` endpoint with `curl` and reference the URL in
   the Description HTML). Don't silently ignore the request.
 
-Example Description HTML:
+Example **Description** HTML (story and context only — no ACs):
 
 ```html
-<p><strong>Als</strong> &lt;Rolle&gt;<br>
-<strong>möchte ich</strong> &lt;Fähigkeit&gt;,<br>
-<strong>damit</strong> &lt;Nutzen&gt;.</p>
-<h3>Hintergrund &amp; Ist-Zustand</h3>
-<p>…</p>
+<p><strong>As a</strong> &lt;role&gt;<br>
+<strong>I want</strong> &lt;capability&gt;,<br>
+<strong>so that</strong> &lt;business outcome&gt;.</p>
+<p><strong>Business value:</strong> &hellip;<br>
+<strong>Priority:</strong> P2 &nbsp;&nbsp;<strong>Target:</strong> TBD</p>
+<h3>Background &amp; current state</h3>
+<p>&hellip;</p>
+<h3>Open questions</h3><p>None.</p>
+<h3>Out of scope</h3><ul><li>&hellip;</li></ul>
 ```
+
+Example **Acceptance Criteria** field HTML (`Microsoft.VSTS.Common.AcceptanceCriteria`):
+
+```html
+<ul>
+  <li><strong>AC-01 &mdash; &lt;short title&gt;</strong>
+    <ul>
+      <li><strong>Given</strong> &hellip;</li>
+      <li><strong>When</strong> &hellip;</li>
+      <li><strong>Then</strong> &hellip;</li>
+    </ul>
+  </li>
+  <li><strong>AC-02 &mdash; &lt;short title&gt;</strong>
+    <ul>
+      <li><strong>Given</strong> &hellip;</li>
+      <li><strong>When</strong> &hellip;</li>
+      <li><strong>Then</strong> &hellip;</li>
+    </ul>
+  </li>
+</ul>
+```
+
+Write the labels in the customer's language when the story is localized (e.g. German
+*Als / m&ouml;chte ich / damit* and *Gegeben / Wenn / Dann*), keeping the HTML entity escaping.
+
+**GitHub Issues:** the issue body is Markdown — keep the story, then an `## Acceptance criteria`
+section with the same `AC-0x — title` bullets and Given/When/Then sub-bullets.
 
 ## Spec summary back-write (after bc-spec)
 

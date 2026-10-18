@@ -1,7 +1,7 @@
 ---
 description: "BC Pull Request - prepares and reviews BC pull requests. Use when: open a PR, write a pull request description, run the AL quality checklist, link the ADO work item, get ready for review, update a PR description."
-model: "Claude Opus 4.8"
-tools: ['search/codebase', 'search/textSearch', 'search/usages', 'edit/editFiles', 'execute/runInTerminal', 'execute/runTests', 'read/problems', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_get_diagnostics', 'nabsolutions.nab-al-tools/getTextsToTranslate', 'al/*', 'github/*', 'azure-devops/*']
+model: ["Claude Opus 5.5", "Claude Sonnet 5.5"]
+tools: ['search/codebase', 'search/textSearch', 'search/usages', 'read/readFile', 'read/viewImage', 'read/problems', 'edit/editFiles', 'edit/createFile', 'execute/runInTerminal', 'execute/runTests', 'agent/runSubagent', 'todo', 'web/githubRepo', 'web/fetch', 'ms-dynamics-smb.al/al_build', 'ms-dynamics-smb.al/al_get_diagnostics', 'ms-dynamics-smb.al/al_symbolsearch', 'nabsolutions.nab-al-tools/getTextsToTranslate', 'microsoft.docs.mcp/*', 'al/*', 'github/*', 'azure-devops/*']
 handoffs:
   - label: "SHIP · Compose the release after merge"
     agent: "bc-deploy"
@@ -55,15 +55,23 @@ List all commits on the feature branch since branching from `main`. Group them b
 
 ### Step 3 — Generate PR description
 
-Use the `.github/PULL_REQUEST_TEMPLATE.md` structure. Fill it in based on spec content and commits:
+Use the `.github/PULL_REQUEST_TEMPLATE.md` structure. Fill it in based on spec content and commits.
 
-**Title format:** `[ABC-{ID}] Short description matching spec brief`
+**Pick the description tier from the target branch** (see *PR description tiers* in the skill):
+**A — minimal** for an integration/DEV branch, **B — functional** (customer language, tester
+scenarios, no object tables) for a UAT/TEST branch, **C — technical** (everything below) for the
+production branch. A feature PR into `main` under the default branching strategy is Tier C.
+
+**Title format:** Conventional Commit, same as commits — `<type>: #{ID} - Short description matching spec brief`
+(e.g. `feat: #2117 - Country-division footer data in a configurable table`). Squash merges make the
+title the commit subject.
 
 **ADO link:** Always include a reference to the ADO work item. Format:
 ```
 AB#123
 ```
-(GitHub automatically links this to Azure DevOps when configured.)
+(GitHub automatically links this to Azure DevOps when configured; in Azure Repos also add the item
+in the PR's **Work items** field.) Use `Closes AB#123` only on the PR into the production branch.
 
 **Type of change:** Determine from spec:
 - New feature from `brief.md`? → Feature
