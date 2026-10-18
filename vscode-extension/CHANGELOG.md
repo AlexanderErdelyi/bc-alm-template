@@ -6,6 +6,15 @@ All notable changes to the **BC ALM** extension are listed here. The format foll
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-10-18
+
+### Added
+
+- Agent models can be a **prioritized fallback list** (`model: ["Claude Sonnet 5.5", "Claude Sonnet 5"]`).
+  The extension reads list values from `template.config.json` `models`, writes them into each
+  agent's `model:` line (a one-item list stays a plain string), and the template validator accepts
+  both forms.
+
 ### Security
 
 - Release downloads are now signed. Each GitHub release includes a Sigstore build-provenance
