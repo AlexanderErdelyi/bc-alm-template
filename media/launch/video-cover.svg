@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- LinkedIn video cover / thumbnail (16:9). Export: npx sharp-cli -i ./media/launch/video-cover.svg -o ./media/launch/video-cover.png -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B3D5C"/>
+      <stop offset="1" stop-color="#062233"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E7C86"/>
+      <stop offset="1" stop-color="#0B3D5C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.8" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0E7C86" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#0E7C86" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <rect width="1920" height="10" fill="#7FE3D9"/>
+
+  <!-- brand -->
+  <g transform="translate(120 110)">
+    <rect width="96" height="96" rx="22" fill="url(#tile)" stroke="#7FE3D9" stroke-opacity="0.4" stroke-width="2"/>
+    <g transform="translate(48 48) scale(3.2) translate(-12 -12)" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#FFFFFF" fill-opacity="0.18"/>
+      <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+      <path d="M17.5 14v7M14 17.5h7" stroke="#7FE3D9"/>
+    </g>
+  </g>
+
+  <g font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <text x="240" y="172" font-size="40" font-weight="700" fill="#FFFFFF">BC ALM</text>
+
+    <text x="120" y="420" font-size="124" font-weight="700" fill="#FFFFFF">I stopped</text>
+    <text x="120" y="560" font-size="124" font-weight="700" fill="#FFFFFF">copy-pasting</text>
+    <text x="120" y="700" font-size="124" font-weight="700" fill="#7FE3D9">Copilot agents.</text>
+    <text x="124" y="800" font-size="52" fill="#D6E7EE">Here's what I built instead.</text>
+
+    <!-- stacked agent files behind the play button -->
+    <g font-family="Cascadia Code, Consolas, monospace" font-size="30">
+      <g transform="translate(1250 250) rotate(-6)">
+        <rect width="520" height="96" rx="16" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.15"/>
+        <text x="32" y="60" fill="#8FB3C4">bc-spec.agent.md</text>
+      </g>
+      <g transform="translate(1320 780) rotate(4)">
+        <rect width="520" height="96" rx="16" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.15"/>
+        <text x="32" y="60" fill="#8FB3C4">bc-build-feature/SKILL.md</text>
+      </g>
+      <g transform="translate(1150 945) rotate(-3)">
+        <rect width="420" height="96" rx="16" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.15"/>
+        <text x="32" y="60" fill="#8FB3C4">bc-dev.agent.md</text>
+      </g>
+    </g>
+
+    <!-- play button -->
+    <circle cx="1500" cy="540" r="190" fill="#7FE3D9" fill-opacity="0.15"/>
+    <circle cx="1500" cy="540" r="150" fill="#7FE3D9"/>
+    <path d="M1455 465 L1585 540 L1455 615 Z" fill="#0B3D5C"/>
+
+    <text x="120" y="980" font-size="36" fill="#8FB3C4">VS Code extension · Business Central · GitHub Copilot</text>
+  </g>
+</svg>

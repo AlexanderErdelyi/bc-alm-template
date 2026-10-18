@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
+  <!-- LinkedIn feed image (4:5): the spec-driven flow. Export: npx sharp-cli -i ./media/launch/spec-driven-flow.svg -o ./media/launch/spec-driven-flow.png -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B3D5C"/>
+      <stop offset="1" stop-color="#062233"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1080" height="1350" fill="url(#bg)"/>
+  <rect width="1080" height="1350" fill="url(#grid)"/>
+  <rect width="1080" height="8" fill="#7FE3D9"/>
+
+  <g font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <text x="80" y="92" font-size="22" font-weight="600" letter-spacing="3" fill="#7FE3D9">SPEC-DRIVEN BUSINESS CENTRAL DEVELOPMENT</text>
+    <text x="78" y="172" font-size="66" font-weight="700" fill="#FFFFFF">One agent. One skill.</text>
+    <text x="78" y="248" font-size="66" font-weight="700" fill="#7FE3D9">Every step.</text>
+
+    <!-- orchestrator -->
+    <rect x="80" y="290" width="920" height="64" rx="32" fill="#7FE3D9" fill-opacity="0.12" stroke="#7FE3D9" stroke-opacity="0.6" stroke-width="2"/>
+    <text x="112" y="331" font-size="24" fill="#FFFFFF"><tspan font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-orchestrator</tspan>  knows where your ticket is and routes it</text>
+
+    <!-- connector line behind the numbers -->
+    <line x1="140" y1="430" x2="140" y2="1162" stroke="#7FE3D9" stroke-opacity="0.35" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round"/>
+
+    <g id="steps">
+      <g transform="translate(0 380)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">1</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">Triage</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Intake, labels, duplicates, priority</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-pm</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-triage-backlog</text>
+      </g>
+      <g transform="translate(0 502)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">2</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">Story</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">User story + testable acceptance criteria</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-plan</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-plan-user-story</text>
+      </g>
+      <g transform="translate(0 624)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">3</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">Spec</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Brief, plan, acceptance criteria</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-spec</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-spec-author</text>
+      </g>
+      <g transform="translate(0 746)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">4</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">AL</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Implement to spec, tests, version bump</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-dev</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-build-feature</text>
+      </g>
+      <g transform="translate(0 868)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">5</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">PR</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Self-review, quality gate, PR description</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-pr</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-ship-pull-request</text>
+      </g>
+      <g transform="translate(0 990)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">6</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">Release</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Compose the release, deploy TEST → PROD</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-deploy</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-ship-release</text>
+      </g>
+      <g transform="translate(0 1112)">
+        <rect x="80" width="920" height="100" rx="20" fill="#FFFFFF" fill-opacity="0.06"/>
+        <circle cx="140" cy="50" r="30" fill="#7FE3D9"/><text x="140" y="61" font-size="30" font-weight="700" text-anchor="middle" fill="#0B3D5C">7</text>
+        <text x="195" y="45" font-size="34" font-weight="700" fill="#FFFFFF">Docs</text>
+        <text x="195" y="80" font-size="22" fill="#B7CED9">Customer docs + changelog</text>
+        <text x="968" y="45" font-size="24" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#7FE3D9">@bc-doc</text>
+        <text x="968" y="80" font-size="20" text-anchor="end" font-family="Cascadia Code, Consolas, monospace" fill="#8FB3C4">bc-docs-feature</text>
+      </g>
+    </g>
+
+    <text x="80" y="1290" font-size="24" fill="#D6E7EE"><tspan font-weight="700" fill="#FFFFFF">BC ALM</tspan>  ·  enable, disable or swap any step, per repo</text>
+  </g>
+</svg>
